@@ -1,0 +1,37 @@
+{
+  "name": "@opero/database",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Prisma schema, migrations, and client factory for Opero.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "prisma generate && tsc -p tsconfig.json --noEmit",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate deploy",
+    "db:validate": "prisma validate",
+    "lint": "eslint .",
+    "typecheck": "prisma generate && tsc -p tsconfig.json --noEmit",
+    "pretest": "pnpm --filter @opero/shared build",
+    "test": "prisma generate && prisma validate && vitest run"
+  },
+  "dependencies": {
+    "@opero/shared": "workspace:*",
+    "@prisma/adapter-pg": "7.10.1",
+    "@prisma/client": "7.10.1",
+    "dotenv": "18.0.10",
+    "pg": "8.23.1"
+  },
+  "devDependencies": {
+    "@opero/eslint-config": "workspace:*",
+    "@opero/typescript-config": "workspace:*",
+    "@types/node": "24.19.2",
+    "@types/pg": "8.23.1",
+    "eslint": "10.14.0",
+    "prisma": "7.10.1",
+    "typescript": "6.0.3",
+    "vitest": "5.1.0"
+  }
+}

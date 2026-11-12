@@ -1,0 +1,12 @@
+{
+  "name": "@opero/typescript-config",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Shared TypeScript configuration for the Opero monorepo.",
+  "exports": {
+    "./base.json": "./base.json",
+    "./node.json": "./node.json",
+    "./nestjs.json": "./nestjs.json",
+    "./nextjs.json": "./nextjs.json"
+  }
+}

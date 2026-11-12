@@ -1,0 +1,27 @@
+{
+  "name": "@opero/eslint-config",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Shared ESLint flat config for Opero Node and NestJS packages.",
+  "type": "module",
+  "exports": {
+    "./base": "./base.js",
+    "./nest": "./nest.js"
+  },
+  "scripts": {
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@eslint/js": "10.0.1",
+    "globals": "17.14.0",
+    "typescript-eslint": "8.72.2"
+  },
+  "devDependencies": {
+    "eslint": "10.14.0",
+    "typescript": "6.0.3"
+  },
+  "peerDependencies": {
+    "eslint": ">=9",
+    "typescript": ">=5.4 <6.1"
+  }
+}
