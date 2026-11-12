@@ -2,6 +2,7 @@
 // Organization relationships describe ownership. They do not authorize access.
 // Every future service that reads or writes tenant data must scope queries by
 // organizationId, and that behavior must be tested before a business API is exposed.
+// Postgres RLS is not enabled in Phase 3; authorization is enforced in the API.
 
 generator client {
   provider     = "prisma-client"
@@ -17,7 +18,7 @@ datasource db {
 enum MembershipRole {
   OWNER
   ADMIN
-  MEMBER
+  ANALYST
   VIEWER
 }
 
@@ -29,20 +30,27 @@ model Organization {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   memberships Membership[]
+  invitations OrganizationInvitation[]
   auditEvents AuditEvent[]
 
   @@map("organizations")
 }
 
 model User {
-  id        String   @id @default(uuid()) @db.Uuid
-  email     String   @unique
-  name      String
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id              String    @id @default(uuid()) @db.Uuid
+  email           String    @unique
+  name            String
+  passwordHash    String    @map("password_hash")
+  emailVerifiedAt DateTime? @map("email_verified_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
 
-  memberships Membership[]
-  auditEvents AuditEvent[]
+  memberships              Membership[]
+  sessions                 Session[]
+  emailVerificationTokens  EmailVerificationToken[]
+  passwordResetTokens      PasswordResetToken[]
+  invitationsSent          OrganizationInvitation[] @relation("InvitationInviter")
+  auditEvents              AuditEvent[]
 
   @@map("users")
 }
@@ -64,24 +72,94 @@ model Membership {
   @@map("memberships")
 }
 
-/// Append-only record. Deleting an organization is restricted while events exist
-/// so history is not removed implicitly. Actor deletion keeps the event and
-/// clears actorUserId. This is referential integrity, not an authorization policy.
+model Session {
+  id             String    @id @default(uuid()) @db.Uuid
+  userId         String    @map("user_id") @db.Uuid
+  tokenHash      String    @unique @map("token_hash")
+  expiresAt      DateTime  @map("expires_at")
+  revokedAt      DateTime? @map("revoked_at")
+  rotatedFromId  String?   @map("rotated_from_id") @db.Uuid
+  ip             String?
+  userAgent      String?   @map("user_agent")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+model EmailVerificationToken {
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  tokenHash  String    @unique @map("token_hash")
+  expiresAt  DateTime  @map("expires_at")
+  consumedAt DateTime? @map("consumed_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("email_verification_tokens")
+}
+
+model PasswordResetToken {
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  tokenHash  String    @unique @map("token_hash")
+  expiresAt  DateTime  @map("expires_at")
+  consumedAt DateTime? @map("consumed_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("password_reset_tokens")
+}
+
+model OrganizationInvitation {
+  id              String         @id @default(uuid()) @db.Uuid
+  organizationId  String         @map("organization_id") @db.Uuid
+  email           String
+  role            MembershipRole
+  tokenHash       String         @unique @map("token_hash")
+  invitedByUserId String         @map("invited_by_user_id") @db.Uuid
+  expiresAt       DateTime       @map("expires_at")
+  consumedAt      DateTime?      @map("consumed_at")
+  revokedAt       DateTime?      @map("revoked_at")
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  invitedBy    User         @relation("InvitationInviter", fields: [invitedByUserId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, email])
+  @@index([organizationId])
+  @@map("organization_invitations")
+}
+
+/// Append-only record. Organization context is optional for auth events.
+/// Actor deletion keeps the event and clears actorUserId.
+/// This is referential integrity, not an authorization policy.
 model AuditEvent {
   id             String   @id @default(uuid()) @db.Uuid
-  organizationId String   @map("organization_id") @db.Uuid
+  organizationId String?  @map("organization_id") @db.Uuid
   actorUserId    String?  @map("actor_user_id") @db.Uuid
   action         String
   entityType     String   @map("entity_type")
-  entityId       String?  @map("entity_id") @db.Uuid
+  entityId       String?  @map("entity_id")
+  requestId      String?  @map("request_id")
   metadata       Json?
   createdAt      DateTime @default(now()) @map("created_at")
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  actor        User?        @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  actor        User?         @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
 
   @@index([organizationId, createdAt])
   @@index([actorUserId])
   @@index([organizationId, entityType, entityId])
+  @@index([requestId])
   @@map("audit_events")
 }

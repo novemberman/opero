@@ -6,7 +6,7 @@ Opero is an AI-assisted Business Operating System.
 
 A business diagnostic platform that transforms financial reports into actionable insights, business health scores, and governed improvement plans.
 
-This repository is the platform foundation: a Next.js web app, a NestJS API, a NestJS worker, shared contracts, and PostgreSQL and Redis for local development. Opero X-Ray diagnostics, authentication, payments, and production deployment are later phases.
+This repository is the Opero platform: a Next.js web app, a NestJS API with first-party authentication and tenant-scoped organization APIs, a NestJS worker, shared contracts, and PostgreSQL and Redis for local development. Opero X-Ray diagnostics, payments, and production deployment are later phases.
 
 ## Stack
 
@@ -47,10 +47,14 @@ pnpm dev
 Open:
 
 - Web: http://127.0.0.1:3000
+- Register / login: http://127.0.0.1:3000/register · http://127.0.0.1:3000/login
 - Web health: http://127.0.0.1:3000/health
 - API health: http://127.0.0.1:3001/api/v1/health
+- API docs: http://127.0.0.1:3001/api/v1/docs
 
-The worker has no HTTP port. It connects to Redis and registers a local `heartbeat` job on the `example` queue. That job only echoes a timestamp.
+Development email is written under `.data/mail/` (gitignored). Verification and reset links are not returned in API responses. Swap `EmailPort` for Resend/SES (or similar) in production.
+
+The worker has no HTTP port. It connects to Redis and registers a local `heartbeat` job on the `example` queue. That job only echoes a timestamp. Tenant-scoped jobs must carry a validated `organizationId` (see `apps/worker/src/tenant`).
 
 ## Scripts
 
@@ -104,11 +108,11 @@ ssh -N \
 
 Then use `127.0.0.1` and the same ports on the laptop.
 
-## Tenant isolation
+## Tenant isolation and roles
 
-`packages/database` stores organization, user, membership, and audit data. Membership roles are `OWNER`, `ADMIN`, `MEMBER`, and `VIEWER`.
+`packages/database` stores organization, user, membership, session, invitation, and audit data. Membership roles are `OWNER`, `ADMIN`, `ANALYST`, and `VIEWER`.
 
-The schema does not enforce tenant isolation. Relationships make an organization scope possible. They do not stop a query from reading another organization's rows. Service code must filter by `organizationId`, and those rules must be tested, before any business API is exposed. There is no authentication in this phase, and users have no credential fields yet.
+The schema does **not** enable Postgres RLS. The NestJS API derives identity from the server session cookie, verifies membership for `:organizationId`, and enforces an explicit permission matrix. Client-supplied organization ids are never treated as proof of access. Future X-Ray resources must include `organizationId` and reuse the same guards.
 
 ## Authoring a migration
 
@@ -136,4 +140,4 @@ packages/typescript-config
 
 ## Not in this phase
 
-Authentication, financial-document analysis, AI calls, payments, Railway deployment, and public database endpoints are intentionally absent.
+Financial-document analysis, AI calls, payments, Railway deployment, and public mutation of audit records are intentionally absent.

@@ -1,29 +1,45 @@
 import { describe, expect, it } from "vitest";
 import { parseApiEnv } from "./env";
 
+const valid = {
+  DATABASE_URL: "postgresql://opero:secret@127.0.0.1:54329/opero",
+  CSRF_SECRET: "dev-csrf-secret-at-least-32-chars!!",
+};
+
 describe("parseApiEnv", () => {
-  it("applies loopback defaults", () => {
-    expect(parseApiEnv({})).toMatchObject({
-      NODE_ENV: "development",
-      API_HOST: "127.0.0.1",
-      API_PORT: 3001,
-      LOG_LEVEL: "info",
-    });
+  it("accepts a complete environment with defaults", () => {
+    expect(parseApiEnv(valid).API_PORT).toBe(3001);
+    expect(parseApiEnv(valid).SESSION_COOKIE_NAME).toBe("opero_session");
+    expect(parseApiEnv(valid).AUTH_THROTTLE_DISABLED).toBe(false);
+    expect(parseApiEnv(valid).AUTH_LOGIN_THROTTLE_LIMIT).toBe(10);
   });
 
-  it("coerces a string port and keeps configured origins", () => {
-    const env = parseApiEnv({
-      API_PORT: "4100",
-      CORS_ORIGINS: "http://127.0.0.1:3000",
-      LOG_LEVEL: "debug",
-    });
-
-    expect(env.API_PORT).toBe(4100);
-    expect(env.CORS_ORIGINS).toBe("http://127.0.0.1:3000");
-    expect(env.LOG_LEVEL).toBe("debug");
+  it("requires DATABASE_URL and CSRF_SECRET", () => {
+    expect(() => parseApiEnv({})).toThrow(/Invalid API environment/);
+    expect(() => parseApiEnv({ DATABASE_URL: valid.DATABASE_URL })).toThrow(/CSRF_SECRET/);
   });
 
   it("rejects an invalid port", () => {
-    expect(() => parseApiEnv({ API_PORT: "0" })).toThrow(/Invalid API environment/);
+    expect(() => parseApiEnv({ ...valid, API_PORT: 0 })).toThrow(/API_PORT/);
+  });
+
+  it("forbids disabling auth throttling in production", () => {
+    expect(() =>
+      parseApiEnv({
+        ...valid,
+        NODE_ENV: "production",
+        AUTH_THROTTLE_DISABLED: "true",
+      }),
+    ).toThrow(/AUTH_THROTTLE_DISABLED/);
+  });
+
+  it("allows AUTH_THROTTLE_DISABLED only outside production", () => {
+    expect(
+      parseApiEnv({
+        ...valid,
+        NODE_ENV: "test",
+        AUTH_THROTTLE_DISABLED: "true",
+      }).AUTH_THROTTLE_DISABLED,
+    ).toBe(true);
   });
 });

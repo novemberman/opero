@@ -49,16 +49,22 @@ export default function HomePage() {
         <div className="mt-8 flex flex-wrap gap-3">
           <Link
             className="inline-flex min-h-11 items-center rounded-full bg-pine px-5 text-paper no-underline hover:bg-pine-dark"
+            href="/register"
+          >
+            Create account
+          </Link>
+          <Link
+            className="inline-flex min-h-11 items-center rounded-full border border-line px-5 text-ink no-underline hover:border-ink"
+            href="/login"
+          >
+            Sign in
+          </Link>
+          <Link
+            className="inline-flex min-h-11 items-center rounded-full border border-line px-5 text-ink no-underline hover:border-ink"
             href="/health"
           >
-            Web health endpoint
+            Health
           </Link>
-          <a
-            className="inline-flex min-h-11 items-center rounded-full border border-line px-5 text-ink no-underline hover:border-ink"
-            href="https://github.com/novemberman/opero"
-          >
-            Repository
-          </a>
         </div>
         <section className="mt-16" aria-labelledby="surfaces-heading">
           <h2 id="surfaces-heading" className="text-2xl text-ink sm:text-3xl">
@@ -75,12 +81,11 @@ export default function HomePage() {
         </section>
         <section className="mt-12 rounded-2xl bg-pine px-6 py-8 text-paper sm:px-8" aria-labelledby="scope-heading">
           <h2 id="scope-heading" className="text-2xl">
-            Tenant data is modeled, not yet enforced in services
+            Identity and tenant isolation are active in the API
           </h2>
           <p className="mt-3 max-w-3xl leading-relaxed text-paper/90">
-            Organizations, users, memberships, and audit events live in PostgreSQL. Isolation
-            between organizations has to be implemented and tested in the service layer before any
-            business API is exposed. This phase has no authentication and no document analysis.
+            Registration, sessions, organization membership, and permission checks run on the
+            NestJS API. Financial document analysis remains a later phase.
           </p>
         </section>
       </main>

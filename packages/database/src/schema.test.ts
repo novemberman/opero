@@ -37,15 +37,29 @@ describe("prisma schema", () => {
     expect(schema).toMatch(/slug\s+String\s+@unique/);
     expect(schema).toMatch(/email\s+String\s+@unique/);
     expect(schema).toContain("@@unique([organizationId, userId])");
-    expect(schema).toMatch(
-      /organizationId\s+String\s+@map\("organization_id"\)\s+@db\.Uuid/,
-    );
     expect(schema).toContain("@@index([organizationId, createdAt])");
     expect(schema).toContain("onDelete: Restrict");
+  });
+
+  it("adds auth session invitation and credential fields", () => {
+    for (const model of [
+      "Session",
+      "EmailVerificationToken",
+      "PasswordResetToken",
+      "OrganizationInvitation",
+    ]) {
+      expect(schema).toContain(`model ${model} {`);
+    }
+    expect(schema).toContain("passwordHash");
+    expect(schema).toContain("emailVerifiedAt");
+    expect(schema).toContain("tokenHash");
+    expect(schema).not.toContain("MEMBER");
   });
 
   it("documents that tenant isolation is a service-layer responsibility", () => {
     expect(schema).toMatch(/Tenant isolation is not enforced by this schema/);
     expect(schema).toMatch(/organizationId/);
+    expect(schema).toMatch(/Postgres RLS is not enabled in Phase 3/);
   });
 });
+

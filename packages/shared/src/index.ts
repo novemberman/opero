@@ -1,15 +1,21 @@
 import { z } from "zod";
 
-/**
- * Membership roles stored on Membership.role.
- * Keep this list aligned with the MembershipRole enum in packages/database.
- * These names are a shared contract, not an authorization implementation.
- */
-export const membershipRoles = ["OWNER", "ADMIN", "MEMBER", "VIEWER"] as const;
+export {
+  assignableMembershipRoleSchema,
+  assignableMembershipRoles,
+  membershipRoleSchema,
+  membershipRoles,
+  type AssignableMembershipRole,
+  type MembershipRole,
+} from "./roles";
 
-export const membershipRoleSchema = z.enum(membershipRoles);
-
-export type MembershipRole = z.infer<typeof membershipRoleSchema>;
+export {
+  permissions,
+  roleHasEveryPermission,
+  roleHasPermission,
+  rolePermissions,
+  type Permission,
+} from "./permissions";
 
 export const healthServiceSchema = z.enum(["web", "api", "worker"]);
 
@@ -35,3 +41,82 @@ export function createHealthResponse(
     timestamp: now.toISOString(),
   });
 }
+
+export const registerBodySchema = z
+  .object({
+    email: z.email().max(320),
+    name: z.string().trim().min(1).max(120),
+    password: z.string().min(12).max(200),
+  })
+  .strict();
+
+export type RegisterBody = z.infer<typeof registerBodySchema>;
+
+export const loginBodySchema = z
+  .object({
+    email: z.email().max(320),
+    password: z.string().min(1).max(200),
+  })
+  .strict();
+
+export type LoginBody = z.infer<typeof loginBodySchema>;
+
+export const verifyEmailBodySchema = z
+  .object({
+    token: z.string().min(1).max(500),
+  })
+  .strict();
+
+export const forgotPasswordBodySchema = z
+  .object({
+    email: z.email().max(320),
+  })
+  .strict();
+
+export const resetPasswordBodySchema = z
+  .object({
+    token: z.string().min(1).max(500),
+    password: z.string().min(12).max(200),
+  })
+  .strict();
+
+export const createOrganizationBodySchema = z
+  .object({
+    name: z.string().trim().min(1).max(120),
+    slug: z
+      .string()
+      .trim()
+      .min(2)
+      .max(64)
+      .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Slug must be lowercase letters, numbers, and hyphens"),
+  })
+  .strict();
+
+export type CreateOrganizationBody = z.infer<typeof createOrganizationBodySchema>;
+
+export const updateOrganizationBodySchema = z
+  .object({
+    name: z.string().trim().min(1).max(120),
+  })
+  .strict();
+
+export const inviteMemberBodySchema = z
+  .object({
+    email: z.email().max(320),
+    role: z.enum(["ADMIN", "ANALYST", "VIEWER"]),
+  })
+  .strict();
+
+export const changeMemberRoleBodySchema = z
+  .object({
+    role: z.enum(["OWNER", "ADMIN", "ANALYST", "VIEWER"]),
+  })
+  .strict();
+
+export const acceptInvitationBodySchema = z
+  .object({
+    token: z.string().min(1).max(500),
+    name: z.string().trim().min(1).max(120).optional(),
+    password: z.string().min(12).max(200).optional(),
+  })
+  .strict();
