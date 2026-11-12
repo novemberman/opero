@@ -37,6 +37,12 @@ export default function OrganizationDetailPage() {
             <p className="mt-2 text-muted">{org.slug}</p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link
+                className="inline-flex min-h-11 items-center rounded-full bg-pine px-5 text-paper no-underline"
+                href={`/organizations/${orgId}/documents`}
+              >
+                Documents
+              </Link>
+              <Link
                 className="inline-flex min-h-11 items-center rounded-full border border-line px-5 text-ink no-underline"
                 href={`/organizations/${orgId}/settings`}
               >

@@ -46,6 +46,16 @@ describe("Phase 3 security integration", () => {
   beforeAll(async () => {
     const { createPrismaClient } = await loadDatabaseModule();
     const prisma = createPrismaClient(process.env.DATABASE_URL!);
+    await prisma.documentAccessEvent.deleteMany();
+    await prisma.extractionReview.deleteMany();
+    await prisma.financialLineItem.deleteMany();
+    await prisma.evidenceReference.deleteMany();
+    await prisma.financialStatement.deleteMany();
+    await prisma.documentExtraction.deleteMany();
+    await prisma.documentProcessingJob.deleteMany();
+    await prisma.documentVersion.deleteMany();
+    await prisma.documentUpload.deleteMany();
+    await prisma.document.deleteMany();
     await prisma.auditEvent.deleteMany();
     await prisma.organizationInvitation.deleteMany();
     await prisma.membership.deleteMany();

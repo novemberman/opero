@@ -120,3 +120,53 @@ export const acceptInvitationBodySchema = z
     password: z.string().min(12).max(200).optional(),
   })
   .strict();
+
+export const documentFormatSchema = z.enum(["PDF", "XLSX", "CSV"]);
+
+export const createDocumentUploadBodySchema = z
+  .object({
+    filename: z.string().trim().min(1).max(255),
+    declaredMimeType: z.string().trim().min(1).max(200).optional(),
+    declaredFormat: documentFormatSchema.optional(),
+    expectedByteSize: z.number().int().positive().max(50_000_000).optional(),
+  })
+  .strict();
+
+export const reviewLineItemBodySchema = z
+  .object({
+    lineItemId: z.uuid(),
+    action: z.enum(["CONFIRM", "CORRECT", "REJECT"]),
+    newValue: z.string().trim().min(1).max(64).optional(),
+    newConcept: z
+      .enum([
+        "REVENUE",
+        "COST_OF_GOODS_SOLD",
+        "GROSS_PROFIT",
+        "OPERATING_EXPENSES",
+        "OPERATING_PROFIT",
+        "NET_PROFIT",
+        "CASH_AND_EQUIVALENTS",
+        "ACCOUNTS_RECEIVABLE",
+        "ACCOUNTS_PAYABLE",
+        "CURRENT_ASSETS",
+        "CURRENT_LIABILITIES",
+        "TOTAL_ASSETS",
+        "TOTAL_LIABILITIES",
+        "EQUITY",
+        "OPERATING_CASH_FLOW",
+        "UNMAPPED",
+      ])
+      .optional(),
+    reason: z.string().trim().min(1).max(500).optional(),
+  })
+  .strict();
+
+export const DOCUMENTS_QUEUE = "documents" as const;
+
+export type DocumentProcessJobPayload = {
+  organizationId: string;
+  documentId: string;
+  processingJobId: string;
+  actorUserId: string;
+  correlationId?: string;
+};

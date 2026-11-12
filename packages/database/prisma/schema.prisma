@@ -2,7 +2,8 @@
 // Organization relationships describe ownership. They do not authorize access.
 // Every future service that reads or writes tenant data must scope queries by
 // organizationId, and that behavior must be tested before a business API is exposed.
-// Postgres RLS is not enabled in Phase 3; authorization is enforced in the API.
+// Postgres RLS is not enabled; authorization is enforced in the API.
+// Raw financial documents are never stored in PostgreSQL — only object-storage keys.
 
 generator client {
   provider     = "prisma-client"
@@ -22,6 +23,118 @@ enum MembershipRole {
   VIEWER
 }
 
+enum DocumentFormat {
+  PDF
+  XLSX
+  CSV
+}
+
+enum DocumentProcessingStatus {
+  UPLOADED
+  QUARANTINED
+  SCANNING
+  SCANNED
+  EXTRACTING
+  EXTRACTED
+  REVIEW_REQUIRED
+  READY
+  REJECTED
+  FAILED
+}
+
+enum DocumentScanStatus {
+  PENDING
+  CLEAN
+  INFECTED
+  ERROR
+  UNAVAILABLE
+}
+
+enum DocumentExtractionStatus {
+  PENDING
+  RUNNING
+  SUCCEEDED
+  FAILED
+  MANUAL_REQUIRED
+}
+
+enum DocumentDeletionStatus {
+  ACTIVE
+  PENDING_DELETE
+  DELETED
+}
+
+enum FailureClass {
+  VALIDATION
+  MALWARE
+  SCANNER_UNAVAILABLE
+  PARSER
+  TIMEOUT
+  STORAGE
+  INTERNAL
+  UNSUPPORTED
+}
+
+enum StatementType {
+  INCOME_STATEMENT
+  BALANCE_SHEET
+  CASH_FLOW
+  UNKNOWN
+}
+
+enum UnitScale {
+  ACTUAL
+  THOUSANDS
+  MILLIONS
+}
+
+enum FinancialConcept {
+  REVENUE
+  COST_OF_GOODS_SOLD
+  GROSS_PROFIT
+  OPERATING_EXPENSES
+  OPERATING_PROFIT
+  NET_PROFIT
+  CASH_AND_EQUIVALENTS
+  ACCOUNTS_RECEIVABLE
+  ACCOUNTS_PAYABLE
+  CURRENT_ASSETS
+  CURRENT_LIABILITIES
+  TOTAL_ASSETS
+  TOTAL_LIABILITIES
+  EQUITY
+  OPERATING_CASH_FLOW
+  UNMAPPED
+}
+
+enum ExtractionQuality {
+  HIGH
+  MEDIUM
+  LOW
+  MANUAL
+}
+
+enum LineItemReviewStatus {
+  PENDING
+  CONFIRMED
+  CORRECTED
+  REJECTED
+}
+
+enum ReviewAction {
+  CONFIRM
+  CORRECT
+  REJECT
+}
+
+enum DocumentAccessAction {
+  VIEW
+  DOWNLOAD
+  DELETE
+  UPLOAD
+  REVIEW
+}
+
 model Organization {
   id        String   @id @default(uuid()) @db.Uuid
   name      String
@@ -29,9 +142,15 @@ model Organization {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  memberships Membership[]
-  invitations OrganizationInvitation[]
-  auditEvents AuditEvent[]
+  memberships      Membership[]
+  invitations      OrganizationInvitation[]
+  auditEvents      AuditEvent[]
+  documents        Document[]
+  documentUploads  DocumentUpload[]
+  processingJobs   DocumentProcessingJob[]
+  extractions      DocumentExtraction[]
+  statements       FinancialStatement[]
+  accessEvents     DocumentAccessEvent[]
 
   @@map("organizations")
 }
@@ -51,6 +170,10 @@ model User {
   passwordResetTokens      PasswordResetToken[]
   invitationsSent          OrganizationInvitation[] @relation("InvitationInviter")
   auditEvents              AuditEvent[]
+  uploadedDocuments        Document[]               @relation("DocumentUploader")
+  documentUploads          DocumentUpload[]         @relation("DocumentUploadActor")
+  extractionReviews        ExtractionReview[]
+  accessEvents             DocumentAccessEvent[]
 
   @@map("users")
 }
@@ -162,4 +285,244 @@ model AuditEvent {
   @@index([organizationId, entityType, entityId])
   @@index([requestId])
   @@map("audit_events")
+}
+
+model Document {
+  id               String                    @id @default(uuid()) @db.Uuid
+  organizationId   String                    @map("organization_id") @db.Uuid
+  uploadedByUserId String                    @map("uploaded_by_user_id") @db.Uuid
+  originalFilename String                    @map("original_filename")
+  mimeType         String                    @map("mime_type")
+  format           DocumentFormat
+  byteSize         BigInt                    @map("byte_size")
+  sha256           String
+  storageKey       String                    @map("storage_key")
+  quarantineKey    String?                   @map("quarantine_key")
+  processingStatus DocumentProcessingStatus  @default(UPLOADED) @map("processing_status")
+  scanStatus       DocumentScanStatus        @default(PENDING) @map("scan_status")
+  extractionStatus DocumentExtractionStatus  @default(PENDING) @map("extraction_status")
+  failureClass     FailureClass?             @map("failure_class")
+  failureMessage   String?                   @map("failure_message")
+  deletionStatus   DocumentDeletionStatus    @default(ACTIVE) @map("deletion_status")
+  deletedAt        DateTime?                 @map("deleted_at")
+  retentionUntil   DateTime?                 @map("retention_until")
+  uploadedAt       DateTime                  @default(now()) @map("uploaded_at")
+  createdAt        DateTime                  @default(now()) @map("created_at")
+  updatedAt        DateTime                  @updatedAt @map("updated_at")
+
+  organization Organization            @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  uploadedBy   User                    @relation("DocumentUploader", fields: [uploadedByUserId], references: [id], onDelete: Restrict)
+  versions     DocumentVersion[]
+  uploads      DocumentUpload[]
+  jobs         DocumentProcessingJob[]
+  extractions  DocumentExtraction[]
+  statements   FinancialStatement[]
+  accessEvents DocumentAccessEvent[]
+
+  @@unique([organizationId, sha256])
+  @@index([organizationId, uploadedAt])
+  @@index([organizationId, processingStatus])
+  @@index([organizationId, deletionStatus])
+  @@map("documents")
+}
+
+model DocumentVersion {
+  id             String         @id @default(uuid()) @db.Uuid
+  documentId     String         @map("document_id") @db.Uuid
+  organizationId String         @map("organization_id") @db.Uuid
+  versionNumber  Int            @map("version_number")
+  sha256         String
+  byteSize       BigInt         @map("byte_size")
+  storageKey     String         @map("storage_key")
+  format         DocumentFormat
+  mimeType       String         @map("mime_type")
+  createdAt      DateTime       @default(now()) @map("created_at")
+
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([documentId, versionNumber])
+  @@index([organizationId, documentId])
+  @@map("document_versions")
+}
+
+model DocumentUpload {
+  id               String    @id @default(uuid()) @db.Uuid
+  organizationId   String    @map("organization_id") @db.Uuid
+  actorUserId      String    @map("actor_user_id") @db.Uuid
+  documentId       String?   @map("document_id") @db.Uuid
+  declaredFilename String    @map("declared_filename")
+  declaredMimeType String?   @map("declared_mime_type")
+  declaredFormat   DocumentFormat @map("declared_format")
+  expectedByteSize BigInt?   @map("expected_byte_size")
+  quarantineKey    String    @map("quarantine_key")
+  expiresAt        DateTime  @map("expires_at")
+  consumedAt       DateTime? @map("consumed_at")
+  completedSha256  String?   @map("completed_sha256")
+  completedByteSize BigInt?  @map("completed_byte_size")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  actor        User         @relation("DocumentUploadActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+  document     Document?    @relation(fields: [documentId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, createdAt])
+  @@index([organizationId, expiresAt])
+  @@map("document_uploads")
+}
+
+model DocumentProcessingJob {
+  id               String                   @id @default(uuid()) @db.Uuid
+  organizationId   String                   @map("organization_id") @db.Uuid
+  documentId       String                   @map("document_id") @db.Uuid
+  bullJobId        String?                  @map("bull_job_id")
+  status           DocumentProcessingStatus @default(QUARANTINED)
+  attemptCount     Int                      @default(0) @map("attempt_count")
+  maxAttempts      Int                      @default(5) @map("max_attempts")
+  correlationId    String?                  @map("correlation_id")
+  actorUserId      String?                  @map("actor_user_id") @db.Uuid
+  errorClass       FailureClass?            @map("error_class")
+  errorMessage     String?                  @map("error_message")
+  startedAt        DateTime?                @map("started_at")
+  finishedAt       DateTime?                @map("finished_at")
+  createdAt        DateTime                 @default(now()) @map("created_at")
+  updatedAt        DateTime                 @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  document     Document     @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, documentId])
+  @@index([status, createdAt])
+  @@index([correlationId])
+  @@map("document_processing_jobs")
+}
+
+model DocumentExtraction {
+  id             String                   @id @default(uuid()) @db.Uuid
+  organizationId String                   @map("organization_id") @db.Uuid
+  documentId     String                   @map("document_id") @db.Uuid
+  method         String
+  quality        ExtractionQuality        @default(MEDIUM)
+  status         DocumentExtractionStatus @default(PENDING)
+  warnings       Json?
+  startedAt      DateTime?                @map("started_at")
+  finishedAt     DateTime?                @map("finished_at")
+  createdAt      DateTime                 @default(now()) @map("created_at")
+  updatedAt      DateTime                 @updatedAt @map("updated_at")
+
+  organization Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  document     Document            @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  statements   FinancialStatement[]
+
+  @@index([organizationId, documentId])
+  @@map("document_extractions")
+}
+
+model FinancialStatement {
+  id             String               @id @default(uuid()) @db.Uuid
+  organizationId String               @map("organization_id") @db.Uuid
+  documentId     String               @map("document_id") @db.Uuid
+  extractionId   String               @map("extraction_id") @db.Uuid
+  statementType  StatementType        @map("statement_type")
+  currency       String?
+  unitScale      UnitScale            @default(ACTUAL) @map("unit_scale")
+  periodStart    DateTime?            @map("period_start") @db.Date
+  periodEnd      DateTime?            @map("period_end") @db.Date
+  periodLabel    String?              @map("period_label")
+  reviewStatus   LineItemReviewStatus @default(PENDING) @map("review_status")
+  createdAt      DateTime             @default(now()) @map("created_at")
+  updatedAt      DateTime             @updatedAt @map("updated_at")
+
+  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  document     Document           @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  extraction   DocumentExtraction @relation(fields: [extractionId], references: [id], onDelete: Cascade)
+  lineItems    FinancialLineItem[]
+
+  @@index([organizationId, documentId])
+  @@index([extractionId])
+  @@map("financial_statements")
+}
+
+model FinancialLineItem {
+  id                   String               @id @default(uuid()) @db.Uuid
+  organizationId       String               @map("organization_id") @db.Uuid
+  statementId          String               @map("statement_id") @db.Uuid
+  concept              FinancialConcept
+  labelRaw             String               @map("label_raw")
+  rawValue             String               @map("raw_value")
+  normalizedValue      String?              @map("normalized_value")
+  currency             String?
+  unitScale            UnitScale            @default(ACTUAL) @map("unit_scale")
+  extractionMethod     String               @map("extraction_method")
+  quality              ExtractionQuality    @default(MEDIUM)
+  reviewStatus         LineItemReviewStatus @default(PENDING) @map("review_status")
+  evidenceId           String?              @map("evidence_id") @db.Uuid
+  createdAt            DateTime             @default(now()) @map("created_at")
+  updatedAt            DateTime             @updatedAt @map("updated_at")
+
+  statement FinancialStatement  @relation(fields: [statementId], references: [id], onDelete: Cascade)
+  evidence  EvidenceReference?  @relation(fields: [evidenceId], references: [id], onDelete: SetNull)
+  reviews   ExtractionReview[]
+
+  @@index([organizationId, statementId])
+  @@index([concept])
+  @@map("financial_line_items")
+}
+
+model EvidenceReference {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  documentId     String   @map("document_id") @db.Uuid
+  evidenceKey    String   @unique @map("evidence_key")
+  pageNumber     Int?     @map("page_number")
+  sheetName      String?  @map("sheet_name")
+  cellRef        String?  @map("cell_ref")
+  rowIndex       Int?     @map("row_index")
+  columnIndex    Int?     @map("column_index")
+  snippet        String?
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  lineItems FinancialLineItem[]
+
+  @@index([organizationId, documentId])
+  @@map("evidence_references")
+}
+
+model ExtractionReview {
+  id             String       @id @default(uuid()) @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  lineItemId     String       @map("line_item_id") @db.Uuid
+  actorUserId    String       @map("actor_user_id") @db.Uuid
+  action         ReviewAction
+  previousValue  String?      @map("previous_value")
+  newValue       String?      @map("new_value")
+  previousConcept FinancialConcept? @map("previous_concept")
+  newConcept     FinancialConcept?  @map("new_concept")
+  reason         String?
+  createdAt      DateTime     @default(now()) @map("created_at")
+
+  lineItem FinancialLineItem @relation(fields: [lineItemId], references: [id], onDelete: Cascade)
+  actor    User              @relation(fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, lineItemId])
+  @@index([actorUserId])
+  @@map("extraction_reviews")
+}
+
+model DocumentAccessEvent {
+  id             String               @id @default(uuid()) @db.Uuid
+  organizationId String               @map("organization_id") @db.Uuid
+  documentId     String               @map("document_id") @db.Uuid
+  actorUserId    String?              @map("actor_user_id") @db.Uuid
+  action         DocumentAccessAction
+  requestId      String?              @map("request_id")
+  metadata       Json?
+  createdAt      DateTime             @default(now()) @map("created_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  document     Document     @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  actor        User?        @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, documentId, createdAt])
+  @@map("document_access_events")
 }

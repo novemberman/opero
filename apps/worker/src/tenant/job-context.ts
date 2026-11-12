@@ -8,6 +8,8 @@
 export type TenantJobContext = {
   organizationId: string;
   actorUserId: string;
+  documentId?: string;
+  processingJobId?: string;
 };
 
 export function assertTenantJobContext(value: unknown): TenantJobContext {

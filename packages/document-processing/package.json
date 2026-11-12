@@ -1,0 +1,36 @@
+{
+  "name": "@opero/document-processing",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Secure financial document validation, extraction, and normalization.",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsc -p tsconfig.json --watch --preserveWatchOutput",
+    "lint": "eslint .",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "csv-parse": "^6.1.0",
+    "decimal.js": "^10.6.0",
+    "exceljs": "^4.4.0",
+    "file-type": "^21.0.0",
+    "pdfjs-dist": "^5.4.296",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@opero/eslint-config": "workspace:*",
+    "@opero/typescript-config": "workspace:*",
+    "@types/node": "24.19.2",
+    "eslint": "10.14.0",
+    "typescript": "6.0.3",
+    "vitest": "5.1.0"
+  }
+}

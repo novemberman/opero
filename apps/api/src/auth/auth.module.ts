@@ -1,4 +1,4 @@
-import { Module } from "@nestjs/common";
+import { Global, Module } from "@nestjs/common";
 import { AuthController } from "./auth.controller";
 import { AuthService } from "./auth.service";
 import { CsrfService } from "./csrf.service";
@@ -8,6 +8,7 @@ import { LoginRateLimitGuard } from "./guards/login-rate-limit.guard";
 import { SessionAuthGuard } from "./guards/session-auth.guard";
 import { SessionService } from "./session.service";
 
+@Global()
 @Module({
   controllers: [AuthController],
   providers: [

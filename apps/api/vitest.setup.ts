@@ -11,4 +11,8 @@ process.env.MAIL_DIR = resolve(import.meta.dirname, "../../.data/mail-test");
 // Skip global/default throttlers for deterministic suites. Login throttle tests
 // override AUTH_THROTTLE_DISABLED=false with a low AUTH_LOGIN_THROTTLE_LIMIT.
 process.env.AUTH_THROTTLE_DISABLED = "true";
+process.env.DOCUMENT_STORAGE_DRIVER = "memory";
+process.env.DOCUMENT_SCANNER_DRIVER = "mock";
+process.env.REDIS_PASSWORD =
+  process.env.REDIS_PASSWORD ?? "replace-with-local-dev-password";
 

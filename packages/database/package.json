@@ -4,17 +4,22 @@
   "version": "0.0.0",
   "description": "Prisma schema, migrations, and client factory for Opero.",
   "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
-    ".": "./src/index.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
   },
   "scripts": {
-    "build": "prisma generate && tsc -p tsconfig.json --noEmit",
+    "build": "prisma generate && node ./scripts/emit-dist.mjs",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate deploy",
     "db:validate": "prisma validate",
     "lint": "eslint .",
     "typecheck": "prisma generate && tsc -p tsconfig.json --noEmit",
-    "pretest": "pnpm --filter @opero/shared build",
+    "pretest": "pnpm --filter @opero/shared build && pnpm build",
     "test": "prisma generate && prisma validate && vitest run"
   },
   "dependencies": {

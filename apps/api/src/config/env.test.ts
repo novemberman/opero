@@ -42,4 +42,19 @@ describe("parseApiEnv", () => {
       }).AUTH_THROTTLE_DISABLED,
     ).toBe(true);
   });
+
+  it("forbids mock malware scanner in production", () => {
+    expect(() =>
+      parseApiEnv({
+        ...valid,
+        NODE_ENV: "production",
+        DOCUMENT_SCANNER_DRIVER: "mock",
+        REDIS_PASSWORD: "prod-redis-password",
+      }),
+    ).toThrow(/DOCUMENT_SCANNER_DRIVER/);
+  });
+
+  it("defaults document max bytes to 20 MB", () => {
+    expect(parseApiEnv(valid).DOCUMENT_MAX_BYTES).toBe(20_971_520);
+  });
 });

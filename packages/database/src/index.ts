@@ -1,10 +1,33 @@
 export { createPrismaClient, PrismaClient } from "./client";
 
 export {
+  DocumentAccessAction,
+  DocumentDeletionStatus,
+  DocumentExtractionStatus,
+  DocumentFormat,
+  DocumentProcessingStatus,
+  DocumentScanStatus,
+  ExtractionQuality,
+  FailureClass,
+  FinancialConcept,
+  LineItemReviewStatus,
   MembershipRole,
   Prisma,
+  ReviewAction,
+  StatementType,
+  UnitScale,
   type AuditEvent,
+  type Document,
+  type DocumentAccessEvent,
+  type DocumentExtraction,
+  type DocumentProcessingJob,
+  type DocumentUpload,
+  type DocumentVersion,
   type EmailVerificationToken,
+  type EvidenceReference,
+  type ExtractionReview,
+  type FinancialLineItem,
+  type FinancialStatement,
   type Membership,
   type Organization,
   type OrganizationInvitation,
@@ -12,4 +35,3 @@ export {
   type Session,
   type User,
 } from "../generated/prisma/client";
-

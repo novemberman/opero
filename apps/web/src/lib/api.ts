@@ -23,7 +23,7 @@ export async function ensureCsrfToken(): Promise<string> {
 
 export async function apiFetch<T>(
   path: string,
-  init: RequestInit & { json?: unknown } = {},
+  init: RequestInit & { json?: unknown; formData?: FormData } = {},
 ): Promise<{ status: number; body: T }> {
   const headers = new Headers(init.headers);
   const method = (init.method ?? "GET").toUpperCase();
@@ -39,13 +39,26 @@ export async function apiFetch<T>(
     ...init,
     headers,
     credentials: "include",
-    body: init.json !== undefined ? JSON.stringify(init.json) : init.body,
+    body:
+      init.formData !== undefined
+        ? init.formData
+        : init.json !== undefined
+          ? JSON.stringify(init.json)
+          : init.body,
   });
 
   const text = await response.text();
-  const body = text ? (JSON.parse(text) as T) : (null as T);
+  let body = null as T;
+  if (text) {
+    try {
+      body = JSON.parse(text) as T;
+    } catch {
+      body = text as T;
+    }
+  }
   return { status: response.status, body };
 }
+
 
 export function resetCsrfToken(): void {
   csrfToken = null;

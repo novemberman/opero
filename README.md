@@ -88,12 +88,13 @@ docker compose down
 
 ## Development infrastructure
 
-`compose.yaml` runs PostgreSQL 17 and Redis 8.
+`compose.yaml` runs PostgreSQL 17, Redis 8, and ClamAV (`clamd` on TCP 3310).
 
-- Host ports default to `127.0.0.1:54329` (Postgres) and `127.0.0.1:63799` (Redis).
+- Host ports default to `127.0.0.1:54329` (Postgres), `127.0.0.1:63799` (Redis), and `127.0.0.1:3310` (ClamAV).
 - Published ports bind to loopback only.
-- Data is stored in the named volumes `opero_postgres_data` and `opero_redis_data`.
+- Data is stored in named volumes (`opero_postgres_data`, `opero_redis_data`, `opero_clamav_data`).
 - Credentials are read from `.env`. The compose file has no embedded passwords.
+- Document object storage defaults to a private filesystem root (`.data/object-storage`). Set `DOCUMENT_STORAGE_DRIVER=s3` and the `S3_*` vars when using a managed S3-compatible provider.
 
 To reach the services from a laptop while they run on this machine, forward the loopback ports over SSH. This does not change the server's SSH or firewall configuration:
 
@@ -103,16 +104,29 @@ ssh -N \
   -L 3001:127.0.0.1:3001 \
   -L 54329:127.0.0.1:54329 \
   -L 63799:127.0.0.1:63799 \
+  -L 3310:127.0.0.1:3310 \
   opero@<server>
 ```
 
 Then use `127.0.0.1` and the same ports on the laptop.
 
+## Document ingestion (Phase 4)
+
+Uploads are API-mediated multipart (max 20 MB via `DOCUMENT_MAX_BYTES`). The browser never talks to object storage directly; short-lived download URLs are issued only after authz and a clean scan.
+
+Pipeline: quarantine → ClamAV scan (**fail closed** if the scanner is unreachable) → promote → CSV/XLSX/PDF text extraction → financial concept normalization (`decimal.js` string amounts) → evidence locators → optional human review.
+
+- UI: `/organizations/[orgId]/documents` (VIEWER is read-only; API still enforces `xray:read` / `xray:write`)
+- Worker queue: `documents`
+- No OCR and no AI extraction in this phase — image-only PDFs go to manual review
+- Soft delete marks `deletionStatus=DELETED`, removes object bytes when possible, and records `DOCUMENT_RETENTION_DAYS` metadata. Automated purge of expired rows is not implemented in this phase.
+- Filesystem storage is private under `.data/object-storage` (gitignored); API and worker resolve that path from the monorepo root so they share the same tree.
+
 ## Tenant isolation and roles
 
-`packages/database` stores organization, user, membership, session, invitation, and audit data. Membership roles are `OWNER`, `ADMIN`, `ANALYST`, and `VIEWER`.
+`packages/database` stores organization, user, membership, session, invitation, audit, and document/evidence data. Membership roles are `OWNER`, `ADMIN`, `ANALYST`, and `VIEWER`.
 
-The schema does **not** enable Postgres RLS. The NestJS API derives identity from the server session cookie, verifies membership for `:organizationId`, and enforces an explicit permission matrix. Client-supplied organization ids are never treated as proof of access. Future X-Ray resources must include `organizationId` and reuse the same guards.
+The schema does **not** enable Postgres RLS. The NestJS API derives identity from the server session cookie, verifies membership for `:organizationId`, and enforces an explicit permission matrix. Client-supplied organization ids are never treated as proof of access. Document jobs re-validate tenant context in the worker.
 
 ## Authoring a migration
 
@@ -129,10 +143,12 @@ Read the SQL before you apply it. If Prisma reports drift, do not reset a databa
 ## Layout
 
 ```text
-apps/web        Next.js App Router
-apps/api        NestJS HTTP API
-apps/worker     NestJS BullMQ worker
+apps/web                  Next.js App Router
+apps/api                  NestJS HTTP API
+apps/worker               NestJS BullMQ worker
 packages/database
+packages/document-processing
+packages/object-storage
 packages/shared
 packages/eslint-config
 packages/typescript-config
@@ -140,4 +156,4 @@ packages/typescript-config
 
 ## Not in this phase
 
-Financial-document analysis, AI calls, payments, Railway deployment, and public mutation of audit records are intentionally absent.
+AI extraction / health scores, OCR, billing, Railway deployment, and public mutation of audit records are intentionally absent.

@@ -1,5 +1,7 @@
 # Development infrastructure only.
-# PostgreSQL and Redis publish on 127.0.0.1. They are not reachable from the public network.
+# PostgreSQL, Redis, and ClamAV publish on 127.0.0.1. They are not reachable from the public network.
+# Object storage defaults to a private filesystem root (.data/object-storage) because MinIO images
+# were unavailable or non-writable in this environment. S3ObjectStorage remains for managed S3.
 # Credentials come from the gitignored .env file. See .env.example.
 
 name: opero
@@ -55,8 +57,27 @@ services:
     security_opt:
       - no-new-privileges:true
 
+  clamav:
+    image: clamav/clamav:1.4
+    container_name: opero-clamav
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${CLAMAV_PORT:?CLAMAV_PORT is required}:3310"
+    volumes:
+      - clamav_data:/var/lib/clamav
+    healthcheck:
+      test: ["CMD-SHELL", "echo PING | nc 127.0.0.1 3310 | grep -q PONG"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 240s
+    security_opt:
+      - no-new-privileges:true
+
 volumes:
   postgres_data:
     name: opero_postgres_data
   redis_data:
     name: opero_redis_data
+  clamav_data:
+    name: opero_clamav_data

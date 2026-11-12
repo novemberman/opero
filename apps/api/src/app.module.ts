@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { BullModule } from "@nestjs/bullmq";
 import { MiddlewareConsumer, Module, NestModule } from "@nestjs/common";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 import { APP_GUARD } from "@nestjs/core";
@@ -11,8 +12,10 @@ import { AuthorizationModule } from "./authorization/authorization.module";
 import { CorrelationIdMiddleware } from "./common/correlation-id.middleware";
 import { parseApiEnv, type ApiEnv } from "./config/env";
 import { DatabaseModule } from "./database/database.module";
+import { DocumentsModule } from "./documents/documents.module";
 import { HealthModule } from "./health/health.module";
 import { OrganizationsModule } from "./organizations/organizations.module";
+import { StorageModule } from "./storage/storage.module";
 
 @Module({
   imports: [
@@ -27,22 +30,24 @@ import { OrganizationsModule } from "./organizations/organizations.module";
         const loginLimit = config.get("AUTH_LOGIN_THROTTLE_LIMIT", { infer: true });
         const loginTtl = config.get("AUTH_LOGIN_THROTTLE_TTL_MS", { infer: true });
         return {
-          // Never skip when NODE_ENV=production (also rejected by env schema).
           skipIf: () => config.get("AUTH_THROTTLE_DISABLED", { infer: true }) === true,
           throttlers: [
-            {
-              name: "default",
-              ttl: 60_000,
-              limit: 120,
-            },
-            {
-              name: "login",
-              ttl: loginTtl,
-              limit: loginLimit,
-            },
+            { name: "default", ttl: 60_000, limit: 120 },
+            { name: "login", ttl: loginTtl, limit: loginLimit },
           ],
         };
       },
+    }),
+    BullModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService<ApiEnv, true>) => ({
+        connection: {
+          host: config.get("REDIS_HOST", { infer: true }),
+          port: config.get("REDIS_PORT", { infer: true }),
+          password: config.get("REDIS_PASSWORD", { infer: true }),
+          maxRetriesPerRequest: null,
+        },
+      }),
     }),
     LoggerModule.forRootAsync({
       inject: [ConfigService],
@@ -67,10 +72,8 @@ import { OrganizationsModule } from "./organizations/organizations.module";
                 "req.body.csrfToken",
                 'res.headers["set-cookie"]',
               ],
-
               censor: "[Redacted]",
             },
-
             serializers: {
               req(req) {
                 return {
@@ -84,7 +87,6 @@ import { OrganizationsModule } from "./organizations/organizations.module";
                     "user-agent": req.headers["user-agent"],
                     "content-type": req.headers["content-type"],
                     origin: req.headers.origin,
-                    // never log cookie or authorization
                   },
                   remoteAddress: req.remoteAddress,
                   remotePort: req.remotePort,
@@ -103,10 +105,12 @@ import { OrganizationsModule } from "./organizations/organizations.module";
       },
     }),
     DatabaseModule,
+    StorageModule,
     AuditModule,
     AuthorizationModule,
     AuthModule,
     OrganizationsModule,
+    DocumentsModule,
     HealthModule,
   ],
   providers: [

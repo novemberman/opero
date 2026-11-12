@@ -59,7 +59,25 @@ describe("prisma schema", () => {
   it("documents that tenant isolation is a service-layer responsibility", () => {
     expect(schema).toMatch(/Tenant isolation is not enforced by this schema/);
     expect(schema).toMatch(/organizationId/);
-    expect(schema).toMatch(/Postgres RLS is not enabled in Phase 3/);
+    expect(schema).toMatch(/Postgres RLS is not enabled/);
+  });
+
+  it("defines Phase 4 document and financial evidence models", () => {
+    for (const model of [
+      "Document",
+      "DocumentVersion",
+      "DocumentUpload",
+      "DocumentProcessingJob",
+      "DocumentExtraction",
+      "FinancialStatement",
+      "FinancialLineItem",
+      "EvidenceReference",
+      "ExtractionReview",
+      "DocumentAccessEvent",
+    ]) {
+      expect(schema).toContain(`model ${model} {`);
+    }
+    expect(schema).toMatch(/Raw financial documents are never stored in PostgreSQL/);
   });
 });
 

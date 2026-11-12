@@ -21,13 +21,28 @@ export const apiEnvSchema = z
     AUTH_TOKEN_TTL_HOURS: z.coerce.number().int().min(1).max(168).default(24),
     MAIL_DRIVER: z.enum(["dev"]).default("dev"),
     MAIL_DIR: z.string().min(1).default(".data/mail"),
-    /**
-     * When true, ThrottlerGuard skips limits. Forbidden in production.
-     * Use only for non-throttle integration tests so they stay deterministic.
-     */
     AUTH_THROTTLE_DISABLED: boolFromEnv,
     AUTH_LOGIN_THROTTLE_LIMIT: z.coerce.number().int().min(1).max(1000).default(10),
     AUTH_LOGIN_THROTTLE_TTL_MS: z.coerce.number().int().min(1000).max(3_600_000).default(60_000),
+    REDIS_HOST: z.string().min(1).default("127.0.0.1"),
+    REDIS_PORT: z.coerce.number().int().min(1).max(65535).default(63799),
+    REDIS_PASSWORD: z.string().min(1).default("replace-with-local-dev-password"),
+    DOCUMENT_STORAGE_DRIVER: z.enum(["filesystem", "s3", "memory"]).default("filesystem"),
+    DOCUMENT_STORAGE_ROOT: z.string().min(1).default(".data/object-storage"),
+    S3_ENDPOINT: z.string().optional(),
+    S3_REGION: z.string().default("us-east-1"),
+    S3_ACCESS_KEY_ID: z.string().optional(),
+    S3_SECRET_ACCESS_KEY: z.string().optional(),
+    S3_FORCE_PATH_STYLE: boolFromEnv.default(true),
+    S3_QUARANTINE_BUCKET: z.string().min(1).default("opero-quarantine"),
+    S3_DOCUMENTS_BUCKET: z.string().min(1).default("opero-documents"),
+    S3_PRESIGN_TTL_SECONDS: z.coerce.number().int().min(30).max(3600).default(120),
+    DOCUMENT_MAX_BYTES: z.coerce.number().int().min(1024).max(50_000_000).default(20_971_520),
+    DOCUMENT_UPLOAD_TTL_MINUTES: z.coerce.number().int().min(5).max(1440).default(30),
+    DOCUMENT_RETENTION_DAYS: z.coerce.number().int().min(1).max(3650).default(365),
+    DOCUMENT_SCANNER_DRIVER: z.enum(["clamav", "mock"]).default("clamav"),
+    CLAMAV_HOST: z.string().min(1).default("127.0.0.1"),
+    CLAMAV_PORT: z.coerce.number().int().min(1).max(65535).default(3310),
   })
   .superRefine((env, ctx) => {
     if (env.NODE_ENV === "production" && env.AUTH_THROTTLE_DISABLED) {
@@ -36,6 +51,22 @@ export const apiEnvSchema = z
         path: ["AUTH_THROTTLE_DISABLED"],
         message: "AUTH_THROTTLE_DISABLED cannot be enabled in production",
       });
+    }
+    if (env.NODE_ENV === "production" && env.DOCUMENT_SCANNER_DRIVER === "mock") {
+      ctx.addIssue({
+        code: "custom",
+        path: ["DOCUMENT_SCANNER_DRIVER"],
+        message: "DOCUMENT_SCANNER_DRIVER=mock is forbidden in production",
+      });
+    }
+    if (env.DOCUMENT_STORAGE_DRIVER === "s3") {
+      if (!env.S3_ENDPOINT || !env.S3_ACCESS_KEY_ID || !env.S3_SECRET_ACCESS_KEY) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["S3_ENDPOINT"],
+          message: "S3 endpoint and credentials are required when DOCUMENT_STORAGE_DRIVER=s3",
+        });
+      }
     }
   });
 
