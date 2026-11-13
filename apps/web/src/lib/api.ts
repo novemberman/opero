@@ -59,6 +59,48 @@ export async function apiFetch<T>(
   return { status: response.status, body };
 }
 
+/**
+ * Fetches a binary resource (e.g. a report PDF) with the session cookie.
+ * On failure the API's JSON error message is returned instead of a blob.
+ */
+export async function apiDownload(
+  path: string,
+): Promise<{ status: number; blob: Blob | null; message: string | null }> {
+  const response = await fetch(`${API_BASE}${path}`, { credentials: "include" });
+  if (!response.ok) {
+    let message: string | null = null;
+    try {
+      message = apiErrorMessage(await response.json(), "");
+    } catch {
+      message = null;
+    }
+    return { status: response.status, blob: null, message: message || null };
+  }
+  return { status: response.status, blob: await response.blob(), message: null };
+}
+
+/** Reads the error text of an API response body, including validation issues. */
+export function apiErrorMessage(body: unknown, fallback: string): string {
+  if (!body || typeof body !== "object") return fallback;
+  const { message, issues } = body as { message?: unknown; issues?: unknown };
+  const text = Array.isArray(message)
+    ? message.filter((part): part is string => typeof part === "string").join("; ")
+    : typeof message === "string"
+      ? message
+      : "";
+  const details = Array.isArray(issues)
+    ? issues
+        .map((issue) => {
+          if (!issue || typeof issue !== "object") return "";
+          const { path, message: detail } = issue as { path?: unknown; message?: unknown };
+          if (typeof detail !== "string") return "";
+          return typeof path === "string" && path ? `${path}: ${detail}` : detail;
+        })
+        .filter(Boolean)
+    : [];
+  if (!text) return details.length ? details.join("; ") : fallback;
+  return details.length ? `${text} (${details.join("; ")})` : text;
+}
 
 export function resetCsrfToken(): void {
   csrfToken = null;

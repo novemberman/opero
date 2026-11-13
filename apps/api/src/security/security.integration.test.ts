@@ -3,6 +3,7 @@ import type { INestApplication } from "@nestjs/common";
 import request from "supertest";
 import { createTestApp, getCookie, mergeCookies } from "../testing/app-factory";
 import type { MemoryEmailService } from "../testing/memory-email.service";
+import { deletePhase6Data } from "../testing/phase6-cleanup";
 import { loadDatabaseModule } from "../database/load-database";
 
 async function registerVerifyLogin(
@@ -46,6 +47,7 @@ describe("Phase 3 security integration", () => {
   beforeAll(async () => {
     const { createPrismaClient } = await loadDatabaseModule();
     const prisma = createPrismaClient(process.env.DATABASE_URL!);
+    await deletePhase6Data(prisma);
     await prisma.diagnosticEvidenceLink.deleteMany();
     await prisma.diagnosticReview.deleteMany();
     await prisma.diagnosticFinding.deleteMany();

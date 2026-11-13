@@ -8,6 +8,7 @@ import { loadDatabaseModule } from "../database/load-database";
 import { OBJECT_STORAGE } from "../storage/storage.constants";
 import { createTestApp, getCookie, mergeCookies } from "../testing/app-factory";
 import type { MemoryEmailService } from "../testing/memory-email.service";
+import { deletePhase6Data } from "../testing/phase6-cleanup";
 
 async function registerVerifyLogin(
   app: INestApplication,
@@ -197,6 +198,7 @@ describe("document ingestion integration", () => {
 
     const { createPrismaClient: createClient } = await loadDatabaseModule();
     const prisma = createClient(process.env.DATABASE_URL!);
+    await deletePhase6Data(prisma);
     await prisma.diagnosticEvidenceLink.deleteMany();
     await prisma.diagnosticReview.deleteMany();
     await prisma.diagnosticFinding.deleteMany();

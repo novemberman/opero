@@ -10,6 +10,7 @@ import request from "supertest";
 import { loadDatabaseModule } from "../database/load-database";
 import { createTestApp, getCookie, mergeCookies } from "../testing/app-factory";
 import type { MemoryEmailService } from "../testing/memory-email.service";
+import { deletePhase6Data } from "../testing/phase6-cleanup";
 import { runDiagnosticJob } from "./run-diagnostic-job";
 
 async function registerVerifyLogin(
@@ -174,6 +175,7 @@ describe("diagnostics integration", () => {
   beforeAll(async () => {
     const { createPrismaClient: create } = await loadDatabaseModule();
     const prisma = create(process.env.DATABASE_URL!);
+    await deletePhase6Data(prisma);
     await prisma.diagnosticEvidenceLink.deleteMany();
     await prisma.diagnosticReview.deleteMany();
     await prisma.diagnosticFinding.deleteMany();

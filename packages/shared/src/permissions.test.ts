@@ -14,6 +14,13 @@ describe("rolePermissions", () => {
     expect(roleHasPermission("VIEWER", "xray:write")).toBe(false);
   });
 
+  it("grants xray publish only to owners and admins", () => {
+    expect(roleHasPermission("OWNER", "xray:publish")).toBe(true);
+    expect(roleHasPermission("ADMIN", "xray:publish")).toBe(true);
+    expect(roleHasPermission("ANALYST", "xray:publish")).toBe(false);
+    expect(roleHasPermission("VIEWER", "xray:publish")).toBe(false);
+  });
+
   it("requires every listed permission", () => {
     expect(roleHasEveryPermission("VIEWER", ["org:read", "xray:read"])).toBe(true);
     expect(roleHasEveryPermission("VIEWER", ["org:read", "member:invite"])).toBe(false);

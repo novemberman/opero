@@ -104,5 +104,27 @@ describe("prisma schema", () => {
       expect(schema).toContain(concept);
     }
   });
+
+  it("defines Phase 6 readiness, AI, and report models", () => {
+    for (const model of [
+      "FinancialMetadataReview",
+      "DiagnosticReadinessAssessment",
+      "EvidenceReconciliation",
+      "EvidenceReconciliationItem",
+      "AIInterpretationRun",
+      "AIInterpretationVersion",
+      "XRayReport",
+      "XRayReportVersion",
+      "ReportApproval",
+      "ReportAccessEvent",
+    ]) {
+      expect(schema).toContain(`model ${model} {`);
+    }
+    expect(schema).toContain("enum PeriodType");
+    expect(schema).toContain("enum DiagnosticReadinessStatus");
+    expect(schema).toContain("enum XRayReportStatus");
+    expect(schema).toContain("periodType");
+    expect(schema).toContain("consolidationScope");
+  });
 });
 

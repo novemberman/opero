@@ -7,7 +7,11 @@ import {
   S3Client,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { ObjectStoragePort, type ObjectHead } from "./storage.port.js";
+import {
+  ObjectAlreadyExistsError,
+  ObjectStoragePort,
+  type ObjectHead,
+} from "./storage.port.js";
 
 export type S3StorageConfig = {
   endpoint: string;
@@ -38,15 +42,28 @@ export class S3ObjectStorage extends ObjectStoragePort {
     key: string;
     body: Buffer;
     contentType?: string;
+    overwrite?: boolean;
   }): Promise<void> {
-    await this.client.send(
-      new PutObjectCommand({
-        Bucket: input.bucket,
-        Key: input.key,
-        Body: input.body,
-        ContentType: input.contentType,
-      }),
-    );
+    try {
+      await this.client.send(
+        new PutObjectCommand({
+          Bucket: input.bucket,
+          Key: input.key,
+          Body: input.body,
+          ContentType: input.contentType,
+          ...(input.overwrite === false ? { IfNoneMatch: "*" } : {}),
+        }),
+      );
+    } catch (error) {
+      const name =
+        error && typeof error === "object" && "name" in error
+          ? String((error as { name: unknown }).name)
+          : "";
+      if (input.overwrite === false && (name === "PreconditionFailed" || name === "412")) {
+        throw new ObjectAlreadyExistsError(input.bucket, input.key);
+      }
+      throw error;
+    }
   }
 
   async getObjectBuffer(input: { bucket: string; key: string }): Promise<Buffer> {

@@ -1,0 +1,33 @@
+{
+  "name": "@opero/reports",
+  "private": true,
+  "version": "0.0.0",
+  "description": "X-Ray report model assembly and PDF rendering from deterministic diagnostic results.",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsc -p tsconfig.json --watch --preserveWatchOutput",
+    "lint": "eslint .",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@types/pdfkit": "0.17.7",
+    "pdfkit": "0.20.2"
+  },
+  "devDependencies": {
+    "@opero/eslint-config": "workspace:*",
+    "@opero/typescript-config": "workspace:*",
+    "@types/node": "24.19.2",
+    "eslint": "10.14.0",
+    "pdfjs-dist": "^5.4.296",
+    "typescript": "6.0.3",
+    "vitest": "5.1.0"
+  }
+}

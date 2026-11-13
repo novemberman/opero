@@ -1,7 +1,12 @@
 import { createHash, randomUUID } from "node:crypto";
-import { mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
+import { constants } from "node:fs";
+import { access, mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, resolve, sep } from "node:path";
-import { ObjectStoragePort, type ObjectHead } from "./storage.port.js";
+import {
+  ObjectAlreadyExistsError,
+  ObjectStoragePort,
+  type ObjectHead,
+} from "./storage.port.js";
 
 /**
  * Private local object storage rooted under DOCUMENT_STORAGE_ROOT.
@@ -31,10 +36,33 @@ export class FilesystemObjectStorage extends ObjectStoragePort {
     key: string;
     body: Buffer;
     contentType?: string;
+    overwrite?: boolean;
   }): Promise<void> {
     const path = this.resolvePath(input.bucket, input.key);
     await mkdir(dirname(path), { recursive: true });
-    await writeFile(path, input.body);
+    if (input.overwrite === false) {
+      try {
+        await access(path, constants.F_OK);
+        throw new ObjectAlreadyExistsError(input.bucket, input.key);
+      } catch (error) {
+        if (error instanceof ObjectAlreadyExistsError) throw error;
+        // ENOENT — proceed
+      }
+    }
+    const tmp = `${path}.${randomUUID()}.tmp`;
+    await writeFile(tmp, input.body);
+    if (input.overwrite === false) {
+      try {
+        await access(path, constants.F_OK);
+        await rm(tmp, { force: true });
+        throw new ObjectAlreadyExistsError(input.bucket, input.key);
+      } catch (error) {
+        if (error instanceof ObjectAlreadyExistsError) throw error;
+      }
+      await rename(tmp, path);
+    } else {
+      await rename(tmp, path);
+    }
     if (input.contentType) {
       await writeFile(`${path}.meta.json`, JSON.stringify({ contentType: input.contentType }), "utf8");
     }

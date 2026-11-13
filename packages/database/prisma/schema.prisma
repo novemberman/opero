@@ -184,6 +184,78 @@ enum DocumentAccessAction {
   REVIEW
 }
 
+enum PeriodType {
+  MONTHLY
+  QUARTERLY
+  ANNUAL
+  CUSTOM
+  UNKNOWN
+}
+
+enum ConsolidationScope {
+  CONSOLIDATED
+  ENTITY
+  UNKNOWN
+}
+
+enum DiagnosticReadinessStatus {
+  READY
+  PARTIALLY_READY
+  ACTION_REQUIRED
+  BLOCKED
+}
+
+enum ReadinessIssueSeverity {
+  INFO
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum ReconciliationStatus {
+  OPEN
+  RESOLVED
+  DISMISSED
+}
+
+enum ReconciliationResolution {
+  SELECT_AUTHORITATIVE
+  CORRECT_VALUE
+  DISMISS
+}
+
+enum AiInterpretationStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+  UNAVAILABLE
+}
+
+enum XRayReportStatus {
+  DRAFT
+  REVIEW_REQUIRED
+  APPROVED
+  PUBLISHED
+  REJECTED
+  SUPERSEDED
+}
+
+enum ReportApprovalAction {
+  SUBMIT_REVIEW
+  APPROVE
+  REJECT
+  PUBLISH
+  SUPERSEDE
+}
+
+enum ReportAccessAction {
+  VIEW
+  DOWNLOAD
+  PREVIEW
+}
+
 model Organization {
   id        String   @id @default(uuid()) @db.Uuid
   name      String
@@ -200,8 +272,14 @@ model Organization {
   extractions       DocumentExtraction[]
   statements        FinancialStatement[]
   accessEvents      DocumentAccessEvent[]
-  diagnosticRuns    DiagnosticRun[]
-  diagnosticReviews DiagnosticReview[]
+  diagnosticRuns             DiagnosticRun[]
+  diagnosticReviews          DiagnosticReview[]
+  financialMetadataReviews   FinancialMetadataReview[]
+  readinessAssessments       DiagnosticReadinessAssessment[]
+  evidenceReconciliations    EvidenceReconciliation[]
+  aiInterpretationRuns       AIInterpretationRun[]
+  xrayReports                XRayReport[]
+  reportAccessEvents         ReportAccessEvent[]
 
   @@map("organizations")
 }
@@ -225,8 +303,17 @@ model User {
   documentUploads          DocumentUpload[]         @relation("DocumentUploadActor")
   extractionReviews        ExtractionReview[]
   accessEvents             DocumentAccessEvent[]
-  diagnosticRunsInitiated  DiagnosticRun[]          @relation("DiagnosticRunInitiator")
-  diagnosticReviews        DiagnosticReview[]
+  diagnosticRunsInitiated      DiagnosticRun[]               @relation("DiagnosticRunInitiator")
+  diagnosticReviews            DiagnosticReview[]
+  financialMetadataReviews     FinancialMetadataReview[]
+  evidenceReconciliations      EvidenceReconciliation[]      @relation("ReconciliationActor")
+  aiInterpretationRuns         AIInterpretationRun[]
+  aiInterpretationVersions     AIInterpretationVersion[]
+  xrayReportsCreated           XRayReport[]                  @relation("ReportCreator")
+  xrayReportVersions           XRayReportVersion[]
+  reportApprovals              ReportApproval[]
+  reportAccessEvents           ReportAccessEvent[]
+  statementsConfirmed          FinancialStatement[]          @relation("StatementConfirmer")
 
   @@map("users")
 }
@@ -472,28 +559,55 @@ model DocumentExtraction {
 }
 
 model FinancialStatement {
-  id             String               @id @default(uuid()) @db.Uuid
-  organizationId String               @map("organization_id") @db.Uuid
-  documentId     String               @map("document_id") @db.Uuid
-  extractionId   String               @map("extraction_id") @db.Uuid
-  statementType  StatementType        @map("statement_type")
-  currency       String?
-  unitScale      UnitScale            @default(ACTUAL) @map("unit_scale")
-  periodStart    DateTime?            @map("period_start") @db.Date
-  periodEnd      DateTime?            @map("period_end") @db.Date
-  periodLabel    String?              @map("period_label")
-  reviewStatus   LineItemReviewStatus @default(PENDING) @map("review_status")
-  createdAt      DateTime             @default(now()) @map("created_at")
-  updatedAt      DateTime             @updatedAt @map("updated_at")
+  id                   String               @id @default(uuid()) @db.Uuid
+  organizationId       String               @map("organization_id") @db.Uuid
+  documentId           String               @map("document_id") @db.Uuid
+  extractionId         String               @map("extraction_id") @db.Uuid
+  statementType        StatementType        @map("statement_type")
+  currency             String?
+  unitScale            UnitScale            @default(ACTUAL) @map("unit_scale")
+  periodStart          DateTime?            @map("period_start") @db.Date
+  periodEnd            DateTime?            @map("period_end") @db.Date
+  periodLabel          String?              @map("period_label")
+  periodType           PeriodType           @default(UNKNOWN) @map("period_type")
+  fiscalYearEndMonth   Int?                 @map("fiscal_year_end_month")
+  consolidationScope   ConsolidationScope   @default(UNKNOWN) @map("consolidation_scope")
+  entityName           String?              @map("entity_name")
+  extractedMetadata    Json?                @map("extracted_metadata")
+  confirmedAt          DateTime?            @map("confirmed_at")
+  confirmedByUserId    String?              @map("confirmed_by_user_id") @db.Uuid
+  reviewStatus         LineItemReviewStatus @default(PENDING) @map("review_status")
+  createdAt            DateTime             @default(now()) @map("created_at")
+  updatedAt            DateTime             @updatedAt @map("updated_at")
 
-  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  document     Document           @relation(fields: [documentId], references: [id], onDelete: Cascade)
-  extraction   DocumentExtraction @relation(fields: [extractionId], references: [id], onDelete: Cascade)
-  lineItems    FinancialLineItem[]
+  organization    Organization              @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  document        Document                  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  extraction      DocumentExtraction        @relation(fields: [extractionId], references: [id], onDelete: Cascade)
+  confirmedBy     User?                     @relation("StatementConfirmer", fields: [confirmedByUserId], references: [id], onDelete: SetNull)
+  lineItems       FinancialLineItem[]
+  metadataReviews FinancialMetadataReview[]
 
   @@index([organizationId, documentId])
   @@index([extractionId])
   @@map("financial_statements")
+}
+
+model FinancialMetadataReview {
+  id                   String   @id @default(uuid()) @db.Uuid
+  organizationId       String   @map("organization_id") @db.Uuid
+  financialStatementId String   @map("financial_statement_id") @db.Uuid
+  actorUserId          String   @map("actor_user_id") @db.Uuid
+  previousValues       Json     @map("previous_values")
+  nextValues           Json     @map("next_values")
+  note                 String?
+  createdAt            DateTime @default(now()) @map("created_at")
+
+  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  statement    FinancialStatement @relation(fields: [financialStatementId], references: [id], onDelete: Cascade)
+  actor        User               @relation(fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, financialStatementId])
+  @@map("financial_metadata_reviews")
 }
 
 model FinancialLineItem {
@@ -627,6 +741,10 @@ model DiagnosticRun {
   score        DiagnosticScore?
   findings     DiagnosticFinding[]
   reviews      DiagnosticReview[]
+  readinessAssessments DiagnosticReadinessAssessment[]
+  reconciliations      EvidenceReconciliation[]
+  aiInterpretationRuns AIInterpretationRun[]
+  xrayReports          XRayReport[]
 
   @@index([organizationId, createdAt])
   @@index([organizationId, status])
@@ -786,4 +904,209 @@ model DiagnosticReview {
 
   @@index([organizationId, diagnosticRunId])
   @@map("diagnostic_reviews")
+}
+
+model DiagnosticReadinessAssessment {
+  id               String                    @id @default(uuid()) @db.Uuid
+  organizationId   String                    @map("organization_id") @db.Uuid
+  diagnosticRunId  String?                   @map("diagnostic_run_id") @db.Uuid
+  documentIds      String[]                  @map("document_ids") @db.Uuid
+  status           DiagnosticReadinessStatus
+  checklist        Json
+  issues           Json
+  blockingReasons  Json?                     @map("blocking_reasons")
+  createdAt        DateTime                  @default(now()) @map("created_at")
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  run          DiagnosticRun? @relation(fields: [diagnosticRunId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, createdAt])
+  @@index([diagnosticRunId])
+  @@map("diagnostic_readiness_assessments")
+}
+
+model EvidenceReconciliation {
+  id              String               @id @default(uuid()) @db.Uuid
+  organizationId  String               @map("organization_id") @db.Uuid
+  diagnosticRunId String?              @map("diagnostic_run_id") @db.Uuid
+  conflictKey     String               @map("conflict_key")
+  concept         FinancialConcept?
+  severity        ReadinessIssueSeverity
+  status          ReconciliationStatus @default(OPEN)
+  title           String
+  explanation     String
+  candidates      Json
+  resolution      ReconciliationResolution?
+  resolvedValue   String?              @map("resolved_value")
+  resolvedByUserId String?             @map("resolved_by_user_id") @db.Uuid
+  resolutionReason String?             @map("resolution_reason")
+  resolvedAt      DateTime?            @map("resolved_at")
+  createdAt       DateTime             @default(now()) @map("created_at")
+  updatedAt       DateTime             @updatedAt @map("updated_at")
+
+  organization Organization                 @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  run          DiagnosticRun?               @relation(fields: [diagnosticRunId], references: [id], onDelete: SetNull)
+  resolvedBy   User?                        @relation("ReconciliationActor", fields: [resolvedByUserId], references: [id], onDelete: SetNull)
+  items        EvidenceReconciliationItem[]
+
+  @@unique([organizationId, conflictKey, diagnosticRunId])
+  @@index([organizationId, status])
+  @@map("evidence_reconciliations")
+}
+
+model EvidenceReconciliationItem {
+  id                String  @id @default(uuid()) @db.Uuid
+  organizationId    String  @map("organization_id") @db.Uuid
+  reconciliationId  String  @map("reconciliation_id") @db.Uuid
+  documentId        String? @map("document_id") @db.Uuid
+  lineItemId        String? @map("line_item_id") @db.Uuid
+  label             String
+  value             String?
+  currency          String?
+  periodLabel       String? @map("period_label")
+  isAuthoritative   Boolean @default(false) @map("is_authoritative")
+
+  reconciliation EvidenceReconciliation @relation(fields: [reconciliationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, reconciliationId])
+  @@map("evidence_reconciliation_items")
+}
+
+model AIInterpretationRun {
+  id                 String                 @id @default(uuid()) @db.Uuid
+  organizationId     String                 @map("organization_id") @db.Uuid
+  diagnosticRunId    String                 @map("diagnostic_run_id") @db.Uuid
+  initiatedByUserId  String                 @map("initiated_by_user_id") @db.Uuid
+  status             AiInterpretationStatus @default(QUEUED)
+  provider           String
+  model              String?
+  promptVersion      String                 @map("prompt_version")
+  failureMessage     String?                @map("failure_message")
+  bullJobId          String?                @map("bull_job_id")
+  requestId          String?                @map("request_id")
+  startedAt          DateTime?              @map("started_at")
+  completedAt        DateTime?              @map("completed_at")
+  createdAt          DateTime               @default(now()) @map("created_at")
+  updatedAt          DateTime               @updatedAt @map("updated_at")
+
+  organization Organization              @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  run          DiagnosticRun             @relation(fields: [diagnosticRunId], references: [id], onDelete: Cascade)
+  initiatedBy  User                      @relation(fields: [initiatedByUserId], references: [id], onDelete: Restrict)
+  versions     AIInterpretationVersion[]
+
+  @@index([organizationId, diagnosticRunId])
+  @@index([organizationId, status])
+  @@map("ai_interpretation_runs")
+}
+
+model AIInterpretationVersion {
+  id                   String   @id @default(uuid()) @db.Uuid
+  organizationId       String   @map("organization_id") @db.Uuid
+  aiInterpretationRunId String  @map("ai_interpretation_run_id") @db.Uuid
+  versionNumber        Int      @map("version_number")
+  narrative            Json
+  groundedClaims       Json     @map("grounded_claims")
+  unsupportedClaims    Json     @map("unsupported_claims")
+  editedNarrative      Json?    @map("edited_narrative")
+  editedByUserId       String?  @map("edited_by_user_id") @db.Uuid
+  isSimulated          Boolean  @default(false) @map("is_simulated")
+  createdAt            DateTime @default(now()) @map("created_at")
+
+  interpretationRun AIInterpretationRun @relation(fields: [aiInterpretationRunId], references: [id], onDelete: Cascade)
+  editedBy          User?               @relation(fields: [editedByUserId], references: [id], onDelete: SetNull)
+  reportVersions    XRayReportVersion[]
+
+  @@unique([aiInterpretationRunId, versionNumber])
+  @@index([organizationId])
+  @@map("ai_interpretation_versions")
+}
+
+model XRayReport {
+  id                 String          @id @default(uuid()) @db.Uuid
+  organizationId     String          @map("organization_id") @db.Uuid
+  diagnosticRunId    String          @map("diagnostic_run_id") @db.Uuid
+  createdByUserId    String          @map("created_by_user_id") @db.Uuid
+  status             XRayReportStatus @default(DRAFT)
+  title              String
+  verifiedPublication Boolean        @default(false) @map("verified_publication")
+  currentVersionId   String?         @unique @map("current_version_id") @db.Uuid
+  publishedAt        DateTime?       @map("published_at")
+  createdAt          DateTime        @default(now()) @map("created_at")
+  updatedAt          DateTime        @updatedAt @map("updated_at")
+
+  organization   Organization         @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  diagnosticRun  DiagnosticRun        @relation(fields: [diagnosticRunId], references: [id], onDelete: Restrict)
+  createdBy      User                 @relation("ReportCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  currentVersion XRayReportVersion?   @relation("CurrentReportVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
+  versions       XRayReportVersion[]  @relation("ReportVersions")
+  approvals      ReportApproval[]
+  accessEvents   ReportAccessEvent[]
+
+  @@index([organizationId, createdAt])
+  @@index([organizationId, status])
+  @@map("xray_reports")
+}
+
+model XRayReportVersion {
+  id                      String   @id @default(uuid()) @db.Uuid
+  organizationId          String   @map("organization_id") @db.Uuid
+  reportId                String   @map("report_id") @db.Uuid
+  versionNumber           Int      @map("version_number")
+  status                  XRayReportStatus
+  snapshotPayload         Json     @map("snapshot_payload")
+  aiInterpretationVersionId String? @map("ai_interpretation_version_id") @db.Uuid
+  storageKey              String?  @map("storage_key")
+  contentHash             String?  @map("content_hash")
+  byteSize                Int?     @map("byte_size")
+  disclosures             Json?
+  createdByUserId         String   @map("created_by_user_id") @db.Uuid
+  createdAt               DateTime @default(now()) @map("created_at")
+
+  report                  XRayReport               @relation("ReportVersions", fields: [reportId], references: [id], onDelete: Cascade)
+  currentFor              XRayReport?              @relation("CurrentReportVersion")
+  aiInterpretationVersion AIInterpretationVersion? @relation(fields: [aiInterpretationVersionId], references: [id], onDelete: SetNull)
+  createdBy               User                     @relation(fields: [createdByUserId], references: [id], onDelete: Restrict)
+  approvals               ReportApproval[]
+  accessEvents            ReportAccessEvent[]
+
+  @@unique([reportId, versionNumber])
+  @@index([organizationId, reportId])
+  @@map("xray_report_versions")
+}
+
+model ReportApproval {
+  id             String               @id @default(uuid()) @db.Uuid
+  organizationId String               @map("organization_id") @db.Uuid
+  reportId       String               @map("report_id") @db.Uuid
+  reportVersionId String              @map("report_version_id") @db.Uuid
+  actorUserId    String               @map("actor_user_id") @db.Uuid
+  action         ReportApprovalAction
+  note           String?
+  createdAt      DateTime             @default(now()) @map("created_at")
+
+  report  XRayReport        @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  version XRayReportVersion @relation(fields: [reportVersionId], references: [id], onDelete: Cascade)
+  actor   User              @relation(fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, reportId])
+  @@map("report_approvals")
+}
+
+model ReportAccessEvent {
+  id              String             @id @default(uuid()) @db.Uuid
+  organizationId  String             @map("organization_id") @db.Uuid
+  reportId        String             @map("report_id") @db.Uuid
+  reportVersionId String?            @map("report_version_id") @db.Uuid
+  actorUserId     String             @map("actor_user_id") @db.Uuid
+  action          ReportAccessAction
+  requestId       String?            @map("request_id")
+  createdAt       DateTime           @default(now()) @map("created_at")
+
+  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  report       XRayReport        @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  version      XRayReportVersion? @relation(fields: [reportVersionId], references: [id], onDelete: SetNull)
+  actor        User              @relation(fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, reportId])
+  @@map("report_access_events")
 }

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { SiteHeader } from "../../../../../components/site-header";
+import { StatementMetadataPanel } from "../../../../../components/statement-metadata";
 import { apiFetch } from "../../../../../lib/api";
 
 type Evidence = {
@@ -110,9 +111,8 @@ export default function DocumentDetailPage() {
     await load();
   }
 
-  const lines = extractions.flatMap((extraction) =>
-    extraction.statements.flatMap((statement) => statement.lineItems),
-  );
+  const statements = extractions.flatMap((extraction) => extraction.statements);
+  const lines = statements.flatMap((statement) => statement.lineItems);
 
   return (
     <>
@@ -135,7 +135,32 @@ export default function DocumentDetailPage() {
         {error ? <p className="mt-4 text-sm text-copper">{error}</p> : null}
         {message ? <p className="mt-4 text-sm text-pine">{message}</p> : null}
 
-        <ul className="mt-8 space-y-6">
+        {statements.length > 0 ? (
+          <section className="mt-8">
+            <h2 className="text-xl text-ink">Statement metadata</h2>
+            <p className="mt-1 text-sm text-muted">
+              Period, currency and entity details feed the{" "}
+              <Link className="underline" href={`/organizations/${orgId}/readiness`}>
+                readiness assessment
+              </Link>
+              . Every correction and confirmation is kept in the history.
+            </p>
+            <ul className="mt-3 space-y-4">
+              {statements.map((statement) => (
+                <StatementMetadataPanel
+                  key={statement.id}
+                  orgId={orgId}
+                  statementId={statement.id}
+                  statementType={statement.statementType}
+                  canWrite={canWrite}
+                />
+              ))}
+            </ul>
+          </section>
+        ) : null}
+
+        <h2 className="mt-8 text-xl text-ink">Extracted figures</h2>
+        <ul className="mt-3 space-y-6">
           {lines.map((line) => (
             <li key={line.id} className="border border-line p-4">
               <p className="text-lg text-ink">{line.labelRaw}</p>

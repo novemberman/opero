@@ -5,6 +5,7 @@ import { ConfigModule, ConfigService } from "@nestjs/config";
 import { APP_GUARD } from "@nestjs/core";
 import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler";
 import { LoggerModule } from "nestjs-pino";
+import { AiModule } from "./ai/ai.module";
 import { AuditModule } from "./audit/audit.module";
 import { AuthModule } from "./auth/auth.module";
 import { CsrfMiddleware } from "./auth/csrf.middleware";
@@ -16,6 +17,10 @@ import { DiagnosticsModule } from "./diagnostics/diagnostics.module";
 import { DocumentsModule } from "./documents/documents.module";
 import { HealthModule } from "./health/health.module";
 import { OrganizationsModule } from "./organizations/organizations.module";
+import { ReadinessModule } from "./readiness/readiness.module";
+import { ReconciliationModule } from "./reconciliation/reconciliation.module";
+import { ReportsModule } from "./reports/reports.module";
+import { StatementsModule } from "./statements/statements.module";
 import { StorageModule } from "./storage/storage.module";
 
 @Module({
@@ -113,6 +118,11 @@ import { StorageModule } from "./storage/storage.module";
     OrganizationsModule,
     DocumentsModule,
     DiagnosticsModule,
+    StatementsModule,
+    ReconciliationModule,
+    ReadinessModule,
+    AiModule,
+    ReportsModule,
     HealthModule,
   ],
   providers: [

@@ -50,6 +50,30 @@ export default function OrganizationDetailPage() {
               </Link>
               <Link
                 className="inline-flex min-h-11 items-center rounded-full border border-line px-5 text-ink no-underline"
+                href={`/organizations/${orgId}/readiness`}
+              >
+                Readiness
+              </Link>
+              <Link
+                className="inline-flex min-h-11 items-center rounded-full border border-line px-5 text-ink no-underline"
+                href={`/organizations/${orgId}/reconciliations`}
+              >
+                Reconciliations
+              </Link>
+              <Link
+                className="inline-flex min-h-11 items-center rounded-full border border-line px-5 text-ink no-underline"
+                href={`/organizations/${orgId}/ai`}
+              >
+                AI interpretation
+              </Link>
+              <Link
+                className="inline-flex min-h-11 items-center rounded-full border border-line px-5 text-ink no-underline"
+                href={`/organizations/${orgId}/reports`}
+              >
+                Reports
+              </Link>
+              <Link
+                className="inline-flex min-h-11 items-center rounded-full border border-line px-5 text-ink no-underline"
                 href={`/organizations/${orgId}/settings`}
               >
                 Settings

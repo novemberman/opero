@@ -57,4 +57,18 @@ describe("parseApiEnv", () => {
   it("defaults document max bytes to 20 MB", () => {
     expect(parseApiEnv(valid).DOCUMENT_MAX_BYTES).toBe(20_971_520);
   });
+
+  it("defaults AI provider to mock", () => {
+    expect(parseApiEnv(valid).AI_PROVIDER).toBe("mock");
+    expect(parseApiEnv(valid).AI_SHARE_STRUCTURED_CONTEXT).toBe(true);
+  });
+
+  it("requires OpenAI credentials when AI_PROVIDER=openai", () => {
+    expect(() =>
+      parseApiEnv({
+        ...valid,
+        AI_PROVIDER: "openai",
+      }),
+    ).toThrow(/OPENAI_API_KEY/);
+  });
 });

@@ -6,7 +6,7 @@ Opero is an AI-assisted Business Operating System.
 
 A business diagnostic platform that transforms financial reports into actionable insights, business health scores, and governed improvement plans.
 
-This repository is the Opero platform: a Next.js web app, a NestJS API with first-party authentication and tenant-scoped organization APIs, a NestJS worker, shared contracts, and PostgreSQL and Redis for local development. Opero X-Ray includes document ingestion and deterministic financial diagnostics. Payments and production deployment are later phases.
+This repository is the Opero platform: a Next.js web app, a NestJS API with first-party authentication and tenant-scoped organization APIs, a NestJS worker, shared contracts, and PostgreSQL and Redis for local development. Opero X-Ray includes document ingestion, deterministic financial diagnostics, readiness/reconciliation, optional AI interpretation drafts, and private PDF reports. Payments and production deployment are later phases.
 
 ## Stack
 
@@ -148,6 +148,8 @@ apps/api                  NestJS HTTP API
 apps/worker               NestJS BullMQ worker
 packages/database
 packages/diagnostics
+packages/ai
+packages/reports
 packages/document-processing
 packages/object-storage
 packages/shared
@@ -163,8 +165,17 @@ Deterministic KPI / quality / score / findings engine (`@opero/diagnostics`, met
 - Worker queue: `diagnostics` / job `diagnostic.run`
 - UI: `/organizations/[orgId]/diagnostics`
 - Scores use provisional heuristic bands; incomplete evidence yields `INSUFFICIENT_DATA` rather than inventing values
-- No generative AI, OCR expansion, billing, or Railway deploy in this phase
+
+## Readiness, AI drafts, and reports (Phase 6)
+
+See `docs/PHASE6_AI_AND_REPORTS.md` for prompt versions, data-sharing rules, and publish gates.
+
+- Metadata review on statements; readiness checklist; evidence conflict reconciliation
+- AI: `@opero/ai` with `AI_PROVIDER=mock` (default) or `openai`; structured diagnostic facts only; mock output labeled simulated
+- Reports: `@opero/reports` pdfkit PDFs; workflow DRAFT → REVIEW_REQUIRED → APPROVED → PUBLISHED; `xray:publish` for OWNER/ADMIN
+- UI: `/organizations/[orgId]/readiness`, `reconciliations`, `ai`, `reports`
+- Authoritative math remains `@opero/diagnostics` — AI never changes KPIs or scores
 
 ## Not in this phase
 
-Generative AI interpretation, OCR, billing, Railway deployment, Postgres RLS, and public mutation of audit records are intentionally absent.
+OCR expansion, billing, public share links, Railway deployment, Postgres RLS, and public mutation of audit records are intentionally absent.

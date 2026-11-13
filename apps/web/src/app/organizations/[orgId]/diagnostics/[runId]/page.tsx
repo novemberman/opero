@@ -158,6 +158,29 @@ export default function DiagnosticRunPage() {
           ) : null}
         </section>
 
+        {run?.status === "SUCCEEDED" ? (
+          <section className="mb-10 border border-line p-4">
+            <h2 className="text-lg text-ink">Next steps for this run</h2>
+            <p className="mt-2 flex flex-wrap gap-x-5 gap-y-2 text-sm">
+              <Link className="underline" href={`/organizations/${orgId}/readiness?run=${runId}`}>
+                Check readiness
+              </Link>
+              <Link
+                className="underline"
+                href={`/organizations/${orgId}/reconciliations?run=${runId}`}
+              >
+                Review evidence conflicts
+              </Link>
+              <Link className="underline" href={`/organizations/${orgId}/ai?run=${runId}`}>
+                AI interpretation
+              </Link>
+              <Link className="underline" href={`/organizations/${orgId}/reports?run=${runId}`}>
+                Create a report
+              </Link>
+            </p>
+          </section>
+        ) : null}
+
         <section className="mb-10">
           <h2 className="text-xl text-ink">Key metrics</h2>
           <ul className="mt-3 divide-y divide-line border border-line">

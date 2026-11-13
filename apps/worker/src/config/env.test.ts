@@ -32,4 +32,12 @@ describe("parseWorkerEnv", () => {
       }),
     ).toThrow(/DOCUMENT_SCANNER_DRIVER/);
   });
+
+  it("defaults AI provider to mock", () => {
+    expect(parseWorkerEnv(valid).AI_PROVIDER).toBe("mock");
+  });
+
+  it("requires OpenAI credentials when AI_PROVIDER=openai", () => {
+    expect(() => parseWorkerEnv({ ...valid, AI_PROVIDER: "openai" })).toThrow(/OPENAI_API_KEY/);
+  });
 });

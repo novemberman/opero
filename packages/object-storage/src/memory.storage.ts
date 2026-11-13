@@ -1,4 +1,8 @@
-import { ObjectStoragePort, type ObjectHead } from "./storage.port.js";
+import {
+  ObjectAlreadyExistsError,
+  ObjectStoragePort,
+  type ObjectHead,
+} from "./storage.port.js";
 
 type Stored = { body: Buffer; contentType?: string };
 
@@ -15,8 +19,13 @@ export class MemoryObjectStorage extends ObjectStoragePort {
     key: string;
     body: Buffer;
     contentType?: string;
+    overwrite?: boolean;
   }): Promise<void> {
-    this.objects.set(this.id(input.bucket, input.key), {
+    const id = this.id(input.bucket, input.key);
+    if (input.overwrite === false && this.objects.has(id)) {
+      throw new ObjectAlreadyExistsError(input.bucket, input.key);
+    }
+    this.objects.set(id, {
       body: Buffer.from(input.body),
       contentType: input.contentType,
     });

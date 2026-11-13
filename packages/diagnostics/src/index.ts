@@ -15,6 +15,26 @@ export {
   SCORE_MIN_DIMENSIONS,
   SCORE_MIN_RELIABILITY,
 } from "./versions.js";
+export { assessReadiness } from "./readiness/assess.js";
+export type {
+  ReadinessChecklistItem,
+  ReadinessInput,
+  ReadinessInputDocument,
+  ReadinessIssue,
+  ReadinessIssueSeverity,
+  ReadinessResult,
+  ReadinessStatus,
+} from "./readiness/types.js";
+export {
+  detectEvidenceConflicts,
+  hasUnresolvedCriticalConflicts,
+} from "./reconciliation/detect.js";
+export type {
+  ConflictCandidate,
+  EvidenceConflict,
+  ReconciliationResolutionInput,
+  ReconciliationSeverity,
+} from "./reconciliation/types.js";
 export type {
   DiagnosticEngineResult,
   DiagnosticSnapshot,

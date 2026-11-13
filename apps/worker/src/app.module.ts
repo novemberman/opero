@@ -2,10 +2,12 @@ import { BullModule } from "@nestjs/bullmq";
 import { Module } from "@nestjs/common";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 import { LoggerModule } from "nestjs-pino";
+import { AiModule } from "./ai/ai.module";
 import { parseWorkerEnv, type WorkerEnv } from "./config/env";
 import { DiagnosticsModule } from "./diagnostics/diagnostics.module";
 import { DocumentsModule } from "./documents/documents.module";
 import { ExampleModule } from "./example/example.module";
+import { ReportsModule } from "./reports/reports.module";
 
 @Module({
   imports: [
@@ -47,6 +49,8 @@ import { ExampleModule } from "./example/example.module";
     ExampleModule,
     DocumentsModule,
     DiagnosticsModule,
+    AiModule,
+    ReportsModule,
   ],
 })
 export class AppModule {}

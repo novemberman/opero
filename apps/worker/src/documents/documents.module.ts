@@ -69,5 +69,6 @@ import {
     },
     DocumentProcessProcessor,
   ],
+  exports: [OBJECT_STORAGE],
 })
 export class DocumentsModule {}

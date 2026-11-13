@@ -199,3 +199,114 @@ export type DiagnosticRunJobPayload = {
   actorUserId: string;
   correlationId?: string;
 };
+
+export const periodTypeSchema = z.enum([
+  "MONTHLY",
+  "QUARTERLY",
+  "ANNUAL",
+  "CUSTOM",
+  "UNKNOWN",
+]);
+
+export const consolidationScopeSchema = z.enum(["CONSOLIDATED", "ENTITY", "UNKNOWN"]);
+
+export const updateStatementMetadataBodySchema = z
+  .object({
+    periodType: periodTypeSchema.optional(),
+    fiscalYearEndMonth: z.number().int().min(1).max(12).nullable().optional(),
+    consolidationScope: consolidationScopeSchema.optional(),
+    entityName: z.string().trim().min(1).max(200).nullable().optional(),
+    currency: z
+      .string()
+      .trim()
+      .min(3)
+      .max(3)
+      .regex(/^[A-Z]{3}$/)
+      .nullable()
+      .optional(),
+    periodStart: z.string().date().nullable().optional(),
+    periodEnd: z.string().date().nullable().optional(),
+    periodLabel: z.string().trim().min(1).max(64).nullable().optional(),
+    confirm: z.boolean().optional(),
+    note: z.string().trim().min(1).max(500).optional(),
+  })
+  .strict();
+
+export type UpdateStatementMetadataBody = z.infer<typeof updateStatementMetadataBodySchema>;
+
+export const assessReadinessBodySchema = z
+  .object({
+    documentIds: z.array(z.uuid()).min(1).max(20),
+    diagnosticRunId: z.uuid().optional(),
+  })
+  .strict();
+
+export type AssessReadinessBody = z.infer<typeof assessReadinessBodySchema>;
+
+export const resolveReconciliationBodySchema = z
+  .object({
+    resolution: z.enum(["SELECT_AUTHORITATIVE", "CORRECT_VALUE", "DISMISS"]),
+    selectedLineItemId: z.uuid().optional(),
+    correctedValue: z.string().trim().min(1).max(64).optional(),
+    reason: z.string().trim().min(1).max(500),
+  })
+  .strict();
+
+export type ResolveReconciliationBody = z.infer<typeof resolveReconciliationBodySchema>;
+
+export const createAiInterpretationBodySchema = z
+  .object({
+    diagnosticRunId: z.uuid(),
+    userNotes: z.string().trim().max(2000).optional(),
+  })
+  .strict();
+
+export type CreateAiInterpretationBody = z.infer<typeof createAiInterpretationBodySchema>;
+
+export const editAiInterpretationBodySchema = z
+  .object({
+    summary: z.string().trim().min(1).max(4000).optional(),
+    keyObservations: z.array(z.string().trim().min(1).max(1000)).max(20).optional(),
+    risks: z.array(z.string().trim().min(1).max(1000)).max(20).optional(),
+    limitations: z.array(z.string().trim().min(1).max(1000)).max(20).optional(),
+  })
+  .strict();
+
+export type EditAiInterpretationBody = z.infer<typeof editAiInterpretationBodySchema>;
+
+export const createXrayReportBodySchema = z
+  .object({
+    diagnosticRunId: z.uuid(),
+    title: z.string().trim().min(1).max(200).optional(),
+    aiInterpretationVersionId: z.uuid().optional(),
+  })
+  .strict();
+
+export type CreateXrayReportBody = z.infer<typeof createXrayReportBodySchema>;
+
+export const reportWorkflowBodySchema = z
+  .object({
+    note: z.string().trim().min(1).max(500).optional(),
+  })
+  .strict();
+
+export type ReportWorkflowBody = z.infer<typeof reportWorkflowBodySchema>;
+
+export const AI_QUEUE = "ai" as const;
+export const REPORTS_QUEUE = "reports" as const;
+
+export type AiInterpretJobPayload = {
+  organizationId: string;
+  aiInterpretationRunId: string;
+  actorUserId: string;
+  correlationId?: string;
+  userNotes?: string;
+};
+
+export type ReportRenderJobPayload = {
+  organizationId: string;
+  reportId: string;
+  reportVersionId: string;
+  actorUserId: string;
+  correlationId?: string;
+};

@@ -6,4 +6,8 @@ export { MockMalwareScanner } from "./mock.scanner.js";
 export { resolveStorageRoot } from "./paths.js";
 export { S3ObjectStorage, type S3StorageConfig } from "./s3.storage.js";
 export { MalwareScannerPort, type ScanResult, type ScanVerdict } from "./scanner.port.js";
-export { ObjectStoragePort, type ObjectHead } from "./storage.port.js";
+export {
+  ObjectAlreadyExistsError,
+  ObjectStoragePort,
+  type ObjectHead,
+} from "./storage.port.js";

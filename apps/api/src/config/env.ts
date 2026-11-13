@@ -43,6 +43,13 @@ export const apiEnvSchema = z
     DOCUMENT_SCANNER_DRIVER: z.enum(["clamav", "mock"]).default("clamav"),
     CLAMAV_HOST: z.string().min(1).default("127.0.0.1"),
     CLAMAV_PORT: z.coerce.number().int().min(1).max(65535).default(3310),
+    AI_PROVIDER: z.enum(["mock", "openai"]).default("mock"),
+    OPENAI_API_KEY: z.string().optional(),
+    OPENAI_BASE_URL: z.string().url().optional(),
+    OPENAI_MODEL: z.string().min(1).optional(),
+    AI_TIMEOUT_MS: z.coerce.number().int().min(1000).max(120_000).default(30_000),
+    AI_MAX_RETRIES: z.coerce.number().int().min(0).max(5).default(1),
+    AI_SHARE_STRUCTURED_CONTEXT: boolFromEnv.default(true),
   })
   .superRefine((env, ctx) => {
     if (env.NODE_ENV === "production" && env.AUTH_THROTTLE_DISABLED) {
@@ -65,6 +72,15 @@ export const apiEnvSchema = z
           code: "custom",
           path: ["S3_ENDPOINT"],
           message: "S3 endpoint and credentials are required when DOCUMENT_STORAGE_DRIVER=s3",
+        });
+      }
+    }
+    if (env.AI_PROVIDER === "openai") {
+      if (!env.OPENAI_API_KEY || !env.OPENAI_MODEL) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["OPENAI_API_KEY"],
+          message: "OPENAI_API_KEY and OPENAI_MODEL are required when AI_PROVIDER=openai",
         });
       }
     }

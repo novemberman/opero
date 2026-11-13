@@ -33,14 +33,33 @@ export class PermissionsGuard implements CanActivate {
     }
 
     if (!roleHasEveryPermission(membership.role, required)) {
+      const reportId =
+        typeof req.params.reportId === "string" ? req.params.reportId : null;
+      const path = req.route?.path ?? req.path ?? "";
+      const publicationAction = /\/approve\b/.test(path)
+        ? "approve"
+        : /\/publish\b/.test(path)
+          ? "publish"
+          : /\/reject\b/.test(path)
+            ? "reject"
+            : /\/render\b/.test(path)
+              ? "render"
+              : null;
       await this.audit.record({
-        action: "authz.denied",
-        entityType: "organization",
-        entityId: membership.organizationId,
+        action: publicationAction ? "report.publication_denied" : "authz.denied",
+        entityType: publicationAction ? "xray_report" : "organization",
+        entityId: publicationAction ? reportId : membership.organizationId,
         organizationId: membership.organizationId,
         actorUserId: membership.userId,
         requestId: req.requestId,
-        metadata: { reason: "missing_permission", required },
+        metadata: {
+          reason: "missing_permission",
+          failureCode: "MISSING_PERMISSION",
+          failureClass: "PERMISSION",
+          required,
+          ...(publicationAction ? { requestedAction: publicationAction } : {}),
+          ...(reportId && !publicationAction ? { reportId } : {}),
+        },
       });
       throw new ForbiddenException("Insufficient permissions");
     }
