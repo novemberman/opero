@@ -13,6 +13,7 @@ import {
   cleanupPhase6,
   createOrganization,
   get,
+  grantXrayProAccess,
   post,
   resetDatabase,
   runDiagnostic,
@@ -141,6 +142,7 @@ describe("Phase 6C publication audit and disclosure lock", () => {
 
     await post(app, ctx.owner, `${ctx.path}/approve`).send({}).expect(200);
     const published = await post(app, ctx.owner, `${ctx.path}/publish`).send({}).expect(200);
+    await grantXrayProAccess(prisma, ctx.organizationId, ctx.reportId);
     const versionId = published.body.report.versions[0].id as string;
     const frozen = published.body.report.versions[0].disclosures;
 

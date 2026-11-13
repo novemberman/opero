@@ -28,6 +28,7 @@ import {
   cleanupPhase6,
   createOrganization,
   get,
+  grantXrayProAccess,
   post,
   resetDatabase,
   runDiagnostic,
@@ -207,6 +208,7 @@ describe("Phase 6B publication integrity", () => {
   async function publishedReport(): Promise<Report & { version: VersionSummary }> {
     const report = await approvedReport();
     await post(app, owner, `${report.path}/publish`).send({}).expect(200);
+    await grantXrayProAccess(prisma, organizationId, report.reportId);
     return { ...report, version: await currentVersion(report) };
   }
 
@@ -503,6 +505,7 @@ describe("Phase 6B publication integrity", () => {
     });
 
     const published = await post(app, owner, `${report.path}/publish`).send({}).expect(200);
+    await grantXrayProAccess(prisma, organizationId, report.reportId);
     expect(published.body.report.status).toBe("PUBLISHED");
     const versions = published.body.report.versions as VersionSummary[];
     expect(versions.map((v) => [v.versionNumber, v.status, v.aiInterpretationVersionId])).toEqual([
@@ -674,6 +677,7 @@ describe("Phase 6B publication integrity", () => {
     await post(app, owner, `${report.path}/submit-review`).send({}).expect(200);
     await post(app, owner, `${report.path}/approve`).send({}).expect(200);
     const republished = await post(app, owner, `${report.path}/publish`).send({}).expect(200);
+    await grantXrayProAccess(prisma, organizationId, report.reportId);
     const versions = republished.body.report.versions as VersionSummary[];
     expect(versions.map((v) => [v.versionNumber, v.status])).toEqual([
       [2, "PUBLISHED"],
@@ -745,6 +749,7 @@ describe("Phase 6B publication integrity", () => {
     await post(app, owner, `${report.path}/submit-review`).send({}).expect(200);
     await post(app, owner, `${report.path}/approve`).send({}).expect(200);
     const published = await post(app, owner, `${report.path}/publish`).send({}).expect(200);
+    await grantXrayProAccess(prisma, organizationId, report.reportId);
     const latest = published.body.report.versions[0] as VersionSummary;
     expect(latest.storageKey).not.toBe(key);
     const pdf = await download(app, owner, `${report.path}/pdf`).expect(200);
@@ -801,6 +806,7 @@ describe("Phase 6B publication integrity", () => {
     await post(app, owner, `${report.path}/submit-review`).send({}).expect(200);
     await post(app, owner, `${report.path}/approve`).send({}).expect(200);
     await post(app, owner, `${report.path}/publish`).send({}).expect(200);
+    await grantXrayProAccess(prisma, organizationId, report.reportId);
     const replacement = await download(app, viewer, `${report.path}/pdf`).expect(200);
     expect(replacement.headers["content-disposition"]).toContain("opero-xray-report-v2.pdf");
     const lost = await get(app, viewer, `${report.path}/pdf?versionId=${report.versionId}`).expect(
@@ -913,6 +919,7 @@ describe("Phase 6B publication integrity", () => {
     expect(sha256(stored)).toBe(version.contentHash);
     expect(stored.length).toBe(version.byteSize);
     expect(detail.body.report.publishedAt).toBe(version.disclosures?.generatedAt);
+    await grantXrayProAccess(prisma, organizationId, report.reportId);
     const pdf = await download(app, viewer, `${report.path}/pdf`).expect(200);
     expect((pdf.body as Buffer).equals(stored)).toBe(true);
 

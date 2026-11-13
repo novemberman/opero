@@ -1,48 +1,43 @@
 # Opero agent handoff
 
-Date: 2026-11-13 (Phase 6 / 6B / 6C complete; committed — awaiting owner review)
+Date: 2026-11-13 (Phase 7A Korapay integration audit complete — awaiting owner Git checkpoint)
 Workspace: `/home/opero/projects/opero`
 Branch: `main`
 Remote: private GitHub repository `novemberman/opero` (`git@github.com:novemberman/opero.git`)
-Phase: **Phase 6 + 6B + 6C** implemented. Do not begin Phase 7 or Railway deploy until owner approves.
+HEAD baseline: `75a1ed4` (Phase 6C). Phase 7A remains **uncommitted**.
+Phase: **Phase 7A** audited vs official Korapay docs. **Do not commit/push/deploy until owner approves.**
 
 ## Phase status
 
 | Phase | Status |
 | --- | --- |
-| Phase 2 monorepo foundation | Committed as `f8895ad` |
-| Phase 3 identity / orgs / tenant security | Committed as `2a8d76e` |
-| Phase 4 document ingestion / evidence | Committed as `dc1456c` (push may still need SSH) |
-| Phase 5 financial diagnostics | Committed as `dc8e4ee` (baseline for Phase 6) |
-| Phase 6 readiness / AI / reports + publication integrity | See latest `feat: implement Opero X-Ray AI reports and publication integrity` commit |
+| Phase 5 financial diagnostics | `dc8e4ee` |
+| Phase 6 / 6B / 6C AI reports + publication integrity | `75a1ed4` |
+| Phase 7A Nigerian commercialization (Korapay) | Implemented + integration audit locally — no commit yet |
 
-## Phase 6 notes
+## Phase 7A notes
 
 | Area | Status |
 | --- | --- |
-| Permission `xray:publish` | OWNER + ADMIN only |
-| Prisma migrations | `20261113120000` (Phase 6), `20261113140000` (6B), `20261113150000` (6C disclosure lock) |
-| `@opero/diagnostics` readiness + reconciliation | Pure engines + unit tests |
-| `@opero/ai` | mock + openai-compatible; grounding.v2; prompt `ai.interpret.v1` |
-| `@opero/reports` | pdfkit PDF from diagnostic snapshots |
-| API modules | statements metadata, readiness, reconciliation, AI, reports |
-| Worker | `ai.interpret` + `reports.render` jobs |
-| Web | readiness / reconciliations / ai / reports pages + statement metadata UI |
-| Docs | `docs/PHASE6_AI_AND_REPORTS.md` |
-| Failed approve/publish audit | `report.publication_denied` (independent of rejected tx; deduped; no sensitive payloads) |
-| Published immutability | Trigger locks PDF bytes metadata, disclosures, AI version id, approval-critical fields |
+| Primary provider | Korapay (mock default; no Paystack) |
+| Migration | `20261113180000_phase7a_commercialization` (+ launch catalog seed) |
+| Package | `@opero/payments` |
+| Webhook | `POST /api/v1/billing/webhooks/korapay` via `BILLING_WEBHOOK_BASE_URL` + dashboard |
+| Entitlements | Orthogonal to RBAC; PDF/full published report gated |
+| Subscriptions | Manual `SUBSCRIPTION_RENEW` only; Direct Debit not assumed |
+| Docs | `docs/PHASE7A_BILLING.md` |
+| Sandbox live provider tests | Pending (no sandbox secrets in local env) |
 
 ### Residual / production risks
 
-- **No Postgres RLS** — tenant isolation is service-layer only.
-- Score bands remain provisional heuristics (Phase 5).
-- Mock AI must never be presented as live in production UX.
-- Live AI prose may include ungrounded sentences; tables remain authoritative.
-- Dev DB may need `pnpm db:migrate` after pulling Phase 6.
-- No public share links, billing, or Railway.
+- Live/sandbox Korapay credentials and public webhook URL not configured locally.
+- Korapay recurring Direct Debit not integrated — renewals are manual by design.
+- No Postgres RLS; tenant isolation remains service-layer.
+- Frontend billing UI is functional MVP, not polished commerce UX.
+- No Railway / live payments.
 
 ## Exact next steps (owner-gated)
 
-1. Review Phase 6 / 6B / 6C completion and approve next work.
+1. Review Phase 7A Korapay audit completion report; approve commit/push when ready.
 2. Prefer `pnpm db:migrate`. Never `migrate reset` unless explicitly requested.
-3. Do not start billing, Phase 7, or Railway until approved.
+3. Do not process live payments or deploy to Railway until approved.

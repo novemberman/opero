@@ -126,5 +126,28 @@ describe("prisma schema", () => {
     expect(schema).toContain("periodType");
     expect(schema).toContain("consolidationScope");
   });
+
+  it("defines Phase 7A commercial catalog and billing models", () => {
+    for (const model of [
+      "PricingVersion",
+      "Product",
+      "Price",
+      "Plan",
+      "PlanEntitlement",
+      "CheckoutIntent",
+      "Payment",
+      "PaymentEvent",
+      "Purchase",
+      "EntitlementGrant",
+      "Subscription",
+      "SubscriptionEvent",
+      "EnterpriseQuoteRequest",
+    ]) {
+      expect(schema).toContain(`model ${model} {`);
+    }
+    expect(schema).toContain("amountMinor");
+    expect(schema).toContain("paymentReference");
+    expect(schema).toContain("idempotencyKey");
+  });
 });
 

@@ -16,6 +16,10 @@ const CSRF_EXEMPT_SUFFIXES = [
   "/auth/reset-password",
   "/invitations/accept-public",
   "/docs",
+  // Korapay server-to-server webhooks (signature-verified, no browser CSRF).
+  "/billing/webhooks/korapay",
+  // Public enterprise quotation intake (no session required).
+  "/billing/enterprise-quotes",
 ];
 
 function isCsrfExempt(path: string): boolean {

@@ -280,6 +280,12 @@ model Organization {
   aiInterpretationRuns       AIInterpretationRun[]
   xrayReports                XRayReport[]
   reportAccessEvents         ReportAccessEvent[]
+  checkoutIntents            CheckoutIntent[]
+  payments                   Payment[]
+  purchases                  Purchase[]
+  entitlementGrants          EntitlementGrant[]
+  subscriptions              Subscription[]
+  enterpriseQuoteRequests    EnterpriseQuoteRequest[]
 
   @@map("organizations")
 }
@@ -314,6 +320,10 @@ model User {
   reportApprovals              ReportApproval[]
   reportAccessEvents           ReportAccessEvent[]
   statementsConfirmed          FinancialStatement[]          @relation("StatementConfirmer")
+  checkoutIntentsCreated       CheckoutIntent[]              @relation("CheckoutIntentActor")
+  purchasesCreated             Purchase[]                    @relation("PurchaseActor")
+  subscriptionsCreated         Subscription[]                @relation("SubscriptionActor")
+  enterpriseQuotesRequested    EnterpriseQuoteRequest[]      @relation("EnterpriseQuoteActor")
 
   @@map("users")
 }
@@ -1109,4 +1119,374 @@ model ReportAccessEvent {
 
   @@index([organizationId, reportId])
   @@map("report_access_events")
+}
+
+// ---------------------------------------------------------------------------
+// Phase 7A — Commercial catalog, billing, entitlements (Korapay-ready)
+// Amounts are integer minor units (kobo for NGN). Provider APIs may use major units.
+// ---------------------------------------------------------------------------
+
+enum ProductKind {
+  ONE_TIME
+  SUBSCRIPTION
+  ENTERPRISE
+}
+
+enum BillingInterval {
+  ONE_TIME
+  MONTHLY
+  YEARLY
+  CUSTOM
+}
+
+enum CheckoutPurpose {
+  XRAY_PRO_REPORT
+  SUBSCRIPTION_START
+  SUBSCRIPTION_RENEW
+}
+
+enum CheckoutStatus {
+  CREATED
+  REDIRECTED
+  PENDING_PAYMENT
+  SUCCEEDED
+  FAILED
+  EXPIRED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  REFUNDED
+  PARTIALLY_REFUNDED
+  CANCELLED
+}
+
+enum PurchaseStatus {
+  PENDING
+  FULFILLED
+  REFUNDED
+  REVOKED
+}
+
+enum SubscriptionStatus {
+  PENDING_PAYMENT
+  ACTIVE
+  PAST_DUE
+  GRACE
+  CANCELED
+  EXPIRED
+}
+
+enum EntitlementScopeType {
+  ORGANIZATION
+  REPORT
+}
+
+enum EntitlementSourceType {
+  FREE_TIER
+  PURCHASE
+  SUBSCRIPTION
+  MANUAL
+}
+
+model PricingVersion {
+  id            String    @id @default(uuid()) @db.Uuid
+  code          String    @unique
+  label         String
+  effectiveFrom DateTime  @map("effective_from")
+  effectiveTo   DateTime? @map("effective_to")
+  notes         String?
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  products Product[]
+  prices   Price[]
+  plans    Plan[]
+
+  @@map("pricing_versions")
+}
+
+model Product {
+  id               String      @id @default(uuid()) @db.Uuid
+  pricingVersionId String      @map("pricing_version_id") @db.Uuid
+  code             String
+  name             String
+  description      String?
+  kind             ProductKind
+  active           Boolean     @default(true)
+  createdAt        DateTime    @default(now()) @map("created_at")
+  updatedAt        DateTime    @updatedAt @map("updated_at")
+
+  pricingVersion PricingVersion @relation(fields: [pricingVersionId], references: [id], onDelete: Restrict)
+  prices         Price[]
+  plans          Plan[]
+
+  @@unique([pricingVersionId, code])
+  @@index([code])
+  @@map("products")
+}
+
+model Price {
+  id               String          @id @default(uuid()) @db.Uuid
+  pricingVersionId String          @map("pricing_version_id") @db.Uuid
+  productId        String          @map("product_id") @db.Uuid
+  code             String
+  currency         String          @db.Char(3)
+  amountMinor      Int             @map("amount_minor")
+  interval         BillingInterval
+  active           Boolean         @default(true)
+  createdAt        DateTime        @default(now()) @map("created_at")
+
+  pricingVersion PricingVersion @relation(fields: [pricingVersionId], references: [id], onDelete: Restrict)
+  product        Product        @relation(fields: [productId], references: [id], onDelete: Restrict)
+  plans          Plan[]
+  checkoutIntents CheckoutIntent[]
+  purchases      Purchase[]
+  subscriptions  Subscription[]
+
+  @@unique([pricingVersionId, code])
+  @@index([productId])
+  @@map("prices")
+}
+
+model Plan {
+  id               String   @id @default(uuid()) @db.Uuid
+  pricingVersionId String   @map("pricing_version_id") @db.Uuid
+  productId        String   @map("product_id") @db.Uuid
+  priceId          String   @map("price_id") @db.Uuid
+  code             String
+  name             String
+  description      String?
+  active           Boolean  @default(true)
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  pricingVersion PricingVersion    @relation(fields: [pricingVersionId], references: [id], onDelete: Restrict)
+  product        Product           @relation(fields: [productId], references: [id], onDelete: Restrict)
+  price          Price             @relation(fields: [priceId], references: [id], onDelete: Restrict)
+  entitlements   PlanEntitlement[]
+  subscriptions  Subscription[]
+
+  @@unique([pricingVersionId, code])
+  @@index([code])
+  @@map("plans")
+}
+
+model PlanEntitlement {
+  id              String  @id @default(uuid()) @db.Uuid
+  planId          String  @map("plan_id") @db.Uuid
+  entitlementCode String  @map("entitlement_code")
+  limitValue      Int?    @map("limit_value")
+  metadata        Json?
+
+  plan Plan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@unique([planId, entitlementCode])
+  @@map("plan_entitlements")
+}
+
+model CheckoutIntent {
+  id                 String          @id @default(uuid()) @db.Uuid
+  organizationId     String          @map("organization_id") @db.Uuid
+  actorUserId        String          @map("actor_user_id") @db.Uuid
+  purpose            CheckoutPurpose
+  status             CheckoutStatus  @default(CREATED)
+  priceId            String          @map("price_id") @db.Uuid
+  amountMinor        Int             @map("amount_minor")
+  currency           String          @db.Char(3)
+  pricingVersionCode String          @map("pricing_version_code")
+  productCode        String          @map("product_code")
+  reportId           String?         @map("report_id") @db.Uuid
+  planId             String?         @map("plan_id") @db.Uuid
+  subscriptionId     String?         @map("subscription_id") @db.Uuid
+  idempotencyKey     String          @unique @map("idempotency_key")
+  paymentReference   String          @unique @map("payment_reference")
+  provider           String          @default("korapay")
+  checkoutUrl        String?         @map("checkout_url")
+  customerEmail      String          @map("customer_email")
+  customerName       String?         @map("customer_name")
+  redirectUrl        String?         @map("redirect_url")
+  expiresAt          DateTime        @map("expires_at")
+  metadata           Json?
+  createdAt          DateTime        @default(now()) @map("created_at")
+  updatedAt          DateTime        @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  actor        User         @relation("CheckoutIntentActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+  price        Price        @relation(fields: [priceId], references: [id], onDelete: Restrict)
+  payment      Payment?
+  purchase     Purchase?
+
+  @@index([organizationId, createdAt])
+  @@index([organizationId, reportId])
+  @@map("checkout_intents")
+}
+
+model Payment {
+  id                 String        @id @default(uuid()) @db.Uuid
+  organizationId     String        @map("organization_id") @db.Uuid
+  checkoutIntentId   String        @unique @map("checkout_intent_id") @db.Uuid
+  reference          String        @unique
+  provider           String
+  providerReference  String?       @map("provider_reference")
+  status             PaymentStatus @default(PENDING)
+  amountMinor        Int           @map("amount_minor")
+  currency           String        @db.Char(3)
+  amountPaidMinor    Int?          @map("amount_paid_minor")
+  feeMinor           Int?          @map("fee_minor")
+  paidAt             DateTime?     @map("paid_at")
+  failedAt           DateTime?     @map("failed_at")
+  refundedAt         DateTime?     @map("refunded_at")
+  fulfillmentLock    String?       @unique @map("fulfillment_lock")
+  fulfilledAt        DateTime?     @map("fulfilled_at")
+  rawVerifySnapshot  Json?         @map("raw_verify_snapshot")
+  createdAt          DateTime      @default(now()) @map("created_at")
+  updatedAt          DateTime      @updatedAt @map("updated_at")
+
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  checkoutIntent CheckoutIntent  @relation(fields: [checkoutIntentId], references: [id], onDelete: Restrict)
+  events         PaymentEvent[]
+  purchase       Purchase?
+  subscription   Subscription?   @relation("SubscriptionOriginPayment")
+
+  @@index([organizationId, status])
+  @@map("payments")
+}
+
+model PaymentEvent {
+  id              String   @id @default(uuid()) @db.Uuid
+  paymentId       String?  @map("payment_id") @db.Uuid
+  organizationId  String?  @map("organization_id") @db.Uuid
+  provider        String
+  eventType       String   @map("event_type")
+  providerEventKey String  @unique @map("provider_event_key")
+  reference       String
+  payload         Json
+  signatureValid  Boolean  @map("signature_valid")
+  processedAt     DateTime? @map("processed_at")
+  processResult   String?  @map("process_result")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  payment Payment? @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+
+  @@index([reference])
+  @@index([createdAt])
+  @@map("payment_events")
+}
+
+model Purchase {
+  id               String         @id @default(uuid()) @db.Uuid
+  organizationId   String         @map("organization_id") @db.Uuid
+  actorUserId      String         @map("actor_user_id") @db.Uuid
+  checkoutIntentId String         @unique @map("checkout_intent_id") @db.Uuid
+  paymentId        String         @unique @map("payment_id") @db.Uuid
+  priceId          String         @map("price_id") @db.Uuid
+  reportId         String         @map("report_id") @db.Uuid
+  productCode      String         @map("product_code")
+  amountMinor      Int            @map("amount_minor")
+  currency         String         @db.Char(3)
+  status           PurchaseStatus @default(PENDING)
+  fulfilledAt      DateTime?      @map("fulfilled_at")
+  refundedAt       DateTime?      @map("refunded_at")
+  createdAt        DateTime       @default(now()) @map("created_at")
+  updatedAt        DateTime       @updatedAt @map("updated_at")
+
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  actor          User           @relation("PurchaseActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+  checkoutIntent CheckoutIntent @relation(fields: [checkoutIntentId], references: [id], onDelete: Restrict)
+  payment        Payment        @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+  price          Price          @relation(fields: [priceId], references: [id], onDelete: Restrict)
+
+  @@unique([organizationId, reportId, productCode, paymentId])
+  @@index([organizationId, reportId])
+  @@map("purchases")
+}
+
+model EntitlementGrant {
+  id             String                @id @default(uuid()) @db.Uuid
+  organizationId String                @map("organization_id") @db.Uuid
+  code           String
+  scopeType      EntitlementScopeType  @map("scope_type")
+  /// Organization id for ORGANIZATION scope; report id for REPORT scope.
+  scopeId        String                @map("scope_id")
+  sourceType     EntitlementSourceType @map("source_type")
+  sourceId       String                @map("source_id")
+  limitValue     Int?                  @map("limit_value")
+  validFrom      DateTime              @map("valid_from")
+  validUntil     DateTime?             @map("valid_until")
+  revokedAt      DateTime?             @map("revoked_at")
+  revokeReason   String?               @map("revoke_reason")
+  createdAt      DateTime              @default(now()) @map("created_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  @@unique([organizationId, code, scopeType, scopeId, sourceId])
+  @@index([organizationId, code, revokedAt])
+  @@index([organizationId, scopeType, scopeId])
+  @@map("entitlement_grants")
+}
+
+model Subscription {
+  id                    String             @id @default(uuid()) @db.Uuid
+  organizationId        String             @map("organization_id") @db.Uuid
+  actorUserId           String             @map("actor_user_id") @db.Uuid
+  planId                String             @map("plan_id") @db.Uuid
+  priceId               String             @map("price_id") @db.Uuid
+  status                SubscriptionStatus @default(PENDING_PAYMENT)
+  currentPeriodStart    DateTime?          @map("current_period_start")
+  currentPeriodEnd      DateTime?          @map("current_period_end")
+  graceUntil            DateTime?          @map("grace_until")
+  cancelAtPeriodEnd     Boolean            @default(false) @map("cancel_at_period_end")
+  canceledAt            DateTime?          @map("canceled_at")
+  originPaymentId       String?            @unique @map("origin_payment_id") @db.Uuid
+  amountMinorSnapshot   Int                @map("amount_minor_snapshot")
+  currencySnapshot      String             @map("currency_snapshot") @db.Char(3)
+  pricingVersionCode    String             @map("pricing_version_code")
+  createdAt             DateTime           @default(now()) @map("created_at")
+  updatedAt             DateTime           @updatedAt @map("updated_at")
+
+  organization  Organization         @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  actor         User                 @relation("SubscriptionActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+  plan          Plan                 @relation(fields: [planId], references: [id], onDelete: Restrict)
+  price         Price                @relation(fields: [priceId], references: [id], onDelete: Restrict)
+  originPayment Payment?             @relation("SubscriptionOriginPayment", fields: [originPaymentId], references: [id], onDelete: SetNull)
+  events        SubscriptionEvent[]
+
+  @@index([organizationId, status])
+  @@map("subscriptions")
+}
+
+model SubscriptionEvent {
+  id             String   @id @default(uuid()) @db.Uuid
+  subscriptionId String   @map("subscription_id") @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  fromStatus     String?  @map("from_status")
+  toStatus       String   @map("to_status")
+  reason         String?
+  metadata       Json?
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  subscription Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@index([subscriptionId, createdAt])
+  @@map("subscription_events")
+}
+
+model EnterpriseQuoteRequest {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String?  @map("organization_id") @db.Uuid
+  actorUserId    String?  @map("actor_user_id") @db.Uuid
+  contactName    String   @map("contact_name")
+  contactEmail   String   @map("contact_email")
+  companyName    String   @map("company_name")
+  message        String
+  status         String   @default("RECEIVED")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  actor        User?         @relation("EnterpriseQuoteActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@map("enterprise_quote_requests")
 }

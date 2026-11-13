@@ -13,6 +13,8 @@ process.env.MAIL_DIR = resolve(import.meta.dirname, "../../.data/mail-test");
 process.env.AUTH_THROTTLE_DISABLED = "true";
 process.env.DOCUMENT_STORAGE_DRIVER = "memory";
 process.env.DOCUMENT_SCANNER_DRIVER = "mock";
+process.env.PAYMENT_PROVIDER = process.env.PAYMENT_PROVIDER ?? "mock";
 process.env.REDIS_PASSWORD =
   process.env.REDIS_PASSWORD ?? "replace-with-local-dev-password";
+
 

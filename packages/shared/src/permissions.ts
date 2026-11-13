@@ -5,6 +5,8 @@ import type { MembershipRole } from "./roles";
  * Frontend checks are convenience only; Nest guards enforce these.
  *
  * Phase 6: xray:publish is OWNER/ADMIN only (approve/publish reports).
+ * Phase 7A: billing:manage is OWNER/ADMIN only; billing:read includes VIEWER.
+ * Commercial entitlements are separate — see entitlements.ts.
  */
 export const permissions = [
   "org:read",
@@ -17,6 +19,8 @@ export const permissions = [
   "xray:read",
   "xray:write",
   "xray:publish",
+  "billing:read",
+  "billing:manage",
 ] as const;
 
 export type Permission = (typeof permissions)[number];
@@ -33,6 +37,8 @@ export const rolePermissions: Record<MembershipRole, readonly Permission[]> = {
     "xray:read",
     "xray:write",
     "xray:publish",
+    "billing:read",
+    "billing:manage",
   ],
   ADMIN: [
     "org:read",
@@ -45,9 +51,11 @@ export const rolePermissions: Record<MembershipRole, readonly Permission[]> = {
     "xray:read",
     "xray:write",
     "xray:publish",
+    "billing:read",
+    "billing:manage",
   ],
-  ANALYST: ["org:read", "org:leave", "xray:read", "xray:write"],
-  VIEWER: ["org:read", "org:leave", "xray:read"],
+  ANALYST: ["org:read", "org:leave", "xray:read", "xray:write", "billing:read"],
+  VIEWER: ["org:read", "org:leave", "xray:read", "billing:read"],
 };
 
 export function roleHasPermission(role: MembershipRole, permission: Permission): boolean {

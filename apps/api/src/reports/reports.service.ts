@@ -24,6 +24,8 @@ import type { Queue } from "bullmq";
 import { createHash } from "node:crypto";
 import { narrativeText } from "../ai/narrative";
 import { AuditService } from "../audit/audit.service";
+import { EntitlementsService } from "../billing/entitlements.service";
+import { redactPaidReportPreview } from "../billing/report-access";
 import type { ApiEnv } from "../config/env";
 import { PRISMA_CLIENT } from "../database/database.constants";
 import { ReadinessService } from "../readiness/readiness.service";
@@ -98,6 +100,7 @@ export class ReportsService {
     @InjectQueue(REPORTS_QUEUE_NAME) private readonly queue: Queue,
     private readonly readiness: ReadinessService,
     private readonly reconciliation: ReconciliationService,
+    private readonly entitlements: EntitlementsService,
     private readonly audit: AuditService,
     private readonly config: ConfigService<ApiEnv, true>,
   ) {}
@@ -166,7 +169,7 @@ export class ReportsService {
       },
     });
 
-    return this.getDetail(input.organizationId, report.id);
+    return this.getDetail(input.organizationId, report.id, undefined, { forceFull: true });
   }
 
   /**
@@ -264,7 +267,7 @@ export class ReportsService {
       metadata: { versionId: version.id, versionNumber: version.versionNumber },
     });
 
-    return this.getDetail(input.organizationId, report.id);
+    return this.getDetail(input.organizationId, report.id, undefined, { forceFull: true });
   }
 
   async list(organizationId: string) {
@@ -292,6 +295,7 @@ export class ReportsService {
     organizationId: string,
     reportId: string,
     viewer?: { actor: AuthenticatedUser; requestId?: string },
+    options?: { /** Workflow mutations may return the full frozen payload to the actor. */ forceFull?: boolean },
   ) {
     const report = await this.prisma.xRayReport.findFirst({
       where: { id: reportId, organizationId },
@@ -327,10 +331,21 @@ export class ReportsService {
     }
 
     const { currentVersion, ...summary } = report;
-    const preview = currentVersion
+    const fullPreview = currentVersion
       ? buildReportModel(payloadOf(currentVersion), publicationOf(currentVersion))
       : null;
-    return { report: summary, preview };
+    // Internal draft/review stays fully visible to members. Published paid
+    // content requires a commercial entitlement (purchase or active OS plan).
+    const published = report.status === "PUBLISHED" || report.status === "SUPERSEDED";
+    const entitled =
+      Boolean(options?.forceFull) ||
+      !published ||
+      (await this.entitlements.canAccessFullReport(organizationId, reportId));
+    return {
+      report: summary,
+      access: entitled ? "FULL" : "FREE_PREVIEW",
+      preview: entitled || !fullPreview ? fullPreview : redactPaidReportPreview(fullPreview),
+    };
   }
 
   async listVersions(organizationId: string, reportId: string) {
@@ -347,9 +362,22 @@ export class ReportsService {
       where: { id: versionId, reportId, organizationId },
     });
     if (!version) throw new NotFoundException("Report version not found");
+    const fullPreview = buildReportModel(payloadOf(version), publicationOf(version));
+    const published = version.status === "PUBLISHED" || version.status === "SUPERSEDED";
+    const entitled =
+      !published ||
+      (await this.entitlements.canAccessFullReport(organizationId, reportId));
     return {
-      version,
-      preview: buildReportModel(payloadOf(version), publicationOf(version)),
+      version: entitled
+        ? version
+        : {
+            id: version.id,
+            versionNumber: version.versionNumber,
+            status: version.status,
+            createdAt: version.createdAt,
+          },
+      access: entitled ? "FULL" : "FREE_PREVIEW",
+      preview: entitled ? fullPreview : redactPaidReportPreview(fullPreview),
     };
   }
 
@@ -680,7 +708,7 @@ export class ReportsService {
       },
     });
 
-    return this.getDetail(input.organizationId, report.id);
+    return this.getDetail(input.organizationId, report.id, undefined, { forceFull: true });
   }
 
   async authorizeDownload(input: {
@@ -709,6 +737,31 @@ export class ReportsService {
     }
     if (!version.storageKey.startsWith(`org/${input.organizationId}/reports/${input.reportId}/`)) {
       throw new ForbiddenException("Invalid storage key for organization");
+    }
+    // Commercial gate after publication checks so missing PDFs stay 409, not 403.
+    const canDownload = await this.entitlements.canDownloadPdf(
+      input.organizationId,
+      input.reportId,
+    );
+    if (!canDownload) {
+      await this.audit.record({
+        action: "billing.entitlement_denied",
+        entityType: "xray_report",
+        entityId: input.reportId,
+        organizationId: input.organizationId,
+        actorUserId: input.actor.id,
+        requestId: input.requestId,
+        metadata: {
+          entitlement: "xray.pdf_download",
+          reason: "MISSING_ENTITLEMENT",
+          versionId: version.id,
+        },
+      });
+      throw new ForbiddenException({
+        message: "X-Ray Pro or an active Opero OS subscription is required to download this PDF",
+        code: "ENTITLEMENT_REQUIRED",
+        productCode: "XRAY_PRO",
+      });
     }
 
     let buffer: Buffer;
@@ -883,7 +936,7 @@ export class ReportsService {
       metadata: { versionId: version.id, from: report.status, to: step.to },
     });
 
-    return this.getDetail(input.organizationId, report.id);
+    return this.getDetail(input.organizationId, report.id, undefined, { forceFull: true });
   }
 
   private async requireReport(organizationId: string, reportId: string) {

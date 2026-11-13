@@ -3,18 +3,17 @@
   "private": true,
   "version": "0.0.0",
   "scripts": {
-    "predev": "pnpm --filter @opero/shared --filter @opero/document-processing --filter @opero/object-storage --filter @opero/diagnostics --filter @opero/ai --filter @opero/reports build",
+    "predev": "pnpm --filter @opero/shared --filter @opero/document-processing --filter @opero/object-storage --filter @opero/diagnostics --filter @opero/ai --filter @opero/reports --filter @opero/payments build",
     "dev": "nest start --watch",
-    "prebuild": "pnpm --filter @opero/shared --filter @opero/document-processing --filter @opero/object-storage --filter @opero/diagnostics --filter @opero/ai --filter @opero/reports build",
+    "prebuild": "pnpm --filter @opero/shared --filter @opero/document-processing --filter @opero/object-storage --filter @opero/diagnostics --filter @opero/ai --filter @opero/reports --filter @opero/payments build",
     "build": "nest build",
     "start": "node --import tsx dist/main.js",
     "lint": "eslint .",
-    "pretypecheck": "pnpm --filter @opero/shared --filter @opero/document-processing --filter @opero/object-storage --filter @opero/diagnostics --filter @opero/ai --filter @opero/reports build",
+    "pretypecheck": "pnpm --filter @opero/shared --filter @opero/document-processing --filter @opero/object-storage --filter @opero/diagnostics --filter @opero/ai --filter @opero/reports --filter @opero/payments build",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "pretest": "pnpm --filter @opero/shared --filter @opero/document-processing --filter @opero/object-storage --filter @opero/diagnostics --filter @opero/ai --filter @opero/reports build",
+    "pretest": "pnpm --filter @opero/shared --filter @opero/document-processing --filter @opero/object-storage --filter @opero/diagnostics --filter @opero/ai --filter @opero/reports --filter @opero/payments build",
     "test": "vitest run"
   },
-
   "dependencies": {
     "@nestjs/bullmq": "12.0.1",
     "@nestjs/common": "12.5.0",

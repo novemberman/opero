@@ -10,6 +10,7 @@ import { AuditModule } from "./audit/audit.module";
 import { AuthModule } from "./auth/auth.module";
 import { CsrfMiddleware } from "./auth/csrf.middleware";
 import { AuthorizationModule } from "./authorization/authorization.module";
+import { BillingModule } from "./billing/billing.module";
 import { CorrelationIdMiddleware } from "./common/correlation-id.middleware";
 import { parseApiEnv, type ApiEnv } from "./config/env";
 import { DatabaseModule } from "./database/database.module";
@@ -76,6 +77,8 @@ import { StorageModule } from "./storage/storage.module";
                 "req.body.password",
                 "req.body.token",
                 "req.body.csrfToken",
+                "req.headers.authorization",
+                "KORAPAY_SECRET_KEY",
                 'res.headers["set-cookie"]',
               ],
               censor: "[Redacted]",
@@ -123,6 +126,7 @@ import { StorageModule } from "./storage/storage.module";
     ReadinessModule,
     AiModule,
     ReportsModule,
+    BillingModule,
     HealthModule,
   ],
   providers: [

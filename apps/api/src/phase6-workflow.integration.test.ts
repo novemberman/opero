@@ -15,6 +15,7 @@ import {
   cleanupPhase6,
   createOrganization,
   get,
+  grantXrayProAccess,
   patch,
   post,
   resetDatabase,
@@ -163,8 +164,9 @@ describe("Phase 6 complete workflow", () => {
       .expect(200);
     expect(published.body.report.status).toBe("PUBLISHED");
     expect(published.body.preview.verifiedPublication).toBe(scoreBefore.status === "SCORED");
+    await grantXrayProAccess(prisma, organizationId, reportId);
 
-    // 7. Private PDF download
+    // 7. Private PDF download (requires commercial entitlement after Phase 7A)
     const pdf = await get(app, owner, `${org}/reports/${reportId}/pdf`)
       .buffer(true)
       .parse((res, callback) => {

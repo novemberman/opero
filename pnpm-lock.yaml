@@ -56,6 +56,9 @@ importers:
       '@opero/object-storage':
         specifier: workspace:*
         version: link:../../packages/object-storage
+      '@opero/payments':
+        specifier: workspace:*
+        version: link:../../packages/payments
       '@opero/reports':
         specifier: workspace:*
         version: link:../../packages/reports
@@ -457,6 +460,31 @@ importers:
       '@aws-sdk/s3-request-presigner':
         specifier: ^3.914.0
         version: 3.1168.0
+    devDependencies:
+      '@opero/eslint-config':
+        specifier: workspace:*
+        version: link:../eslint-config
+      '@opero/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
+      '@types/node':
+        specifier: 24.19.2
+        version: 24.19.2
+      eslint:
+        specifier: 10.14.0
+        version: 10.14.0(jiti@2.7.0)
+      typescript:
+        specifier: 6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: 5.1.0
+        version: 5.1.0(@types/node@24.19.2)(vite@8.3.8(@types/node@24.19.2)(jiti@2.7.0)(tsx@4.20.5))
+
+  packages/payments:
+    dependencies:
+      zod:
+        specifier: 4.6.7
+        version: 4.6.7
     devDependencies:
       '@opero/eslint-config':
         specifier: workspace:*

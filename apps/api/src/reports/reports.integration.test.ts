@@ -16,6 +16,7 @@ import {
   cleanupPhase6,
   createOrganization,
   get,
+  grantXrayProAccess,
   post,
   resetDatabase,
   runDiagnostic,
@@ -64,7 +65,9 @@ describe("X-Ray reports integration", () => {
     const path = `/organizations/${organizationId}/reports/${reportId}`;
     await post(app, publisher, `${path}/submit-review`).send({}).expect(200);
     await post(app, publisher, `${path}/approve`).send({}).expect(200);
-    return post(app, publisher, `${path}/publish`).send({}).expect(200);
+    const published = await post(app, publisher, `${path}/publish`).send({}).expect(200);
+    await grantXrayProAccess(prisma, organizationId, reportId);
+    return published;
   }
 
   beforeAll(async () => {
@@ -176,6 +179,7 @@ describe("X-Ray reports integration", () => {
     const published = await post(app, owner, `${path}/publish`)
       .send({ note: "Approved for release" })
       .expect(200);
+    await grantXrayProAccess(prisma, organizationId, reportId);
     expect(published.body.report).toMatchObject({
       status: "PUBLISHED",
       verifiedPublication: true,
@@ -599,6 +603,7 @@ describe("X-Ray reports integration", () => {
 
     await post(app, admin, `${path}/approve`).send({ note: "Checked" }).expect(200);
     const published = await post(app, admin, `${path}/publish`).send({}).expect(200);
+    await grantXrayProAccess(prisma, organizationId, reportId);
     expect(published.body.report).toMatchObject({ status: "PUBLISHED", verifiedPublication: true });
     const contentHash = (published.body.report.versions[0] as VersionSummary).contentHash;
     await download(app, viewer, `${path}/pdf`).expect(200);

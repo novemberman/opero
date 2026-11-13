@@ -1,13 +1,46 @@
 import { getQueueToken } from "@nestjs/bullmq";
 import type { INestApplication } from "@nestjs/common";
 import { createPrismaClient, type PrismaClient } from "@opero/database";
-import { AI_QUEUE, REPORTS_QUEUE } from "@opero/shared";
+import { AI_QUEUE, REPORTS_QUEUE, XRAY_PRO_ENTITLEMENTS } from "@opero/shared";
 import type { Queue } from "bullmq";
+import { randomUUID } from "node:crypto";
 import request from "supertest";
 import { runDiagnosticJob } from "../diagnostics/run-diagnostic-job";
 import { getCookie, mergeCookies } from "./app-factory";
 import type { MemoryEmailService } from "./memory-email.service";
 import { deletePhase6Data } from "./phase6-cleanup";
+
+/** Test-only: grants report-scoped X-Ray Pro entitlements without a payment. */
+export async function grantXrayProAccess(
+  prisma: PrismaClient,
+  organizationId: string,
+  reportId: string,
+  sourceId = `test_${randomUUID()}`,
+): Promise<void> {
+  for (const code of XRAY_PRO_ENTITLEMENTS) {
+    await prisma.entitlementGrant.upsert({
+      where: {
+        organizationId_code_scopeType_scopeId_sourceId: {
+          organizationId,
+          code,
+          scopeType: "REPORT",
+          scopeId: reportId,
+          sourceId,
+        },
+      },
+      create: {
+        organizationId,
+        code,
+        scopeType: "REPORT",
+        scopeId: reportId,
+        sourceType: "MANUAL",
+        sourceId,
+        validFrom: new Date(),
+      },
+      update: { revokedAt: null, revokeReason: null, validUntil: null },
+    });
+  }
+}
 
 export type TestSession = {
   userId: string;

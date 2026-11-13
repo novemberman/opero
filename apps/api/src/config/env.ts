@@ -50,6 +50,12 @@ export const apiEnvSchema = z
     AI_TIMEOUT_MS: z.coerce.number().int().min(1000).max(120_000).default(30_000),
     AI_MAX_RETRIES: z.coerce.number().int().min(0).max(5).default(1),
     AI_SHARE_STRUCTURED_CONTEXT: boolFromEnv.default(true),
+    // Phase 7A — Korapay (mock by default; never process live payments in tests).
+    PAYMENT_PROVIDER: z.enum(["mock", "korapay"]).default("mock"),
+    KORAPAY_SECRET_KEY: z.string().min(8).optional(),
+    KORAPAY_PUBLIC_KEY: z.string().min(8).optional(),
+    KORAPAY_BASE_URL: z.string().url().default("https://api.korapay.com"),
+    BILLING_WEBHOOK_BASE_URL: z.string().url().optional(),
   })
   .superRefine((env, ctx) => {
     if (env.NODE_ENV === "production" && env.AUTH_THROTTLE_DISABLED) {
@@ -83,6 +89,31 @@ export const apiEnvSchema = z
           message: "OPENAI_API_KEY and OPENAI_MODEL are required when AI_PROVIDER=openai",
         });
       }
+    }
+    if (env.PAYMENT_PROVIDER === "korapay" && !env.KORAPAY_SECRET_KEY) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["KORAPAY_SECRET_KEY"],
+        message: "KORAPAY_SECRET_KEY is required when PAYMENT_PROVIDER=korapay",
+      });
+    }
+    if (env.NODE_ENV === "production" && env.PAYMENT_PROVIDER === "mock") {
+      ctx.addIssue({
+        code: "custom",
+        path: ["PAYMENT_PROVIDER"],
+        message: "PAYMENT_PROVIDER=mock is forbidden in production",
+      });
+    }
+    if (
+      env.NODE_ENV === "production" &&
+      env.PAYMENT_PROVIDER === "korapay" &&
+      env.KORAPAY_SECRET_KEY?.startsWith("sk_test_")
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["KORAPAY_SECRET_KEY"],
+        message: "sk_test_ keys are forbidden in production; use sk_live_ after KYC activation",
+      });
     }
   });
 

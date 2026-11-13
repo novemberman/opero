@@ -17,6 +17,14 @@ export {
   type Permission,
 } from "./permissions";
 
+export {
+  FREE_TIER_ENTITLEMENTS,
+  XRAY_PRO_ENTITLEMENTS,
+  entitlementCodes,
+  isEntitlementCode,
+  type EntitlementCode,
+} from "./entitlements";
+
 export const healthServiceSchema = z.enum(["web", "api", "worker"]);
 
 export type HealthServiceName = z.infer<typeof healthServiceSchema>;

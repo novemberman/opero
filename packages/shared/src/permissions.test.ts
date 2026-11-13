@@ -34,4 +34,12 @@ describe("rolePermissions", () => {
       "VIEWER",
     ]);
   });
+
+  it("restricts billing manage to owners and admins", () => {
+    expect(roleHasPermission("OWNER", "billing:manage")).toBe(true);
+    expect(roleHasPermission("ADMIN", "billing:manage")).toBe(true);
+    expect(roleHasPermission("ANALYST", "billing:manage")).toBe(false);
+    expect(roleHasPermission("VIEWER", "billing:manage")).toBe(false);
+    expect(roleHasPermission("VIEWER", "billing:read")).toBe(true);
+  });
 });

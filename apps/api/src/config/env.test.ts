@@ -71,4 +71,24 @@ describe("parseApiEnv", () => {
       }),
     ).toThrow(/OPENAI_API_KEY/);
   });
+
+  it("forbids mock payments and sk_test_ keys in production", () => {
+    expect(() =>
+      parseApiEnv({
+        ...valid,
+        NODE_ENV: "production",
+        PAYMENT_PROVIDER: "mock",
+        REDIS_PASSWORD: "prod-redis-password",
+      }),
+    ).toThrow(/PAYMENT_PROVIDER/);
+    expect(() =>
+      parseApiEnv({
+        ...valid,
+        NODE_ENV: "production",
+        PAYMENT_PROVIDER: "korapay",
+        KORAPAY_SECRET_KEY: "sk_test_not_for_prod",
+        REDIS_PASSWORD: "prod-redis-password",
+      }),
+    ).toThrow(/sk_test_/);
+  });
 });
