@@ -98,13 +98,62 @@ enum FinancialConcept {
   CASH_AND_EQUIVALENTS
   ACCOUNTS_RECEIVABLE
   ACCOUNTS_PAYABLE
+  INVENTORY
   CURRENT_ASSETS
   CURRENT_LIABILITIES
   TOTAL_ASSETS
   TOTAL_LIABILITIES
   EQUITY
+  INTEREST_BEARING_DEBT
+  INTEREST_EXPENSE
   OPERATING_CASH_FLOW
+  CAPITAL_EXPENDITURE
   UNMAPPED
+}
+
+enum DiagnosticRunStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+}
+
+enum DiagnosticMetricStatus {
+  COMPUTED
+  UNDEFINED
+  INSUFFICIENT_INPUTS
+  INCOMPATIBLE
+}
+
+enum DiagnosticScoreStatus {
+  SCORED
+  INSUFFICIENT_DATA
+}
+
+enum DiagnosticFindingSeverity {
+  INFO
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum DiagnosticFindingCategory {
+  OBSERVATION
+  RISK
+  INVESTIGATION
+  DATA_QUALITY
+}
+
+enum DiagnosticFindingReviewStatus {
+  OPEN
+  ACKNOWLEDGED
+  DISMISSED
+}
+
+enum DiagnosticReviewAction {
+  ACKNOWLEDGE
+  DISMISS
 }
 
 enum ExtractionQuality {
@@ -142,15 +191,17 @@ model Organization {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  memberships      Membership[]
-  invitations      OrganizationInvitation[]
-  auditEvents      AuditEvent[]
-  documents        Document[]
-  documentUploads  DocumentUpload[]
-  processingJobs   DocumentProcessingJob[]
-  extractions      DocumentExtraction[]
-  statements       FinancialStatement[]
-  accessEvents     DocumentAccessEvent[]
+  memberships       Membership[]
+  invitations       OrganizationInvitation[]
+  auditEvents       AuditEvent[]
+  documents         Document[]
+  documentUploads   DocumentUpload[]
+  processingJobs    DocumentProcessingJob[]
+  extractions       DocumentExtraction[]
+  statements        FinancialStatement[]
+  accessEvents      DocumentAccessEvent[]
+  diagnosticRuns    DiagnosticRun[]
+  diagnosticReviews DiagnosticReview[]
 
   @@map("organizations")
 }
@@ -174,6 +225,8 @@ model User {
   documentUploads          DocumentUpload[]         @relation("DocumentUploadActor")
   extractionReviews        ExtractionReview[]
   accessEvents             DocumentAccessEvent[]
+  diagnosticRunsInitiated  DiagnosticRun[]          @relation("DiagnosticRunInitiator")
+  diagnosticReviews        DiagnosticReview[]
 
   @@map("users")
 }
@@ -525,4 +578,212 @@ model DocumentAccessEvent {
 
   @@index([organizationId, documentId, createdAt])
   @@map("document_access_events")
+}
+
+model DiagnosticRuleVersion {
+  id          String   @id @default(uuid()) @db.Uuid
+  ruleSetId   String   @map("rule_set_id")
+  ruleId      String   @map("rule_id")
+  version     String
+  title       String
+  description String
+  category    DiagnosticFindingCategory
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  findings DiagnosticFinding[]
+
+  @@unique([ruleSetId, ruleId, version])
+  @@index([ruleSetId, version])
+  @@map("diagnostic_rule_versions")
+}
+
+model DiagnosticRun {
+  id                       String              @id @default(uuid()) @db.Uuid
+  organizationId           String              @map("organization_id") @db.Uuid
+  initiatedByUserId        String              @map("initiated_by_user_id") @db.Uuid
+  status                   DiagnosticRunStatus @default(QUEUED)
+  currency                 String?
+  periodStart              DateTime?           @map("period_start") @db.Date
+  periodEnd                DateTime?           @map("period_end") @db.Date
+  periodLabel              String?             @map("period_label")
+  calculationEngineVersion String              @map("calculation_engine_version")
+  ruleSetVersion           String              @map("rule_set_version")
+  scoreMethodologyVersion  String              @map("score_methodology_version")
+  failureClass             FailureClass?       @map("failure_class")
+  failureMessage           String?             @map("failure_message")
+  bullJobId                String?             @map("bull_job_id")
+  requestId                String?             @map("request_id")
+  startedAt                DateTime?           @map("started_at")
+  completedAt              DateTime?           @map("completed_at")
+  createdAt                DateTime            @default(now()) @map("created_at")
+  updatedAt                DateTime            @updatedAt @map("updated_at")
+
+  organization Organization             @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  initiatedBy  User                     @relation("DiagnosticRunInitiator", fields: [initiatedByUserId], references: [id], onDelete: Restrict)
+  snapshot     DiagnosticInputSnapshot?
+  metrics      FinancialMetric[]
+  quality      DataQualityAssessment?
+  score        DiagnosticScore?
+  findings     DiagnosticFinding[]
+  reviews      DiagnosticReview[]
+
+  @@index([organizationId, createdAt])
+  @@index([organizationId, status])
+  @@map("diagnostic_runs")
+}
+
+model DiagnosticInputSnapshot {
+  id               String   @id @default(uuid()) @db.Uuid
+  organizationId   String   @map("organization_id") @db.Uuid
+  diagnosticRunId  String   @unique @map("diagnostic_run_id") @db.Uuid
+  contentHash      String   @map("content_hash")
+  payload          Json
+  documentIds      String[] @map("document_ids") @db.Uuid
+  extractionIds    String[] @map("extraction_ids") @db.Uuid
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  run DiagnosticRun @relation(fields: [diagnosticRunId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@map("diagnostic_input_snapshots")
+}
+
+model FinancialMetric {
+  id              String                 @id @default(uuid()) @db.Uuid
+  organizationId  String                 @map("organization_id") @db.Uuid
+  diagnosticRunId String                 @map("diagnostic_run_id") @db.Uuid
+  code            String
+  label           String
+  dimension       String
+  status          DiagnosticMetricStatus
+  value           String?
+  unit            String?
+  formulaId       String                 @map("formula_id")
+  periodStart     DateTime?              @map("period_start") @db.Date
+  periodEnd       DateTime?              @map("period_end") @db.Date
+  periodLabel     String?                @map("period_label")
+  inputRefs       Json?                  @map("input_refs")
+  warnings        Json?
+  createdAt       DateTime               @default(now()) @map("created_at")
+
+  run DiagnosticRun @relation(fields: [diagnosticRunId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, diagnosticRunId])
+  @@index([diagnosticRunId, code])
+  @@map("financial_metrics")
+}
+
+model DataQualityAssessment {
+  id                    String   @id @default(uuid()) @db.Uuid
+  organizationId        String   @map("organization_id") @db.Uuid
+  diagnosticRunId       String   @unique @map("diagnostic_run_id") @db.Uuid
+  completeness          String
+  consistency           String
+  evidenceReliability   String   @map("evidence_reliability")
+  diagnosticCoverage    String   @map("diagnostic_coverage")
+  details               Json?
+  createdAt             DateTime @default(now()) @map("created_at")
+
+  run DiagnosticRun @relation(fields: [diagnosticRunId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@map("data_quality_assessments")
+}
+
+model DiagnosticScore {
+  id              String                 @id @default(uuid()) @db.Uuid
+  organizationId  String                 @map("organization_id") @db.Uuid
+  diagnosticRunId String                 @unique @map("diagnostic_run_id") @db.Uuid
+  status          DiagnosticScoreStatus
+  overallScore    Int?                   @map("overall_score")
+  methodologyVersion String              @map("methodology_version")
+  limitations     Json?
+  createdAt       DateTime               @default(now()) @map("created_at")
+
+  run        DiagnosticRun    @relation(fields: [diagnosticRunId], references: [id], onDelete: Cascade)
+  components ScoreComponent[]
+
+  @@index([organizationId])
+  @@map("diagnostic_scores")
+}
+
+model ScoreComponent {
+  id                 String  @id @default(uuid()) @db.Uuid
+  organizationId     String  @map("organization_id") @db.Uuid
+  diagnosticScoreId  String  @map("diagnostic_score_id") @db.Uuid
+  dimension          String
+  weight             Int
+  included           Boolean
+  score              Int?
+  exclusionReason    String? @map("exclusion_reason")
+  metricCodes        String[] @map("metric_codes")
+
+  scoreRow DiagnosticScore @relation(fields: [diagnosticScoreId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, diagnosticScoreId])
+  @@map("score_components")
+}
+
+model DiagnosticFinding {
+  id                 String                        @id @default(uuid()) @db.Uuid
+  organizationId     String                        @map("organization_id") @db.Uuid
+  diagnosticRunId    String                        @map("diagnostic_run_id") @db.Uuid
+  ruleVersionId      String?                       @map("rule_version_id") @db.Uuid
+  ruleId             String                        @map("rule_id")
+  ruleSetVersion     String                        @map("rule_set_version")
+  category           DiagnosticFindingCategory
+  severity           DiagnosticFindingSeverity
+  title              String
+  explanation        String
+  implication        String
+  suggestedAction    String                        @map("suggested_action")
+  confidence         String
+  supportingMetrics  String[]                      @map("supporting_metrics")
+  reviewStatus       DiagnosticFindingReviewStatus @default(OPEN) @map("review_status")
+  createdAt          DateTime                      @default(now()) @map("created_at")
+
+  run         DiagnosticRun               @relation(fields: [diagnosticRunId], references: [id], onDelete: Cascade)
+  ruleVersion DiagnosticRuleVersion?      @relation(fields: [ruleVersionId], references: [id], onDelete: SetNull)
+  evidence    DiagnosticEvidenceLink[]
+  reviews     DiagnosticReview[]
+
+  @@index([organizationId, diagnosticRunId])
+  @@index([diagnosticRunId, ruleId])
+  @@map("diagnostic_findings")
+}
+
+model DiagnosticEvidenceLink {
+  id                   String  @id @default(uuid()) @db.Uuid
+  organizationId       String  @map("organization_id") @db.Uuid
+  findingId            String  @map("finding_id") @db.Uuid
+  documentId           String? @map("document_id") @db.Uuid
+  lineItemId           String? @map("line_item_id") @db.Uuid
+  evidenceReferenceId  String? @map("evidence_reference_id") @db.Uuid
+  snapshotKey          String  @map("snapshot_key")
+  label                String?
+
+  finding DiagnosticFinding @relation(fields: [findingId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, findingId])
+  @@map("diagnostic_evidence_links")
+}
+
+model DiagnosticReview {
+  id             String                  @id @default(uuid()) @db.Uuid
+  organizationId String                  @map("organization_id") @db.Uuid
+  diagnosticRunId String                 @map("diagnostic_run_id") @db.Uuid
+  findingId      String?                 @map("finding_id") @db.Uuid
+  actorUserId    String                  @map("actor_user_id") @db.Uuid
+  action         DiagnosticReviewAction
+  note           String?
+  createdAt      DateTime                @default(now()) @map("created_at")
+
+  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  run          DiagnosticRun      @relation(fields: [diagnosticRunId], references: [id], onDelete: Cascade)
+  finding      DiagnosticFinding? @relation(fields: [findingId], references: [id], onDelete: SetNull)
+  actor        User               @relation(fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, diagnosticRunId])
+  @@map("diagnostic_reviews")
 }

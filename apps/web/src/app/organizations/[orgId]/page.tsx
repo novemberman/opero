@@ -44,6 +44,12 @@ export default function OrganizationDetailPage() {
               </Link>
               <Link
                 className="inline-flex min-h-11 items-center rounded-full border border-line px-5 text-ink no-underline"
+                href={`/organizations/${orgId}/diagnostics`}
+              >
+                Diagnostics
+              </Link>
+              <Link
+                className="inline-flex min-h-11 items-center rounded-full border border-line px-5 text-ink no-underline"
                 href={`/organizations/${orgId}/settings`}
               >
                 Settings

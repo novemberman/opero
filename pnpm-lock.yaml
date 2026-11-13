@@ -44,6 +44,9 @@ importers:
       '@opero/database':
         specifier: workspace:*
         version: link:../../packages/database
+      '@opero/diagnostics':
+        specifier: workspace:*
+        version: link:../../packages/diagnostics
       '@opero/document-processing':
         specifier: workspace:*
         version: link:../../packages/document-processing
@@ -214,6 +217,9 @@ importers:
       '@opero/database':
         specifier: workspace:*
         version: link:../../packages/database
+      '@opero/diagnostics':
+        specifier: workspace:*
+        version: link:../../packages/diagnostics
       '@opero/document-processing':
         specifier: workspace:*
         version: link:../../packages/document-processing
@@ -315,6 +321,31 @@ importers:
       prisma:
         specifier: 7.10.1
         version: 7.10.1(@types/node@24.19.2)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(typescript@6.0.3)
+      typescript:
+        specifier: 6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: 5.1.0
+        version: 5.1.0(@types/node@24.19.2)(vite@8.3.8(@types/node@24.19.2)(jiti@2.7.0)(tsx@4.20.5))
+
+  packages/diagnostics:
+    dependencies:
+      decimal.js:
+        specifier: ^10.6.0
+        version: 10.6.0
+    devDependencies:
+      '@opero/eslint-config':
+        specifier: workspace:*
+        version: link:../eslint-config
+      '@opero/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
+      '@types/node':
+        specifier: 24.19.2
+        version: 24.19.2
+      eslint:
+        specifier: 10.14.0
+        version: 10.14.0(jiti@2.7.0)
       typescript:
         specifier: 6.0.3
         version: 6.0.3

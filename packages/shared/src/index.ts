@@ -148,12 +148,16 @@ export const reviewLineItemBodySchema = z
         "CASH_AND_EQUIVALENTS",
         "ACCOUNTS_RECEIVABLE",
         "ACCOUNTS_PAYABLE",
+        "INVENTORY",
         "CURRENT_ASSETS",
         "CURRENT_LIABILITIES",
         "TOTAL_ASSETS",
         "TOTAL_LIABILITIES",
         "EQUITY",
+        "INTEREST_BEARING_DEBT",
+        "INTEREST_EXPENSE",
         "OPERATING_CASH_FLOW",
+        "CAPITAL_EXPENDITURE",
         "UNMAPPED",
       ])
       .optional(),
@@ -167,6 +171,31 @@ export type DocumentProcessJobPayload = {
   organizationId: string;
   documentId: string;
   processingJobId: string;
+  actorUserId: string;
+  correlationId?: string;
+};
+
+export const DIAGNOSTICS_QUEUE = "diagnostics" as const;
+
+export const createDiagnosticRunBodySchema = z
+  .object({
+    documentIds: z.array(z.uuid()).min(1).max(20),
+    currency: z
+      .string()
+      .trim()
+      .min(3)
+      .max(3)
+      .regex(/^[A-Z]{3}$/)
+      .optional(),
+    periodLabel: z.string().trim().min(1).max(64).optional(),
+  })
+  .strict();
+
+export type CreateDiagnosticRunBody = z.infer<typeof createDiagnosticRunBodySchema>;
+
+export type DiagnosticRunJobPayload = {
+  organizationId: string;
+  diagnosticRunId: string;
   actorUserId: string;
   correlationId?: string;
 };

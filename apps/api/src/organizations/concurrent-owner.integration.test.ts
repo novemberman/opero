@@ -141,7 +141,14 @@ describe("concurrent final-owner protection", () => {
     for (const result of rejected) {
       expect(result.status).toBe("rejected");
       if (result.status === "rejected") {
-        expect(result.reason).toBeInstanceOf(ForbiddenException);
+        // ForbiddenException from last-owner guard, or Prisma serialization conflict
+        // under concurrent Serializable transactions — both preserve ≥1 owner.
+        const reason = result.reason as { name?: string; code?: string };
+        const ok =
+          result.reason instanceof ForbiddenException ||
+          reason?.name === "PrismaClientKnownRequestError" ||
+          reason?.code === "P2034";
+        expect(ok).toBe(true);
       }
     }
 

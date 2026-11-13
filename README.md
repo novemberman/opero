@@ -6,7 +6,7 @@ Opero is an AI-assisted Business Operating System.
 
 A business diagnostic platform that transforms financial reports into actionable insights, business health scores, and governed improvement plans.
 
-This repository is the Opero platform: a Next.js web app, a NestJS API with first-party authentication and tenant-scoped organization APIs, a NestJS worker, shared contracts, and PostgreSQL and Redis for local development. Opero X-Ray diagnostics, payments, and production deployment are later phases.
+This repository is the Opero platform: a Next.js web app, a NestJS API with first-party authentication and tenant-scoped organization APIs, a NestJS worker, shared contracts, and PostgreSQL and Redis for local development. Opero X-Ray includes document ingestion and deterministic financial diagnostics. Payments and production deployment are later phases.
 
 ## Stack
 
@@ -147,6 +147,7 @@ apps/web                  Next.js App Router
 apps/api                  NestJS HTTP API
 apps/worker               NestJS BullMQ worker
 packages/database
+packages/diagnostics
 packages/document-processing
 packages/object-storage
 packages/shared
@@ -154,6 +155,16 @@ packages/eslint-config
 packages/typescript-config
 ```
 
+## Financial diagnostics (Phase 5)
+
+Deterministic KPI / quality / score / findings engine (`@opero/diagnostics`, methodology in `docs/DIAGNOSTIC_METHODOLOGY.md`).
+
+- API: `/organizations/:orgId/diagnostics` (initiate with `xray:write`; read with `xray:read`)
+- Worker queue: `diagnostics` / job `diagnostic.run`
+- UI: `/organizations/[orgId]/diagnostics`
+- Scores use provisional heuristic bands; incomplete evidence yields `INSUFFICIENT_DATA` rather than inventing values
+- No generative AI, OCR expansion, billing, or Railway deploy in this phase
+
 ## Not in this phase
 
-AI extraction / health scores, OCR, billing, Railway deployment, and public mutation of audit records are intentionally absent.
+Generative AI interpretation, OCR, billing, Railway deployment, Postgres RLS, and public mutation of audit records are intentionally absent.

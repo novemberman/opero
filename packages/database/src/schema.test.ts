@@ -79,5 +79,30 @@ describe("prisma schema", () => {
     }
     expect(schema).toMatch(/Raw financial documents are never stored in PostgreSQL/);
   });
+
+  it("defines Phase 5 diagnostic models and extended concepts", () => {
+    for (const model of [
+      "DiagnosticRun",
+      "DiagnosticInputSnapshot",
+      "FinancialMetric",
+      "DataQualityAssessment",
+      "DiagnosticScore",
+      "ScoreComponent",
+      "DiagnosticFinding",
+      "DiagnosticEvidenceLink",
+      "DiagnosticRuleVersion",
+      "DiagnosticReview",
+    ]) {
+      expect(schema).toContain(`model ${model} {`);
+    }
+    for (const concept of [
+      "INVENTORY",
+      "INTEREST_BEARING_DEBT",
+      "INTEREST_EXPENSE",
+      "CAPITAL_EXPENDITURE",
+    ]) {
+      expect(schema).toContain(concept);
+    }
+  });
 });
 

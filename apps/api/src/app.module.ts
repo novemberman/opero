@@ -12,6 +12,7 @@ import { AuthorizationModule } from "./authorization/authorization.module";
 import { CorrelationIdMiddleware } from "./common/correlation-id.middleware";
 import { parseApiEnv, type ApiEnv } from "./config/env";
 import { DatabaseModule } from "./database/database.module";
+import { DiagnosticsModule } from "./diagnostics/diagnostics.module";
 import { DocumentsModule } from "./documents/documents.module";
 import { HealthModule } from "./health/health.module";
 import { OrganizationsModule } from "./organizations/organizations.module";
@@ -111,6 +112,7 @@ import { StorageModule } from "./storage/storage.module";
     AuthModule,
     OrganizationsModule,
     DocumentsModule,
+    DiagnosticsModule,
     HealthModule,
   ],
   providers: [

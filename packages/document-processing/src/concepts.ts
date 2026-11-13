@@ -8,12 +8,16 @@ export const FINANCIAL_CONCEPTS = [
   "CASH_AND_EQUIVALENTS",
   "ACCOUNTS_RECEIVABLE",
   "ACCOUNTS_PAYABLE",
+  "INVENTORY",
   "CURRENT_ASSETS",
   "CURRENT_LIABILITIES",
   "TOTAL_ASSETS",
   "TOTAL_LIABILITIES",
   "EQUITY",
+  "INTEREST_BEARING_DEBT",
+  "INTEREST_EXPENSE",
   "OPERATING_CASH_FLOW",
+  "CAPITAL_EXPENDITURE",
   "UNMAPPED",
 ] as const;
 
@@ -57,6 +61,10 @@ const LABEL_MAP: Array<{ concept: FinancialConceptId; patterns: RegExp[] }> = [
     patterns: [/^accounts?\s+payable$/i, /^trade\s+payables?$/i],
   },
   {
+    concept: "INVENTORY",
+    patterns: [/^inventory$/i, /^inventories$/i, /^stock$/i],
+  },
+  {
     concept: "CURRENT_ASSETS",
     patterns: [/^current\s+assets$/i, /^total\s+current\s+assets$/i],
   },
@@ -80,11 +88,34 @@ const LABEL_MAP: Array<{ concept: FinancialConceptId; patterns: RegExp[] }> = [
     ],
   },
   {
+    concept: "INTEREST_BEARING_DEBT",
+    patterns: [
+      /^interest[- ]bearing\s+debt$/i,
+      /^total\s+debt$/i,
+      /^long[- ]term\s+debt$/i,
+      /^short[- ]term\s+debt$/i,
+      /^borrowings$/i,
+    ],
+  },
+  {
+    concept: "INTEREST_EXPENSE",
+    patterns: [/^interest\s+expense$/i, /^finance\s+costs?$/i, /^interest\s+payable$/i],
+  },
+  {
     concept: "OPERATING_CASH_FLOW",
     patterns: [
       /^net\s+cash\s+(from|provided by)\s+operating/i,
       /^cash\s+from\s+operations$/i,
       /^operating\s+cash\s+flow$/i,
+    ],
+  },
+  {
+    concept: "CAPITAL_EXPENDITURE",
+    patterns: [
+      /^capital\s+expenditures?$/i,
+      /^capex$/i,
+      /^purchases?\s+of\s+property/i,
+      /^additions?\s+to\s+ppe$/i,
     ],
   },
 ];
