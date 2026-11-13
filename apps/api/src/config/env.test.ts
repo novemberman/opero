@@ -6,12 +6,20 @@ const valid = {
   CSRF_SECRET: "dev-csrf-secret-at-least-32-chars!!",
 };
 
+const deployedResend = {
+  MAIL_DRIVER: "resend" as const,
+  RESEND_API_KEY: "re_live_example_key_not_real",
+  MAIL_FROM_ADDRESS: "Opero <noreply@opero.example>",
+};
+
 describe("parseApiEnv", () => {
   it("accepts a complete environment with defaults", () => {
     expect(parseApiEnv(valid).API_PORT).toBe(3001);
     expect(parseApiEnv(valid).SESSION_COOKIE_NAME).toBe("opero_session");
     expect(parseApiEnv(valid).AUTH_THROTTLE_DISABLED).toBe(false);
     expect(parseApiEnv(valid).AUTH_LOGIN_THROTTLE_LIMIT).toBe(10);
+    expect(parseApiEnv(valid).MAIL_DRIVER).toBe("dev");
+    expect(parseApiEnv(valid).MAIL_TIMEOUT_MS).toBe(15_000);
   });
 
   it("requires DATABASE_URL and CSRF_SECRET", () => {
@@ -33,7 +41,7 @@ describe("parseApiEnv", () => {
         S3_ENDPOINT: "https://s3.example.com",
         S3_ACCESS_KEY_ID: "AKIAEXAMPLE",
         S3_SECRET_ACCESS_KEY: "secretsecret",
-        MAIL_DRIVER: "smtp",
+        ...deployedResend,
         PAYMENT_PROVIDER: "korapay",
         KORAPAY_SECRET_KEY: "sk_live_examplekey",
         APP_ORIGIN: "https://app.example.com",
@@ -62,7 +70,7 @@ describe("parseApiEnv", () => {
         S3_ENDPOINT: "https://s3.example.com",
         S3_ACCESS_KEY_ID: "AKIAEXAMPLE",
         S3_SECRET_ACCESS_KEY: "secretsecret",
-        MAIL_DRIVER: "smtp",
+        ...deployedResend,
         PAYMENT_PROVIDER: "korapay",
         KORAPAY_SECRET_KEY: "sk_live_examplekey",
         APP_ORIGIN: "https://app.example.com",
@@ -99,7 +107,7 @@ describe("parseApiEnv", () => {
         S3_ENDPOINT: "https://s3.example.com",
         S3_ACCESS_KEY_ID: "AKIAEXAMPLE",
         S3_SECRET_ACCESS_KEY: "secretsecret",
-        MAIL_DRIVER: "smtp",
+        ...deployedResend,
         APP_ORIGIN: "https://app.example.com",
         REDIS_PASSWORD: "prod-redis-password",
       }),
@@ -114,7 +122,7 @@ describe("parseApiEnv", () => {
         S3_ENDPOINT: "https://s3.example.com",
         S3_ACCESS_KEY_ID: "AKIAEXAMPLE",
         S3_SECRET_ACCESS_KEY: "secretsecret",
-        MAIL_DRIVER: "smtp",
+        ...deployedResend,
         APP_ORIGIN: "https://app.example.com",
         REDIS_PASSWORD: "prod-redis-password",
       }),
@@ -146,7 +154,7 @@ describe("parseApiEnv", () => {
         S3_ENDPOINT: "https://s3.example.com",
         S3_ACCESS_KEY_ID: "AKIAEXAMPLE",
         S3_SECRET_ACCESS_KEY: "secretsecret",
-        MAIL_DRIVER: "smtp",
+        ...deployedResend,
         PAYMENT_PROVIDER: "korapay",
         KORAPAY_SECRET_KEY: "sk_live_examplekey",
         APP_ORIGIN: "http://app.example.com",
@@ -165,7 +173,7 @@ describe("parseApiEnv", () => {
         S3_ENDPOINT: "https://s3.example.com",
         S3_ACCESS_KEY_ID: "AKIAEXAMPLE",
         S3_SECRET_ACCESS_KEY: "secretsecret",
-        MAIL_DRIVER: "smtp",
+        ...deployedResend,
         PAYMENT_PROVIDER: "korapay",
         KORAPAY_SECRET_KEY: "sk_live_should_not_be_here",
         APP_ORIGIN: "https://staging.example.com",
@@ -182,13 +190,72 @@ describe("parseApiEnv", () => {
         S3_ENDPOINT: "https://s3.example.com",
         S3_ACCESS_KEY_ID: "AKIAEXAMPLE",
         S3_SECRET_ACCESS_KEY: "secretsecret",
-        MAIL_DRIVER: "smtp",
+        ...deployedResend,
         PAYMENT_PROVIDER: "korapay",
         KORAPAY_SECRET_KEY: "sk_test_staging_ok",
         APP_ORIGIN: "https://staging.example.com",
         REDIS_PASSWORD: "staging-redis-password",
       }).APP_ENV,
     ).toBe("staging");
+  });
+
+  it("rejects MAIL_DRIVER=smtp because no SMTP adapter exists", () => {
+    expect(() =>
+      parseApiEnv({
+        ...valid,
+        MAIL_DRIVER: "smtp",
+        SMTP_URL: "smtps://user:pass@smtp.example.com:465",
+      }),
+    ).toThrow(/MAIL_DRIVER=smtp is not supported/);
+  });
+
+  it("requires Resend credentials when MAIL_DRIVER=resend", () => {
+    expect(() =>
+      parseApiEnv({
+        ...valid,
+        MAIL_DRIVER: "resend",
+      }),
+    ).toThrow(/RESEND_API_KEY|MAIL_FROM_ADDRESS/);
+
+    expect(() =>
+      parseApiEnv({
+        ...valid,
+        MAIL_DRIVER: "resend",
+        RESEND_API_KEY: "replace-with-resend-api-key",
+        MAIL_FROM_ADDRESS: "replace-with-verified-sender@example.com",
+      }),
+    ).toThrow(/RESEND_API_KEY|MAIL_FROM_ADDRESS/);
+  });
+
+  it("accepts MAIL_DRIVER=resend with API key and sender", () => {
+    const env = parseApiEnv({
+      ...valid,
+      ...deployedResend,
+    });
+    expect(env.MAIL_DRIVER).toBe("resend");
+    expect(env.RESEND_API_KEY).toBe(deployedResend.RESEND_API_KEY);
+    expect(env.MAIL_FROM_ADDRESS).toBe(deployedResend.MAIL_FROM_ADDRESS);
+  });
+
+  it("forbids MAIL_DRIVER=dev in staging even when Resend vars are present", () => {
+    expect(() =>
+      parseApiEnv({
+        ...valid,
+        NODE_ENV: "production",
+        APP_ENV: "staging",
+        DOCUMENT_STORAGE_DRIVER: "s3",
+        S3_ENDPOINT: "https://s3.example.com",
+        S3_ACCESS_KEY_ID: "AKIAEXAMPLE",
+        S3_SECRET_ACCESS_KEY: "secretsecret",
+        MAIL_DRIVER: "dev",
+        RESEND_API_KEY: deployedResend.RESEND_API_KEY,
+        MAIL_FROM_ADDRESS: deployedResend.MAIL_FROM_ADDRESS,
+        PAYMENT_PROVIDER: "korapay",
+        KORAPAY_SECRET_KEY: "sk_test_staging_ok",
+        APP_ORIGIN: "https://staging.example.com",
+        REDIS_PASSWORD: "staging-redis-password",
+      }),
+    ).toThrow(/MAIL_DRIVER/);
   });
 
   it("resolves cookie secure defaults", () => {

@@ -32,6 +32,8 @@ export const apiEnvSchema = z
     AUTH_TOKEN_TTL_HOURS: z.coerce.number().int().min(1).max(168).default(24),
     MAIL_DRIVER: z.enum(["dev", "smtp", "resend"]).default("dev"),
     MAIL_DIR: z.string().min(1).default(".data/mail"),
+    MAIL_FROM_ADDRESS: z.string().min(3).optional(),
+    MAIL_TIMEOUT_MS: z.coerce.number().int().min(1000).max(120_000).default(15_000),
     SMTP_URL: z.string().optional(),
     RESEND_API_KEY: z.string().optional(),
     AUTH_THROTTLE_DISABLED: boolFromEnv,
@@ -112,6 +114,32 @@ export const apiEnvSchema = z
         path: ["MAIL_DRIVER"],
         message: "MAIL_DRIVER=dev is forbidden in staging/production",
       });
+    }
+    if (env.MAIL_DRIVER === "smtp") {
+      ctx.addIssue({
+        code: "custom",
+        path: ["MAIL_DRIVER"],
+        message:
+          "MAIL_DRIVER=smtp is not supported: no SMTP adapter is configured. Use MAIL_DRIVER=resend or MAIL_DRIVER=dev",
+      });
+    }
+    if (env.MAIL_DRIVER === "resend") {
+      const apiKey = env.RESEND_API_KEY?.trim() ?? "";
+      const fromAddress = env.MAIL_FROM_ADDRESS?.trim() ?? "";
+      if (!apiKey || apiKey.includes("replace-with") || apiKey.length < 8) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["RESEND_API_KEY"],
+          message: "RESEND_API_KEY is required when MAIL_DRIVER=resend",
+        });
+      }
+      if (!fromAddress || fromAddress.includes("replace-with") || !fromAddress.includes("@")) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["MAIL_FROM_ADDRESS"],
+          message: "MAIL_FROM_ADDRESS is required when MAIL_DRIVER=resend",
+        });
+      }
     }
     if (isDeployed && env.COOKIE_SECURE === false) {
       ctx.addIssue({

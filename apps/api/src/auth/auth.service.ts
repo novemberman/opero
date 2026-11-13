@@ -13,6 +13,7 @@ import { PRISMA_CLIENT } from "../database/database.constants";
 import { hashPassword, verifyPassword } from "../security/passwords";
 import { generateOpaqueToken, hashToken } from "../security/tokens";
 import { EmailPort } from "./email/email.port";
+import { buildPasswordResetEmail, buildVerificationEmail } from "./email/email.templates";
 import { SessionService } from "./session.service";
 
 const GENERIC_AUTH_FAILURE = "Invalid email or password";
@@ -32,8 +33,12 @@ export class AuthService {
     return this.config.get("APP_ORIGIN", { infer: true });
   }
 
+  private tokenTtlHours(): number {
+    return this.config.get("AUTH_TOKEN_TTL_HOURS", { infer: true });
+  }
+
   private tokenTtlMs(): number {
-    return this.config.get("AUTH_TOKEN_TTL_HOURS", { infer: true }) * 60 * 60 * 1000;
+    return this.tokenTtlHours() * 60 * 60 * 1000;
   }
 
   async register(input: {
@@ -67,11 +72,14 @@ export class AuthService {
       },
     });
 
-    await this.email.send({
-      to: user.email,
-      subject: "Verify your Opero email",
-      text: `Verify your email: ${this.appOrigin()}/verify-email?token=${rawToken}`,
-    });
+    await this.email.send(
+      buildVerificationEmail({
+        to: user.email,
+        appOrigin: this.appOrigin(),
+        token: rawToken,
+        ttlHours: this.tokenTtlHours(),
+      }),
+    );
 
     await this.audit.record({
       action: "auth.register",
@@ -191,11 +199,14 @@ export class AuthService {
       },
     });
 
-    await this.email.send({
-      to: user.email,
-      subject: "Reset your Opero password",
-      text: `Reset your password: ${this.appOrigin()}/reset-password?token=${rawToken}`,
-    });
+    await this.email.send(
+      buildPasswordResetEmail({
+        to: user.email,
+        appOrigin: this.appOrigin(),
+        token: rawToken,
+        ttlHours: this.tokenTtlHours(),
+      }),
+    );
 
     await this.audit.record({
       action: "auth.password_reset_requested",

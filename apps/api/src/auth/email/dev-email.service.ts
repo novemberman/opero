@@ -7,8 +7,7 @@ import { EmailPort, type EmailMessage } from "./email.port";
 
 /**
  * Development mail sink. Writes full messages under MAIL_DIR (gitignored).
- * Production should replace EmailPort with a provider adapter (Resend, SES, etc.)
- * that sends over TLS and never logs verification/reset tokens.
+ * Staging/production must use Resend via MAIL_DRIVER=resend — never fall back here.
  */
 @Injectable()
 export class DevEmailService extends EmailPort {
@@ -30,6 +29,7 @@ export class DevEmailService extends EmailPort {
       "",
       message.text,
       "",
+      ...(message.html ? ["--- html ---", message.html, ""] : []),
     ].join("\n");
     await writeFile(filePath, body, "utf8");
     this.logger.log(`Dev email written for ${message.to} (${message.subject})`);

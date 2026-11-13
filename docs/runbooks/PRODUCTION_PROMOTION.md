@@ -9,4 +9,4 @@ Promote only a reviewed commit that already passed staging smoke.
 5. Run `pnpm migrate:deploy` once (advisory lock).
 6. Deploy API → worker → web with the same image/commit.
 7. Verify `/api/v1/ready`, webhook signature path, cookie `Secure`, CORS origins.
-8. Keep mock payments, filesystem storage, and `MAIL_DRIVER=dev` rejected by startup validation.
+8. Keep mock payments, filesystem storage, and `MAIL_DRIVER=dev` rejected by startup validation. Staging/production mail must use `MAIL_DRIVER=resend` with `RESEND_API_KEY` and `MAIL_FROM_ADDRESS`.

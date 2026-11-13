@@ -52,7 +52,7 @@ Open:
 - API health: http://127.0.0.1:3001/api/v1/health
 - API docs: http://127.0.0.1:3001/api/v1/docs
 
-Development email is written under `.data/mail/` (gitignored). Verification and reset links are not returned in API responses. Swap `EmailPort` for Resend/SES (or similar) in production.
+Development email is written under `.data/mail/` (gitignored). Verification and reset links are not returned in API responses. Staging/production use `MAIL_DRIVER=resend` with `RESEND_API_KEY` and `MAIL_FROM_ADDRESS` (never fall back to the dev sink).
 
 The worker has no HTTP port. It connects to Redis and registers a local `heartbeat` job on the `example` queue. That job only echoes a timestamp. Tenant-scoped jobs must carry a validated `organizationId` (see `apps/worker/src/tenant`).
 
