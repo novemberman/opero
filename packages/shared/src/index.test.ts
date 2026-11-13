@@ -21,12 +21,13 @@ describe("membershipRoleSchema", () => {
 describe("healthResponseSchema", () => {
   it("accepts a health payload produced by the shared helper", () => {
     const now = new Date("2026-11-12T18:00:00.000Z");
-    const payload = createHealthResponse("api", now);
+    const payload = createHealthResponse("api", now, "1.2.3");
 
     expect(payload).toEqual({
       status: "ok",
       service: "api",
       timestamp: "2026-11-12T18:00:00.000Z",
+      version: "1.2.3",
     });
     expect(healthResponseSchema.parse(payload)).toEqual(payload);
   });

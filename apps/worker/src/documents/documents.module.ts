@@ -41,12 +41,14 @@ import {
           return new MemoryObjectStorage();
         }
         if (driver === "s3") {
+          const sse = config.get("S3_SSE", { infer: true });
           return new S3ObjectStorage({
             endpoint: config.get("S3_ENDPOINT", { infer: true })!,
             region: config.get("S3_REGION", { infer: true }),
             accessKeyId: config.get("S3_ACCESS_KEY_ID", { infer: true })!,
             secretAccessKey: config.get("S3_SECRET_ACCESS_KEY", { infer: true })!,
             forcePathStyle: config.get("S3_FORCE_PATH_STYLE", { infer: true }),
+            serverSideEncryption: sse === "AES256" ? "AES256" : "none",
           });
         }
         return new FilesystemObjectStorage(

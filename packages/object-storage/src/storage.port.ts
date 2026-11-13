@@ -4,6 +4,8 @@ export type ObjectHead = {
   contentLength: number;
   etag?: string;
   contentType?: string;
+  sha256?: string;
+  serverSideEncryption?: string;
 };
 
 export class ObjectAlreadyExistsError extends Error {
@@ -29,9 +31,14 @@ export abstract class ObjectStoragePort {
     body: Buffer;
     contentType?: string;
     overwrite?: boolean;
+    contentSha256Hex?: string;
   }): Promise<void>;
 
-  abstract getObjectBuffer(input: { bucket: string; key: string }): Promise<Buffer>;
+  abstract getObjectBuffer(input: {
+    bucket: string;
+    key: string;
+    expectedSha256Hex?: string;
+  }): Promise<Buffer>;
 
   abstract headObject(input: { bucket: string; key: string }): Promise<ObjectHead>;
 

@@ -14,6 +14,8 @@ export class CsrfService {
       CSRF_COOKIE_NAME: config.get("CSRF_COOKIE_NAME", { infer: true }),
       NODE_ENV: config.get("NODE_ENV", { infer: true }),
       SESSION_COOKIE_NAME: config.get("SESSION_COOKIE_NAME", { infer: true }),
+      COOKIE_SECURE: config.get("COOKIE_SECURE", { infer: true }),
+      COOKIE_DOMAIN: config.get("COOKIE_DOMAIN", { infer: true }),
     });
   }
 

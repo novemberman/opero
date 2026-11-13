@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseApiEnv } from "./env";
+import { parseApiEnv, resolveCookieSecure } from "./env";
 
 const valid = {
   DATABASE_URL: "postgresql://opero:secret@127.0.0.1:54329/opero",
@@ -29,6 +29,15 @@ describe("parseApiEnv", () => {
         ...valid,
         NODE_ENV: "production",
         AUTH_THROTTLE_DISABLED: "true",
+        DOCUMENT_STORAGE_DRIVER: "s3",
+        S3_ENDPOINT: "https://s3.example.com",
+        S3_ACCESS_KEY_ID: "AKIAEXAMPLE",
+        S3_SECRET_ACCESS_KEY: "secretsecret",
+        MAIL_DRIVER: "smtp",
+        PAYMENT_PROVIDER: "korapay",
+        KORAPAY_SECRET_KEY: "sk_live_examplekey",
+        APP_ORIGIN: "https://app.example.com",
+        REDIS_PASSWORD: "prod-redis-password",
       }),
     ).toThrow(/AUTH_THROTTLE_DISABLED/);
   });
@@ -49,6 +58,14 @@ describe("parseApiEnv", () => {
         ...valid,
         NODE_ENV: "production",
         DOCUMENT_SCANNER_DRIVER: "mock",
+        DOCUMENT_STORAGE_DRIVER: "s3",
+        S3_ENDPOINT: "https://s3.example.com",
+        S3_ACCESS_KEY_ID: "AKIAEXAMPLE",
+        S3_SECRET_ACCESS_KEY: "secretsecret",
+        MAIL_DRIVER: "smtp",
+        PAYMENT_PROVIDER: "korapay",
+        KORAPAY_SECRET_KEY: "sk_live_examplekey",
+        APP_ORIGIN: "https://app.example.com",
         REDIS_PASSWORD: "prod-redis-password",
       }),
     ).toThrow(/DOCUMENT_SCANNER_DRIVER/);
@@ -78,6 +95,12 @@ describe("parseApiEnv", () => {
         ...valid,
         NODE_ENV: "production",
         PAYMENT_PROVIDER: "mock",
+        DOCUMENT_STORAGE_DRIVER: "s3",
+        S3_ENDPOINT: "https://s3.example.com",
+        S3_ACCESS_KEY_ID: "AKIAEXAMPLE",
+        S3_SECRET_ACCESS_KEY: "secretsecret",
+        MAIL_DRIVER: "smtp",
+        APP_ORIGIN: "https://app.example.com",
         REDIS_PASSWORD: "prod-redis-password",
       }),
     ).toThrow(/PAYMENT_PROVIDER/);
@@ -87,8 +110,90 @@ describe("parseApiEnv", () => {
         NODE_ENV: "production",
         PAYMENT_PROVIDER: "korapay",
         KORAPAY_SECRET_KEY: "sk_test_not_for_prod",
+        DOCUMENT_STORAGE_DRIVER: "s3",
+        S3_ENDPOINT: "https://s3.example.com",
+        S3_ACCESS_KEY_ID: "AKIAEXAMPLE",
+        S3_SECRET_ACCESS_KEY: "secretsecret",
+        MAIL_DRIVER: "smtp",
+        APP_ORIGIN: "https://app.example.com",
         REDIS_PASSWORD: "prod-redis-password",
       }),
     ).toThrow(/sk_test_/);
+  });
+
+  it("forbids filesystem storage and dev mail in production", () => {
+    expect(() =>
+      parseApiEnv({
+        ...valid,
+        NODE_ENV: "production",
+        DOCUMENT_STORAGE_DRIVER: "filesystem",
+        MAIL_DRIVER: "dev",
+        PAYMENT_PROVIDER: "korapay",
+        KORAPAY_SECRET_KEY: "sk_live_examplekey",
+        APP_ORIGIN: "https://app.example.com",
+        REDIS_PASSWORD: "prod-redis-password",
+      }),
+    ).toThrow(/DOCUMENT_STORAGE_DRIVER|MAIL_DRIVER/);
+  });
+
+  it("forbids COOKIE_SECURE=false and http APP_ORIGIN in production", () => {
+    expect(() =>
+      parseApiEnv({
+        ...valid,
+        NODE_ENV: "production",
+        COOKIE_SECURE: "false",
+        DOCUMENT_STORAGE_DRIVER: "s3",
+        S3_ENDPOINT: "https://s3.example.com",
+        S3_ACCESS_KEY_ID: "AKIAEXAMPLE",
+        S3_SECRET_ACCESS_KEY: "secretsecret",
+        MAIL_DRIVER: "smtp",
+        PAYMENT_PROVIDER: "korapay",
+        KORAPAY_SECRET_KEY: "sk_live_examplekey",
+        APP_ORIGIN: "http://app.example.com",
+        REDIS_PASSWORD: "prod-redis-password",
+      }),
+    ).toThrow(/COOKIE_SECURE|APP_ORIGIN/);
+  });
+
+  it("forbids live Korapay keys in staging but allows sk_test_", () => {
+    expect(() =>
+      parseApiEnv({
+        ...valid,
+        NODE_ENV: "production",
+        APP_ENV: "staging",
+        DOCUMENT_STORAGE_DRIVER: "s3",
+        S3_ENDPOINT: "https://s3.example.com",
+        S3_ACCESS_KEY_ID: "AKIAEXAMPLE",
+        S3_SECRET_ACCESS_KEY: "secretsecret",
+        MAIL_DRIVER: "smtp",
+        PAYMENT_PROVIDER: "korapay",
+        KORAPAY_SECRET_KEY: "sk_live_should_not_be_here",
+        APP_ORIGIN: "https://staging.example.com",
+        REDIS_PASSWORD: "staging-redis-password",
+      }),
+    ).toThrow(/sk_live_/);
+
+    expect(
+      parseApiEnv({
+        ...valid,
+        NODE_ENV: "production",
+        APP_ENV: "staging",
+        DOCUMENT_STORAGE_DRIVER: "s3",
+        S3_ENDPOINT: "https://s3.example.com",
+        S3_ACCESS_KEY_ID: "AKIAEXAMPLE",
+        S3_SECRET_ACCESS_KEY: "secretsecret",
+        MAIL_DRIVER: "smtp",
+        PAYMENT_PROVIDER: "korapay",
+        KORAPAY_SECRET_KEY: "sk_test_staging_ok",
+        APP_ORIGIN: "https://staging.example.com",
+        REDIS_PASSWORD: "staging-redis-password",
+      }).APP_ENV,
+    ).toBe("staging");
+  });
+
+  it("resolves cookie secure defaults", () => {
+    expect(resolveCookieSecure({ NODE_ENV: "development", COOKIE_SECURE: undefined })).toBe(false);
+    expect(resolveCookieSecure({ NODE_ENV: "production", COOKIE_SECURE: undefined })).toBe(true);
+    expect(resolveCookieSecure({ NODE_ENV: "development", COOKIE_SECURE: true })).toBe(true);
   });
 });

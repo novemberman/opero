@@ -106,7 +106,10 @@ export class ReportsService {
   ) {}
 
   private bucket(): string {
-    return this.config.get("S3_DOCUMENTS_BUCKET", { infer: true });
+    return (
+      this.config.get("S3_REPORTS_BUCKET", { infer: true }) ??
+      this.config.get("S3_DOCUMENTS_BUCKET", { infer: true })
+    );
   }
 
   async create(input: {

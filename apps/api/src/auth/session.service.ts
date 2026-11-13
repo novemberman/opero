@@ -2,7 +2,7 @@ import { Inject, Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import type { PrismaClient } from "@opero/database";
 import type { Response } from "express";
-import type { ApiEnv } from "../config/env";
+import { resolveCookieSecure, type ApiEnv } from "../config/env";
 import { PRISMA_CLIENT } from "../database/database.constants";
 import { generateOpaqueToken, hashToken } from "../security/tokens";
 import type { AuthenticatedUser } from "../types/express";
@@ -19,7 +19,14 @@ export class SessionService {
   }
 
   private cookieSecure(): boolean {
-    return this.config.get("NODE_ENV", { infer: true }) === "production";
+    return resolveCookieSecure({
+      NODE_ENV: this.config.get("NODE_ENV", { infer: true }),
+      COOKIE_SECURE: this.config.get("COOKIE_SECURE", { infer: true }),
+    });
+  }
+
+  private cookieDomain(): string | undefined {
+    return this.config.get("COOKIE_DOMAIN", { infer: true });
   }
 
   private ttlMs(): number {
@@ -33,6 +40,7 @@ export class SessionService {
       secure: this.cookieSecure(),
       path: "/",
       expires: expiresAt,
+      ...(this.cookieDomain() ? { domain: this.cookieDomain() } : {}),
     });
   }
 
@@ -42,6 +50,7 @@ export class SessionService {
       sameSite: "lax",
       secure: this.cookieSecure(),
       path: "/",
+      ...(this.cookieDomain() ? { domain: this.cookieDomain() } : {}),
     });
   }
 

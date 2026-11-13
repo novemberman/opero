@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Declarative Railway service map for Opero. Create services manually or via Railway CLI; do not auto-detect monorepo roots.",
+  "environments": ["staging", "production"],
+  "services": [
+    {
+      "name": "opero-web",
+      "dockerfile": "deploy/docker/Dockerfile.web",
+      "publicNetworking": true,
+      "healthcheckPath": "/health",
+      "restartPolicy": "on_failure",
+      "requiredEnv": [
+        "WEB_HOST",
+        "WEB_PORT",
+        "NEXT_PUBLIC_API_BASE_URL",
+        "APP_VERSION"
+      ],
+      "notes": "Bind WEB_HOST=0.0.0.0; use Railway $PORT as WEB_PORT."
+    },
+    {
+      "name": "opero-api",
+      "dockerfile": "deploy/docker/Dockerfile.api",
+      "publicNetworking": true,
+      "healthcheckPath": "/api/v1/health",
+      "restartPolicy": "on_failure",
+      "preDeployCommand": "node scripts/migrate-deploy.mjs",
+      "requiredEnv": [
+        "NODE_ENV",
+        "DATABASE_URL",
+        "REDIS_HOST",
+        "REDIS_PORT",
+        "REDIS_PASSWORD",
+        "CSRF_SECRET",
+        "APP_ORIGIN",
+        "CORS_ORIGINS",
+        "DOCUMENT_STORAGE_DRIVER",
+        "PAYMENT_PROVIDER",
+        "APP_VERSION"
+      ],
+      "notes": "Private network to Postgres/Redis/S3. Korapay notification_url = https://<api-domain>/api/v1/billing/webhooks/korapay"
+    },
+    {
+      "name": "opero-worker",
+      "dockerfile": "deploy/docker/Dockerfile.worker",
+      "publicNetworking": false,
+      "restartPolicy": "on_failure",
+      "requiredEnv": [
+        "NODE_ENV",
+        "DATABASE_URL",
+        "REDIS_HOST",
+        "REDIS_PORT",
+        "REDIS_PASSWORD",
+        "DOCUMENT_STORAGE_DRIVER",
+        "APP_VERSION"
+      ],
+      "notes": "No public HTTP. Shares private network with API."
+    },
+    {
+      "name": "PostgreSQL",
+      "type": "plugin",
+      "publicNetworking": false,
+      "notes": "Inject DATABASE_URL via Railway reference variables."
+    },
+    {
+      "name": "Redis",
+      "type": "plugin",
+      "publicNetworking": false,
+      "notes": "Inject REDIS_HOST/PORT/PASSWORD or parse REDIS_URL in release."
+    }
+  ]
+}

@@ -8,6 +8,8 @@ const boolFromEnv = z
 export const apiEnvSchema = z
   .object({
     NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
+    APP_ENV: z.enum(["development", "test", "staging", "production"]).optional(),
+    APP_VERSION: z.string().min(1).optional(),
     API_HOST: z.string().min(1).default("127.0.0.1"),
     API_PORT: z.coerce.number().int().min(1).max(65535).default(3001),
     CORS_ORIGINS: z.string().default("http://127.0.0.1:3000,http://localhost:3000"),
@@ -17,10 +19,21 @@ export const apiEnvSchema = z
     SESSION_COOKIE_NAME: z.string().min(1).default("opero_session"),
     CSRF_COOKIE_NAME: z.string().min(1).default("opero_csrf"),
     CSRF_SECRET: z.string().min(32),
+    COOKIE_SECURE: z
+      .union([z.boolean(), z.enum(["true", "false", "1", "0"])])
+      .optional()
+      .transform((value) => {
+        if (value === undefined) return undefined;
+        return value === true || value === "true" || value === "1";
+      }),
+    COOKIE_DOMAIN: z.string().min(1).optional(),
+    TRUST_PROXY: boolFromEnv.default(false),
     SESSION_TTL_HOURS: z.coerce.number().int().min(1).max(720).default(168),
     AUTH_TOKEN_TTL_HOURS: z.coerce.number().int().min(1).max(168).default(24),
-    MAIL_DRIVER: z.enum(["dev"]).default("dev"),
+    MAIL_DRIVER: z.enum(["dev", "smtp", "resend"]).default("dev"),
     MAIL_DIR: z.string().min(1).default(".data/mail"),
+    SMTP_URL: z.string().optional(),
+    RESEND_API_KEY: z.string().optional(),
     AUTH_THROTTLE_DISABLED: boolFromEnv,
     AUTH_LOGIN_THROTTLE_LIMIT: z.coerce.number().int().min(1).max(1000).default(10),
     AUTH_LOGIN_THROTTLE_TTL_MS: z.coerce.number().int().min(1000).max(3_600_000).default(60_000),
@@ -34,8 +47,11 @@ export const apiEnvSchema = z
     S3_ACCESS_KEY_ID: z.string().optional(),
     S3_SECRET_ACCESS_KEY: z.string().optional(),
     S3_FORCE_PATH_STYLE: boolFromEnv.default(true),
+    S3_SSE: z.enum(["none", "AES256"]).default("none"),
     S3_QUARANTINE_BUCKET: z.string().min(1).default("opero-quarantine"),
     S3_DOCUMENTS_BUCKET: z.string().min(1).default("opero-documents"),
+    /** Defaults to documents bucket; use a dedicated bucket in staging/prod when provisioned. */
+    S3_REPORTS_BUCKET: z.string().min(1).optional(),
     S3_PRESIGN_TTL_SECONDS: z.coerce.number().int().min(30).max(3600).default(120),
     DOCUMENT_MAX_BYTES: z.coerce.number().int().min(1024).max(50_000_000).default(20_971_520),
     DOCUMENT_UPLOAD_TTL_MINUTES: z.coerce.number().int().min(5).max(1440).default(30),
@@ -50,7 +66,6 @@ export const apiEnvSchema = z
     AI_TIMEOUT_MS: z.coerce.number().int().min(1000).max(120_000).default(30_000),
     AI_MAX_RETRIES: z.coerce.number().int().min(0).max(5).default(1),
     AI_SHARE_STRUCTURED_CONTEXT: boolFromEnv.default(true),
-    // Phase 7A — Korapay (mock by default; never process live payments in tests).
     PAYMENT_PROVIDER: z.enum(["mock", "korapay"]).default("mock"),
     KORAPAY_SECRET_KEY: z.string().min(8).optional(),
     KORAPAY_PUBLIC_KEY: z.string().min(8).optional(),
@@ -58,18 +73,72 @@ export const apiEnvSchema = z
     BILLING_WEBHOOK_BASE_URL: z.string().url().optional(),
   })
   .superRefine((env, ctx) => {
-    if (env.NODE_ENV === "production" && env.AUTH_THROTTLE_DISABLED) {
+    // Prefer APP_ENV when set so Railway staging can use NODE_ENV=production runtime
+    // optimizations without applying live-payment rules.
+    const appEnv =
+      env.APP_ENV ?? (env.NODE_ENV === "production" ? "production" : env.NODE_ENV);
+    const isProduction = appEnv === "production";
+    const isStaging = appEnv === "staging";
+    const isDeployed = isProduction || isStaging;
+
+    if (isProduction && env.AUTH_THROTTLE_DISABLED) {
       ctx.addIssue({
         code: "custom",
         path: ["AUTH_THROTTLE_DISABLED"],
         message: "AUTH_THROTTLE_DISABLED cannot be enabled in production",
       });
     }
-    if (env.NODE_ENV === "production" && env.DOCUMENT_SCANNER_DRIVER === "mock") {
+    if (isDeployed && env.DOCUMENT_SCANNER_DRIVER === "mock") {
       ctx.addIssue({
         code: "custom",
         path: ["DOCUMENT_SCANNER_DRIVER"],
-        message: "DOCUMENT_SCANNER_DRIVER=mock is forbidden in production",
+        message: "DOCUMENT_SCANNER_DRIVER=mock is forbidden in staging/production",
+      });
+    }
+    if (
+      isDeployed &&
+      (env.DOCUMENT_STORAGE_DRIVER === "filesystem" || env.DOCUMENT_STORAGE_DRIVER === "memory")
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["DOCUMENT_STORAGE_DRIVER"],
+        message:
+          "DOCUMENT_STORAGE_DRIVER must be s3 in staging/production (ephemeral FS forbidden)",
+      });
+    }
+    if (isDeployed && env.MAIL_DRIVER === "dev") {
+      ctx.addIssue({
+        code: "custom",
+        path: ["MAIL_DRIVER"],
+        message: "MAIL_DRIVER=dev is forbidden in staging/production",
+      });
+    }
+    if (isDeployed && env.COOKIE_SECURE === false) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["COOKIE_SECURE"],
+        message: "COOKIE_SECURE=false is forbidden in staging/production",
+      });
+    }
+    if (isDeployed && !env.APP_ORIGIN.startsWith("https://")) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["APP_ORIGIN"],
+        message: "APP_ORIGIN must be https in staging/production",
+      });
+    }
+    if (isDeployed && env.CSRF_SECRET.includes("replace-with")) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["CSRF_SECRET"],
+        message: "CSRF_SECRET placeholder is forbidden in staging/production",
+      });
+    }
+    if (isDeployed && env.REDIS_PASSWORD.includes("replace-with")) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["REDIS_PASSWORD"],
+        message: "REDIS_PASSWORD placeholder is forbidden in staging/production",
       });
     }
     if (env.DOCUMENT_STORAGE_DRIVER === "s3") {
@@ -78,6 +147,17 @@ export const apiEnvSchema = z
           code: "custom",
           path: ["S3_ENDPOINT"],
           message: "S3 endpoint and credentials are required when DOCUMENT_STORAGE_DRIVER=s3",
+        });
+      }
+      if (
+        isDeployed &&
+        env.S3_ENDPOINT?.startsWith("http://") &&
+        !env.S3_ENDPOINT.includes("127.0.0.1")
+      ) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["S3_ENDPOINT"],
+          message: "S3_ENDPOINT must use https in staging/production (except local loopback)",
         });
       }
     }
@@ -97,7 +177,7 @@ export const apiEnvSchema = z
         message: "KORAPAY_SECRET_KEY is required when PAYMENT_PROVIDER=korapay",
       });
     }
-    if (env.NODE_ENV === "production" && env.PAYMENT_PROVIDER === "mock") {
+    if (isProduction && env.PAYMENT_PROVIDER === "mock") {
       ctx.addIssue({
         code: "custom",
         path: ["PAYMENT_PROVIDER"],
@@ -105,7 +185,7 @@ export const apiEnvSchema = z
       });
     }
     if (
-      env.NODE_ENV === "production" &&
+      isProduction &&
       env.PAYMENT_PROVIDER === "korapay" &&
       env.KORAPAY_SECRET_KEY?.startsWith("sk_test_")
     ) {
@@ -113,6 +193,13 @@ export const apiEnvSchema = z
         code: "custom",
         path: ["KORAPAY_SECRET_KEY"],
         message: "sk_test_ keys are forbidden in production; use sk_live_ after KYC activation",
+      });
+    }
+    if (isStaging && env.KORAPAY_SECRET_KEY?.startsWith("sk_live_")) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["KORAPAY_SECRET_KEY"],
+        message: "sk_live_ keys are forbidden in staging; use sk_test_",
       });
     }
   });
@@ -128,4 +215,10 @@ export function parseApiEnv(source: unknown): ApiEnv {
     throw new Error(`Invalid API environment\n${details}`);
   }
   return parsed.data;
+}
+
+/** Effective cookie Secure flag (production defaults to true). */
+export function resolveCookieSecure(env: Pick<ApiEnv, "NODE_ENV" | "COOKIE_SECURE">): boolean {
+  if (env.COOKIE_SECURE != null) return env.COOKIE_SECURE;
+  return env.NODE_ENV === "production";
 }

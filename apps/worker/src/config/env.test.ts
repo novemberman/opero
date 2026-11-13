@@ -29,6 +29,11 @@ describe("parseWorkerEnv", () => {
         ...valid,
         NODE_ENV: "production",
         DOCUMENT_SCANNER_DRIVER: "mock",
+        DOCUMENT_STORAGE_DRIVER: "s3",
+        S3_ENDPOINT: "https://s3.example.com",
+        S3_ACCESS_KEY_ID: "AKIAEXAMPLE",
+        S3_SECRET_ACCESS_KEY: "secretsecret",
+        REDIS_PASSWORD: "prod-redis-password",
       }),
     ).toThrow(/DOCUMENT_SCANNER_DRIVER/);
   });
@@ -39,5 +44,29 @@ describe("parseWorkerEnv", () => {
 
   it("requires OpenAI credentials when AI_PROVIDER=openai", () => {
     expect(() => parseWorkerEnv({ ...valid, AI_PROVIDER: "openai" })).toThrow(/OPENAI_API_KEY/);
+  });
+
+  it("accepts development defaults", () => {
+    expect(parseWorkerEnv(valid).DOCUMENT_STORAGE_DRIVER).toBe("filesystem");
+  });
+
+  it("rejects filesystem storage in production", () => {
+    expect(() =>
+      parseWorkerEnv({
+        ...valid,
+        NODE_ENV: "production",
+        DOCUMENT_STORAGE_DRIVER: "filesystem",
+        REDIS_PASSWORD: "prod-redis-password",
+      }),
+    ).toThrow(/DOCUMENT_STORAGE_DRIVER/);
+  });
+
+  it("requires S3 credentials when driver=s3", () => {
+    expect(() =>
+      parseWorkerEnv({
+        ...valid,
+        DOCUMENT_STORAGE_DRIVER: "s3",
+      }),
+    ).toThrow(/S3_ENDPOINT/);
   });
 });

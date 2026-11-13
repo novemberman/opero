@@ -34,6 +34,7 @@ export const healthResponseSchema = z
     status: z.literal("ok"),
     service: healthServiceSchema,
     timestamp: z.iso.datetime(),
+    version: z.string().min(1).optional(),
   })
   .strict();
 
@@ -42,13 +43,29 @@ export type HealthResponse = z.infer<typeof healthResponseSchema>;
 export function createHealthResponse(
   service: HealthServiceName,
   now: Date = new Date(),
+  version?: string,
 ): HealthResponse {
   return healthResponseSchema.parse({
     status: "ok",
     service,
     timestamp: now.toISOString(),
+    ...(version ? { version } : {}),
   });
 }
+
+export const readinessStatusSchema = z.enum(["ready", "not_ready"]);
+
+export const readinessResponseSchema = z
+  .object({
+    status: readinessStatusSchema,
+    service: healthServiceSchema,
+    timestamp: z.iso.datetime(),
+    version: z.string().min(1).optional(),
+    checks: z.record(z.string(), z.enum(["ok", "fail", "skip"])),
+  })
+  .strict();
+
+export type ReadinessResponse = z.infer<typeof readinessResponseSchema>;
 
 export const registerBodySchema = z
   .object({

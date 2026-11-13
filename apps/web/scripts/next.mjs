@@ -12,7 +12,8 @@ if (mode !== "dev" && mode !== "start") {
 }
 
 const host = process.env.WEB_HOST || "127.0.0.1";
-const port = process.env.WEB_PORT || "3000";
+// Railway injects PORT; prefer it for container deploys.
+const port = process.env.PORT || process.env.WEB_PORT || "3000";
 const require = createRequire(import.meta.url);
 const nextBin = require.resolve("next/dist/bin/next");
 const childEnv = { ...process.env };

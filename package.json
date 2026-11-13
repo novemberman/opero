@@ -15,7 +15,10 @@
     "typecheck": "turbo typecheck",
     "test": "turbo test",
     "db:generate": "pnpm --filter @opero/database db:generate",
-    "db:migrate": "pnpm --filter @opero/database db:migrate"
+    "db:migrate": "pnpm --filter @opero/database db:migrate",
+    "migrate:deploy": "node scripts/migrate-deploy.mjs",
+    "migrate:status": "pnpm --filter @opero/database exec prisma migrate status",
+    "compose:config": "docker compose -f compose.yaml config"
   },
   "devDependencies": {
     "tsx": "4.20.5",

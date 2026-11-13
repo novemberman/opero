@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import {
   CopyObjectCommand,
   DeleteObjectCommand,
@@ -19,13 +20,24 @@ export type S3StorageConfig = {
   accessKeyId: string;
   secretAccessKey: string;
   forcePathStyle?: boolean;
+  /** Server-side encryption. AES256 when supported by the provider. */
+  serverSideEncryption?: "AES256" | "none";
 };
+
+export class ObjectIntegrityError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ObjectIntegrityError";
+  }
+}
 
 export class S3ObjectStorage extends ObjectStoragePort {
   private readonly client: S3Client;
+  private readonly sse?: "AES256";
 
   constructor(config: S3StorageConfig) {
     super();
+    this.sse = config.serverSideEncryption === "AES256" ? "AES256" : undefined;
     this.client = new S3Client({
       endpoint: config.endpoint,
       region: config.region,
@@ -43,7 +55,11 @@ export class S3ObjectStorage extends ObjectStoragePort {
     body: Buffer;
     contentType?: string;
     overwrite?: boolean;
+    /** Optional expected SHA-256 hex for integrity verification after write. */
+    contentSha256Hex?: string;
   }): Promise<void> {
+    const checksum =
+      input.contentSha256Hex ?? createHash("sha256").update(input.body).digest("hex");
     try {
       await this.client.send(
         new PutObjectCommand({
@@ -51,6 +67,8 @@ export class S3ObjectStorage extends ObjectStoragePort {
           Key: input.key,
           Body: input.body,
           ContentType: input.contentType,
+          Metadata: { "opero-sha256": checksum },
+          ...(this.sse ? { ServerSideEncryption: this.sse } : {}),
           ...(input.overwrite === false ? { IfNoneMatch: "*" } : {}),
         }),
       );
@@ -66,7 +84,12 @@ export class S3ObjectStorage extends ObjectStoragePort {
     }
   }
 
-  async getObjectBuffer(input: { bucket: string; key: string }): Promise<Buffer> {
+  async getObjectBuffer(input: {
+    bucket: string;
+    key: string;
+    /** When set, fail closed if the body does not match. */
+    expectedSha256Hex?: string;
+  }): Promise<Buffer> {
     const response = await this.client.send(
       new GetObjectCommand({ Bucket: input.bucket, Key: input.key }),
     );
@@ -74,7 +97,16 @@ export class S3ObjectStorage extends ObjectStoragePort {
     if (!bytes) {
       throw new Error("Empty object body");
     }
-    return Buffer.from(bytes);
+    const buffer = Buffer.from(bytes);
+    if (input.expectedSha256Hex) {
+      const actual = createHash("sha256").update(buffer).digest("hex");
+      if (actual !== input.expectedSha256Hex.toLowerCase()) {
+        throw new ObjectIntegrityError(
+          `Object integrity mismatch for ${input.bucket}/${input.key}`,
+        );
+      }
+    }
+    return buffer;
   }
 
   async headObject(input: { bucket: string; key: string }): Promise<ObjectHead> {
@@ -87,6 +119,8 @@ export class S3ObjectStorage extends ObjectStoragePort {
       contentLength: Number(response.ContentLength ?? 0),
       etag: response.ETag,
       contentType: response.ContentType,
+      sha256: response.Metadata?.["opero-sha256"],
+      serverSideEncryption: response.ServerSideEncryption,
     };
   }
 
@@ -101,6 +135,7 @@ export class S3ObjectStorage extends ObjectStoragePort {
         Bucket: input.destinationBucket,
         Key: input.destinationKey,
         CopySource: `/${input.sourceBucket}/${input.sourceKey}`,
+        ...(this.sse ? { ServerSideEncryption: this.sse } : {}),
       }),
     );
   }

@@ -1,0 +1,26 @@
+# syntax=docker/dockerfile:1.7
+# Opero Worker — private service (no public HTTP).
+FROM node:24-bookworm-slim AS base
+ENV PNPM_HOME=/pnpm
+ENV PATH=$PNPM_HOME:$PATH
+RUN corepack enable && corepack prepare pnpm@10.34.9 --activate \
+  && apt-get update && apt-get install -y --no-install-recommends ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
+
+FROM base AS build
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json .npmrc ./
+COPY apps ./apps
+COPY packages ./packages
+COPY scripts ./scripts
+RUN pnpm install --frozen-lockfile
+RUN pnpm --filter @opero/worker... build
+
+FROM base AS runtime
+ENV NODE_ENV=production
+WORKDIR /app
+RUN groupadd --system --gid 10001 opero \
+  && useradd --system --uid 10001 --gid opero --home-dir /app --shell /usr/sbin/nologin opero
+COPY --from=build --chown=opero:opero /app /app
+USER opero
+CMD ["pnpm", "--filter", "@opero/worker", "start"]

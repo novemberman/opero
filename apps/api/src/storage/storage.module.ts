@@ -26,12 +26,17 @@ import { MALWARE_SCANNER, OBJECT_STORAGE } from "./storage.constants";
           return new MemoryObjectStorage();
         }
         if (driver === "s3") {
+          const sse = config.get("S3_SSE", { infer: true });
+          const documentsBucket = config.get("S3_DOCUMENTS_BUCKET", { infer: true });
+          const reportsBucket =
+            config.get("S3_REPORTS_BUCKET", { infer: true }) ?? documentsBucket;
           const storage = new S3ObjectStorage({
             endpoint: config.get("S3_ENDPOINT", { infer: true })!,
             region: config.get("S3_REGION", { infer: true }),
             accessKeyId: config.get("S3_ACCESS_KEY_ID", { infer: true })!,
             secretAccessKey: config.get("S3_SECRET_ACCESS_KEY", { infer: true })!,
             forcePathStyle: config.get("S3_FORCE_PATH_STYLE", { infer: true }),
+            serverSideEncryption: sse === "AES256" ? "AES256" : "none",
           });
           await ensureBuckets({
             clientConfig: {
@@ -45,7 +50,8 @@ import { MALWARE_SCANNER, OBJECT_STORAGE } from "./storage.constants";
             },
             buckets: [
               config.get("S3_QUARANTINE_BUCKET", { infer: true }),
-              config.get("S3_DOCUMENTS_BUCKET", { infer: true }),
+              documentsBucket,
+              reportsBucket,
             ],
           });
           return storage;

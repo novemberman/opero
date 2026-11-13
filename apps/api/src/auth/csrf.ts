@@ -1,6 +1,6 @@
 import { doubleCsrf } from "csrf-csrf";
 import type { NextFunction, Request, Response } from "express";
-import type { ApiEnv } from "../config/env";
+import { resolveCookieSecure, type ApiEnv } from "../config/env";
 
 export type CsrfHelpers = {
   generateCsrfToken: (req: Request, res: Response) => string;
@@ -8,7 +8,10 @@ export type CsrfHelpers = {
 };
 
 export function createCsrf(
-  env: Pick<ApiEnv, "CSRF_SECRET" | "CSRF_COOKIE_NAME" | "NODE_ENV" | "SESSION_COOKIE_NAME">,
+  env: Pick<
+    ApiEnv,
+    "CSRF_SECRET" | "CSRF_COOKIE_NAME" | "NODE_ENV" | "SESSION_COOKIE_NAME" | "COOKIE_SECURE" | "COOKIE_DOMAIN"
+  >,
 ): CsrfHelpers {
   const { generateCsrfToken, doubleCsrfProtection } = doubleCsrf({
     getSecret: () => env.CSRF_SECRET,
@@ -21,8 +24,9 @@ export function createCsrf(
     cookieOptions: {
       httpOnly: true,
       sameSite: "lax",
-      secure: env.NODE_ENV === "production",
+      secure: resolveCookieSecure(env),
       path: "/",
+      ...(env.COOKIE_DOMAIN ? { domain: env.COOKIE_DOMAIN } : {}),
     },
     getCsrfTokenFromRequest: (req: Request) =>
       (req.headers["x-csrf-token"] as string | undefined) ?? "",

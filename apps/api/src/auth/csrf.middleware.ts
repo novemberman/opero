@@ -8,6 +8,7 @@ import { CsrfService } from "./csrf.service";
 
 const CSRF_EXEMPT_SUFFIXES = [
   "/health",
+  "/ready",
   "/auth/csrf",
   "/auth/register",
   "/auth/login",
