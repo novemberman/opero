@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { apiErrorMessage, apiFetch, resetCsrfToken } from "../lib/api";
+import { buttonClassName, Button } from "./ui";
 
 type AuthUser = { id: string; email: string; name: string };
 
@@ -59,19 +60,19 @@ export function AuthNav() {
   }
 
   if (!loaded) {
-    return <span className="text-sm text-muted">…</span>;
+    return <span className="text-sm text-text-secondary">…</span>;
   }
 
   if (!user) {
     return (
-      <nav className="flex items-center gap-3 text-sm" aria-label="Account">
-        <Link className="text-ink no-underline hover:text-pine" href="/login">
+      <nav className="flex items-center gap-2 text-sm sm:gap-3" aria-label="Account">
+        <Link
+          className="hidden font-medium text-navy no-underline hover:text-emerald sm:inline"
+          href="/login"
+        >
           Sign in
         </Link>
-        <Link
-          className="inline-flex min-h-9 items-center rounded-full border border-line px-3 text-ink no-underline hover:border-ink"
-          href="/register"
-        >
+        <Link href="/register" className={buttonClassName({ size: "sm" })}>
           Create account
         </Link>
       </nav>
@@ -79,19 +80,18 @@ export function AuthNav() {
   }
 
   return (
-    <nav className="flex flex-wrap items-center justify-end gap-3 text-sm" aria-label="Account">
-      <span className="max-w-[14rem] truncate text-muted" title={user.email}>
-        {user.name}
-      </span>
-      <button
-        type="button"
-        className="inline-flex min-h-9 items-center rounded-full border border-line px-3 text-ink hover:border-ink disabled:opacity-60"
-        onClick={() => void onSignOut()}
-        disabled={pending}
+    <nav className="flex flex-wrap items-center justify-end gap-2 text-sm sm:gap-3" aria-label="Account">
+      <Link
+        href="/organizations"
+        className="max-w-[10rem] truncate font-medium text-text-secondary no-underline hover:text-navy sm:max-w-[14rem]"
+        title={user.email}
       >
+        {user.name}
+      </Link>
+      <Button type="button" variant="secondary" size="sm" loading={pending} onClick={() => void onSignOut()}>
         {pending ? "Signing out…" : "Sign out"}
-      </button>
-      {error ? <span className="basis-full text-right text-copper">{error}</span> : null}
+      </Button>
+      {error ? <span className="basis-full text-right text-sm text-error">{error}</span> : null}
     </nav>
   );
 }

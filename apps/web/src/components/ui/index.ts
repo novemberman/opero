@@ -1,7 +1,7 @@
 export { Alert, type AlertTone } from "./alert";
 export { Badge, type BadgeTone } from "./badge";
 export { Breadcrumbs, type BreadcrumbItem } from "./breadcrumbs";
-export { Button, type ButtonSize, type ButtonVariant } from "./button";
+export { Button, buttonClassName, type ButtonSize, type ButtonVariant } from "./button";
 export { Card, CardHeader } from "./card";
 export { Checkbox } from "./checkbox";
 export { ConfirmDialog, Dialog } from "./dialog";

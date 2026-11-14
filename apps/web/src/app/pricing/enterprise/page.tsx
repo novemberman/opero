@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { SiteHeader } from "../../../components/site-header";
+import { PublicFooter } from "../../../components/marketing/public-footer";
+import { PublicHeader } from "../../../components/marketing/public-header";
+import { Alert, Button, Input, buttonClassName } from "../../../components/ui";
 import { apiFetch } from "../../../lib/api";
 
 export default function EnterpriseQuotePage() {
@@ -36,53 +38,63 @@ export default function EnterpriseQuotePage() {
 
   return (
     <>
-      <SiteHeader mark="Enterprise" />
-      <main className="mx-auto max-w-xl px-5 py-12 sm:px-8">
-        <h1 className="font-[family-name:var(--font-display)] text-4xl text-ink">Enterprise</h1>
-        <p className="mt-3 text-muted">
-          Custom quotation for larger teams. This form does not charge a card and does not start a
-          subscription.
-        </p>
-        <form className="mt-8 space-y-4" onSubmit={onSubmit}>
-          <label className="block text-sm text-ink">
-            Contact name
-            <input className="mt-1 w-full border border-line bg-paper px-3 py-2" name="contactName" required />
-          </label>
-          <label className="block text-sm text-ink">
-            Work email
-            <input
-              className="mt-1 w-full border border-line bg-paper px-3 py-2"
+      <a className="skip-link" href="#main">
+        Skip to content
+      </a>
+      <PublicHeader />
+      <main id="main" className="bg-workspace">
+        <section className="mx-auto max-w-xl px-5 py-12 sm:px-8 sm:py-16">
+          <p className="text-sm font-semibold uppercase tracking-[0.16em] text-emerald">Enterprise</p>
+          <h1 className="mt-3 font-display text-4xl text-navy">Request a quotation</h1>
+          <p className="mt-3 text-sm leading-relaxed text-text-secondary">
+            Custom quotation for larger teams. This form does not charge a card and does not start a
+            subscription.
+          </p>
+          <form className="mt-8 space-y-4 rounded-2xl border border-border bg-surface p-6 shadow-sm" onSubmit={onSubmit}>
+            <Input label="Contact name" name="contactName" autoComplete="name" required />
+            <Input
+              label="Work email"
               name="contactEmail"
               type="email"
+              autoComplete="email"
               required
             />
-          </label>
-          <label className="block text-sm text-ink">
-            Company
-            <input className="mt-1 w-full border border-line bg-paper px-3 py-2" name="companyName" required />
-          </label>
-          <label className="block text-sm text-ink">
-            Requirements
-            <textarea
-              className="mt-1 w-full border border-line bg-paper px-3 py-2"
-              name="message"
-              rows={5}
-              required
-            />
-          </label>
-          <button
-            className="inline-flex min-h-11 items-center rounded-full bg-pine px-5 text-paper"
-            disabled={status === "sending" || status === "sent"}
-            type="submit"
-          >
-            {status === "sending" ? "Sending…" : "Request quotation"}
-          </button>
-        </form>
-        {message ? <p className="mt-4 text-sm text-muted">{message}</p> : null}
-        <Link className="mt-8 inline-block text-pine no-underline" href="/pricing">
-          Back to pricing
-        </Link>
+            <Input label="Company name" name="companyName" autoComplete="organization" required />
+            <label className="block space-y-1.5 text-sm text-text">
+              <span className="font-medium">Message</span>
+              <textarea
+                className="min-h-28 w-full rounded-lg border border-border bg-surface px-3 py-2 text-text shadow-sm focus-visible:border-emerald focus-visible:outline focus-visible:outline-3 focus-visible:outline-offset-0 focus-visible:outline-focus/30"
+                name="message"
+                rows={4}
+              />
+            </label>
+            {status === "error" && message ? (
+              <Alert tone="error" title="Submission failed">
+                {message}
+              </Alert>
+            ) : null}
+            {status === "sent" && message ? (
+              <Alert tone="success" title="Request received">
+                {message}
+              </Alert>
+            ) : null}
+            <Button type="submit" loading={status === "sending"} disabled={status === "sent"}>
+              Submit enquiry
+            </Button>
+          </form>
+          <p className="mt-6 text-sm text-text-secondary">
+            Prefer self-serve?{" "}
+            <Link href="/pricing" className="font-medium text-emerald no-underline hover:underline">
+              View standard pricing
+            </Link>
+            {" · "}
+            <Link href="/register" className={buttonClassName({ variant: "ghost", size: "sm", className: "inline px-0" })}>
+              Create account
+            </Link>
+          </p>
+        </section>
       </main>
+      <PublicFooter />
     </>
   );
 }

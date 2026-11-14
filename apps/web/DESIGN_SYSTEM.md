@@ -75,9 +75,15 @@ Located in `src/components/ui/`. Single design system — do not introduce a par
 
 Review specimen: `/design-system` (9A preview only; not a public marketing surface).
 
-### Later increments (not in 9A)
+## 9B — Public website & authentication
 
-- **9B** Public site + auth
+- Marketing header/footer + landing page (`/`) with X-Ray positioning, how-it-works, capabilities, pricing CTA
+- Premium auth shell (`AuthShell`) with desktop branded panel + form card
+- Auth forms use 9A Input/Button/Alert; removed `.data/mail` development copy
+- Pricing page restyled to match brand (catalog API unchanged)
+
+### Later increments
+
 - **9C** App shell + org dashboard
 - **9D** Documents / extraction
 - **9E** Diagnostics / AI

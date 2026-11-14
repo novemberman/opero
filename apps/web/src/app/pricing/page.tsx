@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { SiteHeader } from "../../components/site-header";
+import { PublicFooter } from "../../components/marketing/public-footer";
+import { PublicHeader } from "../../components/marketing/public-header";
+import { Alert, Skeleton, buttonClassName } from "../../components/ui";
 import { apiFetch } from "../../lib/api";
 
 type CatalogProduct = {
@@ -21,6 +23,7 @@ type CatalogProduct = {
 export default function PricingPage() {
   const [products, setProducts] = useState<CatalogProduct[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     void (async () => {
@@ -29,70 +32,98 @@ export default function PricingPage() {
       );
       if (status >= 400) {
         setError(body.message ?? "Unable to load pricing");
+        setLoaded(true);
         return;
       }
       setProducts(body.products ?? []);
+      setLoaded(true);
     })();
   }, []);
 
   return (
     <>
-      <SiteHeader mark="Pricing" />
-      <main className="relative min-h-[70vh] overflow-hidden">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(46,90,72,0.18),transparent_45%),linear-gradient(160deg,#f7f3ea_0%,#ebe4d6_48%,#dfe8e1_100%)]" />
-        <div className="relative mx-auto max-w-5xl px-5 py-16 sm:px-8">
-          <p className="font-[family-name:var(--font-display)] text-5xl tracking-tight text-ink sm:text-6xl">
-            Opero
-          </p>
-          <h1 className="mt-4 max-w-2xl text-2xl text-ink sm:text-3xl">
-            Nigerian launch pricing for X-Ray and Opero OS
-          </h1>
-          <p className="mt-3 max-w-xl text-muted">
-            Amounts are shown in NGN. Prices are launch defaults and may change; purchases keep the
-            amount you checked out with.
-          </p>
-          {error ? <p className="mt-6 text-copper">{error}</p> : null}
-          <div className="mt-12 grid gap-8 sm:grid-cols-2">
-            {products.map((product) => {
-              const price = product.prices[0];
-              return (
-                <section key={product.code} className="border-t border-line pt-6">
-                  <h2 className="text-xl text-ink">{product.name}</h2>
-                  <p className="mt-2 text-sm text-muted">{product.description}</p>
-                  <p className="mt-4 font-[family-name:var(--font-display)] text-3xl text-pine">
-                    {price?.amountDisplay ?? "Custom"}
-                    {price?.interval === "MONTHLY" ? (
-                      <span className="ml-2 text-base text-muted">/ month</span>
-                    ) : null}
-                    {product.kind === "ENTERPRISE" ? (
-                      <span className="text-base text-muted"> quotation</span>
-                    ) : null}
-                  </p>
-                  <p className="mt-1 text-xs text-muted">
-                    {price
-                      ? `${price.amountMinor.toLocaleString("en-NG")} kobo · ${price.currency}`
-                      : "Contact sales"}
-                  </p>
-                </section>
-              );
-            })}
+      <a className="skip-link" href="#main">
+        Skip to content
+      </a>
+      <PublicHeader />
+      <main id="main" className="bg-workspace">
+        <section className="border-b border-border bg-navy text-text-inverse">
+          <div className="mx-auto max-w-6xl px-5 py-14 sm:px-8 sm:py-16">
+            <p className="text-sm font-semibold uppercase tracking-[0.16em] text-emerald">Pricing</p>
+            <h1 className="mt-3 max-w-2xl font-display text-4xl sm:text-5xl">Opero plans</h1>
+            <p className="mt-4 max-w-xl text-base leading-relaxed text-white/70">
+              Nigerian launch pricing for X-Ray and Opero OS. Amounts are shown in NGN. Purchases
+              keep the amount you checked out with.
+            </p>
           </div>
-          <div className="mt-12 flex flex-wrap gap-3">
-            <Link
-              className="inline-flex min-h-11 items-center rounded-full bg-pine px-5 text-paper no-underline"
-              href="/organizations"
-            >
-              Open an organization
+        </section>
+
+        <section className="mx-auto max-w-6xl px-5 py-12 sm:px-8 sm:py-16">
+          {error ? (
+            <Alert tone="error" title="Pricing unavailable">
+              {error}
+            </Alert>
+          ) : null}
+
+          {!loaded ? (
+            <div className="grid gap-6 sm:grid-cols-2">
+              <Skeleton className="h-48 w-full rounded-2xl" />
+              <Skeleton className="h-48 w-full rounded-2xl" />
+            </div>
+          ) : (
+            <div className="grid gap-6 sm:grid-cols-2">
+              {products.map((product) => {
+                const price = product.prices[0];
+                return (
+                  <article
+                    key={product.code}
+                    className="flex flex-col rounded-2xl border border-border bg-surface p-6 shadow-sm"
+                  >
+                    <h2 className="text-xl font-semibold text-navy">{product.name}</h2>
+                    <p className="mt-2 flex-1 text-sm leading-relaxed text-text-secondary">
+                      {product.description}
+                    </p>
+                    <p className="mt-6 font-display text-3xl text-emerald">
+                      {price?.amountDisplay ?? "Custom"}
+                      {price?.interval === "MONTHLY" ? (
+                        <span className="ml-2 font-sans text-base font-medium text-text-secondary">
+                          / month
+                        </span>
+                      ) : null}
+                      {product.kind === "ENTERPRISE" ? (
+                        <span className="ml-2 font-sans text-base font-medium text-text-secondary">
+                          quotation
+                        </span>
+                      ) : null}
+                    </p>
+                    <p className="mt-1 font-data text-xs text-text-secondary">
+                      {price
+                        ? `${price.amountMinor.toLocaleString("en-NG")} kobo · ${price.currency}`
+                        : "Contact sales"}
+                    </p>
+                  </article>
+                );
+              })}
+            </div>
+          )}
+
+          <div className="mt-10 flex flex-wrap gap-3">
+            <Link href="/register" className={buttonClassName({ size: "lg" })}>
+              Create account
             </Link>
             <Link
-              className="inline-flex min-h-11 items-center rounded-full border border-line px-5 text-ink no-underline"
               href="/pricing/enterprise"
+              className={buttonClassName({ variant: "secondary", size: "lg" })}
             >
               Request Enterprise quote
             </Link>
+            <Link href="/organizations" className={buttonClassName({ variant: "ghost", size: "lg" })}>
+              Open an organization
+            </Link>
           </div>
-        </div>
+        </section>
       </main>
+      <PublicFooter />
     </>
   );
 }

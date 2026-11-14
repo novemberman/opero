@@ -20,6 +20,25 @@ const sizes: Record<ButtonSize, string> = {
   lg: "min-h-12 px-5 text-base",
 };
 
+export function buttonClassName({
+  variant = "primary",
+  size = "md",
+  className,
+}: {
+  variant?: ButtonVariant;
+  size?: ButtonSize;
+  className?: string;
+} = {}) {
+  return cn(
+    "inline-flex items-center justify-center gap-2 rounded-full font-semibold no-underline transition-colors",
+    "focus-visible:outline focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-focus",
+    "disabled:cursor-not-allowed",
+    variants[variant],
+    sizes[size],
+    className,
+  );
+}
+
 export function Button({
   className,
   variant = "primary",
@@ -38,19 +57,14 @@ export function Button({
   return (
     <button
       type={type}
-      className={cn(
-        "inline-flex items-center justify-center gap-2 rounded-full font-semibold transition-colors",
-        "focus-visible:outline focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-focus",
-        "disabled:cursor-not-allowed",
-        variants[variant],
-        sizes[size],
-        className,
-      )}
+      className={buttonClassName({ variant, size, className })}
       disabled={disabled || loading}
       aria-busy={loading || undefined}
       {...props}
     >
-      {loading ? <span className="size-4 animate-spin rounded-full border-2 border-current border-r-transparent" /> : null}
+      {loading ? (
+        <span className="size-4 animate-spin rounded-full border-2 border-current border-r-transparent motion-reduce:animate-none" />
+      ) : null}
       {children}
     </button>
   );
