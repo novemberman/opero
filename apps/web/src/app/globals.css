@@ -1,13 +1,140 @@
 @import "tailwindcss";
 
+/*
+  Opero Phase 9A design tokens.
+  Legacy aliases (paper, ink, pine, copper, line, muted) map onto the new
+  brand palette so existing screens adopt the identity without a rewrite.
+*/
+
 @theme {
-  --color-paper: #f3efe6;
-  --color-ink: #1c1915;
-  --color-pine: #1e4d3a;
-  --color-pine-dark: #143528;
-  --color-copper: #8a4e2b;
-  --color-line: #e3d9cc;
-  --color-muted: #5e574e;
+  /* Brand */
+  --color-navy: #101d32;
+  --color-navy-hover: #0c1626;
+  --color-emerald: #087f6d;
+  --color-emerald-hover: #066557;
+  --color-gold: #d6a85b;
+  --color-gold-muted: #c4964a;
+  --color-workspace: #f7f9fc;
+  --color-slate: #64748b;
+  --color-info-surface: #eaf2f8;
+
+  /* Surfaces & elevation */
+  --color-surface: #ffffff;
+  --color-surface-raised: #ffffff;
+  --color-surface-sunken: #eef2f7;
+  --color-overlay: rgb(16 29 50 / 0.48);
+
+  /* Text */
+  --color-text: #101d32;
+  --color-text-secondary: #64748b;
+  --color-text-inverse: #f7f9fc;
+  --color-text-disabled: #94a3b8;
+
+  /* Borders & interactive */
+  --color-border: #d7e0ea;
+  --color-border-strong: #b7c5d6;
+  --color-hover: #eef3f8;
+  --color-focus: #087f6d;
+  --color-disabled: #cbd5e1;
+
+  /* Semantic */
+  --color-success: #0f7a45;
+  --color-success-surface: #e8f7ef;
+  --color-warning: #9a6700;
+  --color-warning-surface: #fff6e5;
+  --color-error: #b42318;
+  --color-error-surface: #fef3f2;
+  --color-info: #175cd3;
+  --color-info-strong: #175cd3;
+
+  /* Charts (categorical, colour-blind aware sequence) */
+  --color-chart-1: #087f6d;
+  --color-chart-2: #101d32;
+  --color-chart-3: #d6a85b;
+  --color-chart-4: #3b82f6;
+  --color-chart-5: #7c3aed;
+  --color-chart-6: #db2777;
+  --color-chart-grid: #e2e8f0;
+  --color-chart-axis: #64748b;
+
+  /* Legacy aliases — keep class names stable across increments */
+  --color-paper: var(--color-workspace);
+  --color-ink: var(--color-navy);
+  --color-pine: var(--color-emerald);
+  --color-pine-dark: var(--color-emerald-hover);
+  --color-copper: var(--color-gold);
+  --color-line: var(--color-border);
+  --color-muted: var(--color-slate);
+
+  /* Radius & shadow */
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --shadow-sm: 0 1px 2px rgb(16 29 50 / 0.06);
+  --shadow-md: 0 4px 16px rgb(16 29 50 / 0.08);
+  --shadow-lg: 0 12px 32px rgb(16 29 50 / 0.12);
+
+  /* Type */
+  --font-sans: var(--font-ui), "Plus Jakarta Sans", "Segoe UI", sans-serif;
+  --font-data: var(--font-tabular), Inter, "Segoe UI", sans-serif;
+  --font-display: var(--font-editorial), "DM Serif Display", Georgia, serif;
+
+  /* Spacing rhythm (4px base) */
+  --spacing-section: 4rem;
+  --spacing-stack: 1.5rem;
+}
+
+:root {
+  color-scheme: light;
+}
+
+/* Dark mode tokens — opt-in via .dark or data-theme="dark" (shell adopts in 9C+) */
+.dark,
+[data-theme="dark"] {
+  color-scheme: dark;
+  --color-navy: #e8eef7;
+  --color-navy-hover: #ffffff;
+  --color-emerald: #2dd4bf;
+  --color-emerald-hover: #5eead4;
+  --color-gold: #e0b76a;
+  --color-gold-muted: #c4964a;
+  --color-workspace: #0b1220;
+  --color-slate: #94a3b8;
+  --color-info-surface: #152238;
+  --color-surface: #121a2b;
+  --color-surface-raised: #182234;
+  --color-surface-sunken: #0b1220;
+  --color-overlay: rgb(0 0 0 / 0.64);
+  --color-text: #e8eef7;
+  --color-text-secondary: #94a3b8;
+  --color-text-inverse: #0b1220;
+  --color-text-disabled: #64748b;
+  --color-border: #243247;
+  --color-border-strong: #334155;
+  --color-hover: #1a2538;
+  --color-focus: #2dd4bf;
+  --color-disabled: #334155;
+  --color-success: #34d399;
+  --color-success-surface: #052e1c;
+  --color-warning: #fbbf24;
+  --color-warning-surface: #3b2a05;
+  --color-error: #f87171;
+  --color-error-surface: #3f1210;
+  --color-info: #60a5fa;
+  --color-info-strong: #93c5fd;
+  --color-chart-grid: #243247;
+  --color-chart-axis: #94a3b8;
+  --color-paper: var(--color-workspace);
+  --color-ink: var(--color-text);
+  --color-pine: var(--color-emerald);
+  --color-pine-dark: var(--color-emerald-hover);
+  --color-copper: var(--color-gold);
+  --color-line: var(--color-border);
+  --color-muted: var(--color-slate);
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.35);
+  --shadow-md: 0 4px 16px rgb(0 0 0 / 0.4);
+  --shadow-lg: 0 12px 32px rgb(0 0 0 / 0.5);
 }
 
 html {
@@ -15,42 +142,108 @@ html {
 }
 
 body {
-  background: var(--color-paper);
-  color: var(--color-ink);
-  font-family: var(--font-sans), "Source Sans 3", "Segoe UI", sans-serif;
+  background: var(--color-workspace);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  line-height: 1.55;
+  letter-spacing: -0.011em;
 }
 
+/* Operational headings stay UI sans — editorial display is opt-in via .font-display */
 h1,
 h2,
 h3 {
-  font-family: var(--font-display), "Iowan Old Style", Georgia, serif;
-  font-weight: 520;
+  font-family: var(--font-sans);
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  color: var(--color-text);
+  line-height: 1.2;
+}
+
+h1 {
+  font-size: clamp(1.75rem, 1.4rem + 1.2vw, 2.25rem);
+}
+
+h2 {
+  font-size: clamp(1.35rem, 1.2rem + 0.6vw, 1.625rem);
+}
+
+h3 {
+  font-size: 1.125rem;
+}
+
+.font-display {
+  font-family: var(--font-display);
+  font-weight: 400;
+  letter-spacing: -0.01em;
+}
+
+.font-data {
+  font-family: var(--font-data);
+  font-variant-numeric: tabular-nums lining-nums;
+  letter-spacing: 0;
+}
+
+.text-secondary {
+  color: var(--color-text-secondary);
+}
+
+.text-balance {
+  text-wrap: balance;
+}
+
+.surface {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.surface-info {
+  background: var(--color-info-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
 }
 
 .skip-link {
   position: absolute;
   left: 1rem;
   top: -4rem;
-  z-index: 20;
+  z-index: 50;
   border-radius: 999px;
-  background: var(--color-ink);
-  color: var(--color-paper);
+  background: var(--color-navy);
+  color: var(--color-text-inverse);
   padding: 0.6rem 1rem;
+  text-decoration: none;
 }
 
 .skip-link:focus {
   top: 1rem;
-  outline: 3px solid var(--color-copper);
+  outline: 3px solid var(--color-focus);
   outline-offset: 2px;
 }
 
 :focus-visible {
-  outline: 3px solid var(--color-copper);
-  outline-offset: 3px;
+  outline: 3px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--color-emerald) 28%, white);
+  color: var(--color-navy);
 }
 
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }

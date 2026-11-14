@@ -1,29 +1,41 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import { Fraunces, Source_Sans_3 } from "next/font/google";
+import { DM_Serif_Display, Inter, Plus_Jakarta_Sans } from "next/font/google";
 import { PublicEnvScript } from "../components/public-env-script";
 import "./globals.css";
 
-const display = Fraunces({
+const ui = Plus_Jakarta_Sans({
   subsets: ["latin"],
-  variable: "--font-display",
+  variable: "--font-ui",
+  display: "swap",
 });
 
-const sans = Source_Sans_3({
+const data = Inter({
   subsets: ["latin"],
-  variable: "--font-sans",
+  variable: "--font-tabular",
+  display: "swap",
+});
+
+const editorial = DM_Serif_Display({
+  subsets: ["latin"],
+  weight: "400",
+  variable: "--font-editorial",
+  display: "swap",
 });
 
 export const metadata: Metadata = {
-  title: "Opero",
+  title: {
+    default: "Opero",
+    template: "%s · Opero",
+  },
   description:
-    "Opero is an AI-assisted Business Operating System. This environment is the platform foundation for Opero X-Ray.",
+    "Opero is an AI-assisted Business Operating System. This environment hosts Opero X-Ray financial intelligence.",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
   return (
     <html lang="en">
-      <body className={`${display.variable} ${sans.variable} antialiased`}>
+      <body className={`${ui.variable} ${data.variable} ${editorial.variable} antialiased`}>
         <PublicEnvScript />
         {children}
       </body>
