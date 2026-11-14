@@ -112,6 +112,7 @@ async function runPipeline(input: {
     documentId: document.id,
   });
 
+  let nextStatus: "READY" | "REVIEW_REQUIRED" = "READY";
   await prisma.$transaction(async (tx) => {
     const extractionRow = await tx.documentExtraction.create({
       data: {
@@ -133,6 +134,17 @@ async function runPipeline(input: {
           statementType: statement.statementType,
           currency: statement.currency,
           unitScale: statement.unitScale,
+          periodStart: statement.periodStart ? new Date(statement.periodStart) : null,
+          periodEnd: statement.periodEnd ? new Date(statement.periodEnd) : null,
+          periodLabel: statement.periodLabel,
+          entityName: statement.entityName,
+          consolidationScope: statement.consolidationScope,
+          extractedMetadata: {
+            scaleConfidence: statement.scaleConfidence,
+            unitScaleRequiresReview: statement.unitScaleRequiresReview,
+            consistency: extraction.consistency,
+            duplicates: extraction.duplicates,
+          },
         },
       });
       for (const line of statement.lines) {
@@ -159,6 +171,9 @@ async function runPipeline(input: {
             normalizedValue: line.normalizedValue,
             currency: line.currency,
             unitScale: line.unitScale,
+            quantityClass: line.quantityClass,
+            scaleConfidence: line.scaleConfidence,
+            unitScaleRequiresReview: line.unitScaleRequiresReview,
             extractionMethod: extraction.method,
             quality: line.quality,
             evidenceId: evidence.id,
@@ -166,9 +181,11 @@ async function runPipeline(input: {
         });
       }
     }
-    const nextStatus = extraction.manualRequired || extraction.quality === "LOW"
-      ? "REVIEW_REQUIRED"
-      : "READY";
+    const scaleNeedsReview = extraction.statements.some((s) => s.unitScaleRequiresReview);
+    nextStatus =
+      extraction.manualRequired || extraction.quality === "LOW" || scaleNeedsReview
+        ? "REVIEW_REQUIRED"
+        : "READY";
     await tx.document.update({
       where: { id: document.id },
       data: {
@@ -184,7 +201,7 @@ async function runPipeline(input: {
     });
   });
   await prisma.$disconnect();
-  return "READY";
+  return nextStatus;
 }
 
 describe("document ingestion integration", () => {
@@ -293,6 +310,13 @@ describe("document ingestion integration", () => {
       .expect(200);
     expect(["READY", "REVIEW_REQUIRED"]).toContain(status.body.processingStatus);
     expect(status.body.scanStatus).toBe("CLEAN");
+    expect(status.body.progress).toMatchObject({
+      documentId,
+      organizationId,
+      currentStage: expect.any(String),
+      humanActionRequired: expect.any(Boolean),
+    });
+    expect(status.body.progress.stages.length).toBeGreaterThan(5);
 
     const extractions = await request(app.getHttpServer())
       .get(`/api/v1/organizations/${organizationId}/documents/${documentId}/extractions`)

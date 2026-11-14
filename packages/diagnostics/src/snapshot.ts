@@ -13,6 +13,10 @@ export type RawSnapshotLine = {
   normalizedValue: string | null;
   currency: string | null;
   unitScale: UnitScale;
+  /** Defaults to MONETARY for pre-Phase-8 rows. */
+  quantityClass?: string | null;
+  scaleConfidence?: string | null;
+  unitScaleRequiresReview?: boolean | null;
   quality: SnapshotLineItem["quality"];
   reviewStatus: SnapshotLineItem["reviewStatus"];
   statementType: string;
@@ -47,8 +51,27 @@ export function buildSnapshot(input: {
   const warnings: string[] = [];
   const lines: SnapshotLineItem[] = input.lines
     .filter((line) => line.reviewStatus !== "REJECTED" && line.concept !== "UNMAPPED")
+    .filter((line) => {
+      const quantityClass = line.quantityClass ?? "MONETARY";
+      if (quantityClass !== "MONETARY") {
+        warnings.push(
+          `Excluded non-monetary line ${line.labelRaw} (${quantityClass}) from diagnostic snapshot`,
+        );
+        return false;
+      }
+      return true;
+    })
     .map((line) => {
-      const scaled = normalizeActual(line.normalizedValue, line.unitScale);
+      const scaleBlocked =
+        Boolean(line.unitScaleRequiresReview) &&
+        line.reviewStatus !== "CONFIRMED" &&
+        line.reviewStatus !== "CORRECTED";
+      const scaled = scaleBlocked
+        ? {
+            actualValue: null as string | null,
+            warning: `Unconfirmed monetary scale for ${line.labelRaw}; absolute value withheld`,
+          }
+        : normalizeActual(line.normalizedValue, line.unitScale);
       if (scaled.warning) warnings.push(scaled.warning);
       const snapshotKey = [
         line.documentId,

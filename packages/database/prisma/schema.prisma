@@ -88,6 +88,24 @@ enum UnitScale {
   MILLIONS
 }
 
+enum QuantityClass {
+  MONETARY
+  PERCENTAGE
+  RATIO
+  DATE
+  NOTE_NUMBER
+  SHARE_COUNT
+  OTHER
+}
+
+enum ScaleConfidence {
+  HIGH
+  MEDIUM
+  LOW
+  AMBIGUOUS
+  UNKNOWN
+}
+
 enum FinancialConcept {
   REVENUE
   COST_OF_GOODS_SOLD
@@ -527,6 +545,8 @@ model DocumentProcessingJob {
   documentId       String                   @map("document_id") @db.Uuid
   bullJobId        String?                  @map("bull_job_id")
   status           DocumentProcessingStatus @default(QUARANTINED)
+  /// User-facing progress contract (stages, percent, next action). Additive JSON; null for pre-Phase-8 jobs.
+  progress         Json?
   attemptCount     Int                      @default(0) @map("attempt_count")
   maxAttempts      Int                      @default(5) @map("max_attempts")
   correlationId    String?                  @map("correlation_id")
@@ -621,21 +641,25 @@ model FinancialMetadataReview {
 }
 
 model FinancialLineItem {
-  id                   String               @id @default(uuid()) @db.Uuid
-  organizationId       String               @map("organization_id") @db.Uuid
-  statementId          String               @map("statement_id") @db.Uuid
-  concept              FinancialConcept
-  labelRaw             String               @map("label_raw")
-  rawValue             String               @map("raw_value")
-  normalizedValue      String?              @map("normalized_value")
-  currency             String?
-  unitScale            UnitScale            @default(ACTUAL) @map("unit_scale")
-  extractionMethod     String               @map("extraction_method")
-  quality              ExtractionQuality    @default(MEDIUM)
-  reviewStatus         LineItemReviewStatus @default(PENDING) @map("review_status")
-  evidenceId           String?              @map("evidence_id") @db.Uuid
-  createdAt            DateTime             @default(now()) @map("created_at")
-  updatedAt            DateTime             @updatedAt @map("updated_at")
+  id                       String               @id @default(uuid()) @db.Uuid
+  organizationId           String               @map("organization_id") @db.Uuid
+  statementId              String               @map("statement_id") @db.Uuid
+  concept                  FinancialConcept
+  labelRaw                 String               @map("label_raw")
+  rawValue                 String               @map("raw_value")
+  /// Parsed numeric value in statement units (no scale multiplier). Original rawValue is never overwritten.
+  normalizedValue          String?              @map("normalized_value")
+  currency                 String?
+  unitScale                UnitScale            @default(ACTUAL) @map("unit_scale")
+  quantityClass            QuantityClass        @default(MONETARY) @map("quantity_class")
+  scaleConfidence          ScaleConfidence      @default(UNKNOWN) @map("scale_confidence")
+  unitScaleRequiresReview  Boolean              @default(false) @map("unit_scale_requires_review")
+  extractionMethod         String               @map("extraction_method")
+  quality                  ExtractionQuality    @default(MEDIUM)
+  reviewStatus             LineItemReviewStatus @default(PENDING) @map("review_status")
+  evidenceId               String?              @map("evidence_id") @db.Uuid
+  createdAt                DateTime             @default(now()) @map("created_at")
+  updatedAt                DateTime             @updatedAt @map("updated_at")
 
   statement FinancialStatement  @relation(fields: [statementId], references: [id], onDelete: Cascade)
   evidence  EvidenceReference?  @relation(fields: [evidenceId], references: [id], onDelete: SetNull)
@@ -643,6 +667,7 @@ model FinancialLineItem {
 
   @@index([organizationId, statementId])
   @@index([concept])
+  @@index([quantityClass])
   @@map("financial_line_items")
 }
 

@@ -12,6 +12,7 @@ import {
   OBJECT_STORAGE,
   PRISMA_CLIENT,
 } from "./documents.constants";
+import { progressForDocument } from "./processing-progress";
 
 type DocumentJobData = {
   organizationId: string;
@@ -77,10 +78,20 @@ export class DocumentProcessProcessor extends WorkerHost {
       throw new Error("Quarantine key organization mismatch");
     }
 
+    const scanningProgress = progressForDocument({
+      documentId,
+      organizationId,
+      processingStatus: "SCANNING",
+      scanStatus: "PENDING",
+      extractionStatus: document.extractionStatus,
+      attemptCount: processingJob.attemptCount + 1,
+      maxAttempts: processingJob.maxAttempts,
+    });
     await this.prisma.documentProcessingJob.update({
       where: { id: processingJobId },
       data: {
         status: "SCANNING",
+        progress: scanningProgress,
         attemptCount: { increment: 1 },
         startedAt: processingJob.startedAt ?? new Date(),
         actorUserId,
@@ -145,9 +156,18 @@ export class DocumentProcessProcessor extends WorkerHost {
         quarantineKey: null,
       },
     });
+    const extractingProgress = progressForDocument({
+      documentId,
+      organizationId,
+      processingStatus: "EXTRACTING",
+      scanStatus: "CLEAN",
+      extractionStatus: "RUNNING",
+      attemptCount: processingJob.attemptCount + 1,
+      maxAttempts: processingJob.maxAttempts,
+    });
     await this.prisma.documentProcessingJob.update({
       where: { id: processingJobId },
-      data: { status: "EXTRACTING" },
+      data: { status: "EXTRACTING", progress: extractingProgress },
     });
     await this.prisma.document.update({
       where: { id: documentId },
@@ -191,6 +211,14 @@ export class DocumentProcessProcessor extends WorkerHost {
               periodStart: statement.periodStart ? new Date(statement.periodStart) : null,
               periodEnd: statement.periodEnd ? new Date(statement.periodEnd) : null,
               periodLabel: statement.periodLabel,
+              entityName: statement.entityName,
+              consolidationScope: statement.consolidationScope,
+              extractedMetadata: {
+                scaleConfidence: statement.scaleConfidence,
+                unitScaleRequiresReview: statement.unitScaleRequiresReview,
+                consistency: extraction.consistency,
+                duplicates: extraction.duplicates,
+              },
             },
           });
 
@@ -218,6 +246,9 @@ export class DocumentProcessProcessor extends WorkerHost {
                 normalizedValue: line.normalizedValue,
                 currency: line.currency,
                 unitScale: line.unitScale,
+                quantityClass: line.quantityClass,
+                scaleConfidence: line.scaleConfidence,
+                unitScaleRequiresReview: line.unitScaleRequiresReview,
                 extractionMethod: extraction.method,
                 quality: line.quality,
                 evidenceId: evidence.id,
@@ -226,9 +257,24 @@ export class DocumentProcessProcessor extends WorkerHost {
           }
         }
 
-        const nextStatus = extraction.manualRequired || extraction.quality === "LOW"
-          ? "REVIEW_REQUIRED"
-          : "READY";
+        const scaleNeedsReview = extraction.statements.some((s) => s.unitScaleRequiresReview);
+        const nextStatus =
+          extraction.manualRequired ||
+          extraction.quality === "LOW" ||
+          scaleNeedsReview ||
+          extraction.consistency.some((c) => c.status === "INCONSISTENT")
+            ? "REVIEW_REQUIRED"
+            : "READY";
+
+        const doneProgress = progressForDocument({
+          documentId,
+          organizationId,
+          processingStatus: nextStatus,
+          scanStatus: "CLEAN",
+          extractionStatus: extraction.manualRequired ? "MANUAL_REQUIRED" : "SUCCEEDED",
+          attemptCount: processingJob.attemptCount + 1,
+          maxAttempts: processingJob.maxAttempts,
+        });
 
         await tx.document.update({
           where: { id: documentId },
@@ -241,6 +287,7 @@ export class DocumentProcessProcessor extends WorkerHost {
           where: { id: processingJobId },
           data: {
             status: nextStatus,
+            progress: doneProgress,
             finishedAt: new Date(),
           },
         });
@@ -259,6 +306,14 @@ export class DocumentProcessProcessor extends WorkerHost {
     failureClass: "SCANNER_UNAVAILABLE" | "PARSER" | "INTERNAL",
     detail?: string,
   ): Promise<void> {
+    const failedProgress = progressForDocument({
+      documentId,
+      organizationId,
+      processingStatus: "FAILED",
+      scanStatus: failureClass === "SCANNER_UNAVAILABLE" ? "UNAVAILABLE" : "CLEAN",
+      extractionStatus: failureClass === "PARSER" ? "FAILED" : "PENDING",
+      failureClass,
+    });
     await this.prisma.document.updateMany({
       where: { id: documentId, organizationId },
       data: {
@@ -273,6 +328,7 @@ export class DocumentProcessProcessor extends WorkerHost {
       where: { id: processingJobId, organizationId },
       data: {
         status: "FAILED",
+        progress: failedProgress,
         errorClass: failureClass,
         errorMessage: detail?.slice(0, 500) ?? failureClass,
         finishedAt: new Date(),

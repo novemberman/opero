@@ -1,13 +1,16 @@
 import { parse } from "csv-parse/sync";
 import { createHash } from "node:crypto";
-import { mapLabelToConcept } from "../concepts.js";
+import { checkFinancialConsistency } from "../consistency.js";
+import { interpretExtractedLine } from "../interpret-line.js";
 import { PARSER_LIMITS } from "../limits.js";
-import { neutralizeFormulaLike, parseFinancialNumber } from "../money.js";
+import { neutralizeFormulaLike } from "../money.js";
 import {
+  analyzeDuplicateMappedFigures,
+  detectConsolidationScope,
   detectCurrencies,
+  detectEntityName,
   detectPeriodLabel,
   detectUnitScale,
-  warnDuplicateNormalizedValues,
 } from "../normalize-meta.js";
 import type { ExtractionResult, ExtractedLine } from "../types.js";
 
@@ -70,15 +73,19 @@ export function extractFromCsv(buffer: Buffer, documentId: string): ExtractionRe
       )
     : 1;
 
-  const currencyMeta = detectCurrencies(text.slice(0, 4000));
-  const scaleMeta = detectUnitScale(text.slice(0, 4000));
-  const periodMeta = detectPeriodLabel(text.slice(0, 4000));
+  const preview = text.slice(0, 8000);
+  const currencyMeta = detectCurrencies(preview);
+  const scaleMeta = detectUnitScale(preview);
+  const periodMeta = detectPeriodLabel(preview);
+  const entityMeta = detectEntityName(preview);
+  const consolidationMeta = detectConsolidationScope(preview);
   if (currencyMeta.warning) warnings.push(currencyMeta.warning);
   if (scaleMeta.warning) warnings.push(scaleMeta.warning);
   if (periodMeta.warning) warnings.push(periodMeta.warning);
+  if (entityMeta.warning) warnings.push(entityMeta.warning);
+  if (consolidationMeta.warning) warnings.push(consolidationMeta.warning);
 
   const currency = currencyMeta.currency;
-  const unitScale = scaleMeta.unitScale;
   const lines: ExtractedLine[] = [];
 
   for (let i = 0; i < rows.length; i += 1) {
@@ -91,25 +98,40 @@ export function extractFromCsv(buffer: Buffer, documentId: string): ExtractionRe
       warnings.push(`Row ${i + 1}: missing amount for "${labelRaw}" (not treated as zero)`);
       continue;
     }
-    const normalizedValue = parseFinancialNumber(rawValue);
-    if (!normalizedValue) {
-      warnings.push(`Row ${i + 1}: could not parse amount "${rawValue}"`);
+
+    const interpreted = interpretExtractedLine({
+      labelRaw,
+      rawValue,
+      documentUnitScale: scaleMeta.unitScale,
+      documentScaleConfidence: scaleMeta.confidence,
+      documentScaleRequiresReview: scaleMeta.requiresReview,
+    });
+    warnings.push(...interpreted.warnings);
+
+    if (!interpreted.normalizedValue && interpreted.quantityClass === "MONETARY") {
       continue;
     }
-    const concept = mapLabelToConcept(labelRaw);
+    if (!interpreted.normalizedValue) {
+      // Keep non-monetary evidence that still parsed, or skip unparsable.
+      continue;
+    }
+
     const evidenceKey = createHash("sha256")
-      .update(`${documentId}:csv:${i}:${labelIdx}:${valueIdx}:${normalizedValue}`)
+      .update(`${documentId}:csv:${i}:${labelIdx}:${valueIdx}:${interpreted.normalizedValue}`)
       .digest("hex")
       .slice(0, 32);
 
     lines.push({
-      labelRaw,
-      rawValue,
-      normalizedValue,
-      concept,
+      labelRaw: interpreted.labelRaw,
+      rawValue: interpreted.rawValue,
+      normalizedValue: interpreted.normalizedValue,
+      concept: interpreted.concept,
+      quantityClass: interpreted.quantityClass,
       currency,
-      unitScale,
-      quality: concept === "UNMAPPED" ? "LOW" : "MEDIUM",
+      unitScale: interpreted.unitScale,
+      scaleConfidence: interpreted.scaleConfidence,
+      unitScaleRequiresReview: interpreted.unitScaleRequiresReview,
+      quality: interpreted.quality,
       evidence: {
         evidenceKey,
         rowIndex: hasHeader ? i + 2 : i + 1,
@@ -122,21 +144,58 @@ export function extractFromCsv(buffer: Buffer, documentId: string): ExtractionRe
   if (lines.length === 0) {
     warnings.push("No financial amounts detected in CSV");
   }
-  warnings.push(...warnDuplicateNormalizedValues(lines));
+
+  const duplicates = analyzeDuplicateMappedFigures(
+    lines.map((l) => ({
+      concept: l.concept,
+      normalizedValue: l.normalizedValue,
+      periodLabel: periodMeta.periodLabel,
+      consolidationScope: consolidationMeta.consolidationScope,
+      labelRaw: l.labelRaw,
+    })),
+  );
+  warnings.push(...duplicates.warnings);
+
+  const consistency = checkFinancialConsistency(
+    lines.map((l) => ({
+      concept: l.concept,
+      normalizedValue: l.normalizedValue,
+      unitScale: l.unitScale,
+      quantityClass: l.quantityClass,
+      currency: l.currency,
+      periodLabel: periodMeta.periodLabel,
+    })),
+  );
+  for (const finding of consistency) {
+    if (finding.status === "INCONSISTENT" || finding.status === "REQUIRES_REVIEW") {
+      warnings.push(`[${finding.code}] ${finding.message}`);
+    }
+  }
+
+  const monetaryMapped = lines.some(
+    (l) => l.quantityClass === "MONETARY" && l.concept !== "UNMAPPED",
+  );
+  const scaleBlocksReady = scaleMeta.requiresReview;
 
   return {
     method: "csv-parse",
-    quality: lines.some((l) => l.concept !== "UNMAPPED") ? "MEDIUM" : "LOW",
+    quality: monetaryMapped && !scaleBlocksReady ? "MEDIUM" : "LOW",
     warnings,
-    manualRequired: lines.every((l) => l.concept === "UNMAPPED"),
+    manualRequired: !monetaryMapped || scaleBlocksReady,
+    consistency,
+    duplicates: duplicates.findings,
     statements: [
       {
         statementType: "UNKNOWN",
         currency,
-        unitScale,
-        periodStart: null,
-        periodEnd: null,
+        unitScale: scaleMeta.unitScale,
+        scaleConfidence: scaleMeta.confidence,
+        unitScaleRequiresReview: scaleMeta.requiresReview,
+        periodStart: periodMeta.periodStart,
+        periodEnd: periodMeta.periodEnd,
         periodLabel: periodMeta.periodLabel,
+        entityName: entityMeta.entityName,
+        consolidationScope: consolidationMeta.consolidationScope,
         lines,
       },
     ],

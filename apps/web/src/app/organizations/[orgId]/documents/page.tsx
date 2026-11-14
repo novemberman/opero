@@ -3,7 +3,8 @@
 import { membershipRoleSchema, roleHasPermission, type MembershipRole } from "@opero/shared";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { DocumentUploadForm } from "../../../../components/document-upload-form";
 import { SiteHeader } from "../../../../components/site-header";
 import { apiFetch } from "../../../../lib/api";
 
@@ -23,7 +24,6 @@ export default function DocumentsPage() {
   const [documents, setDocuments] = useState<DocumentRow[]>([]);
   const [role, setRole] = useState<MembershipRole | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [uploading, setUploading] = useState(false);
 
   const canWrite = role ? roleHasPermission(role, "xray:write") : false;
 
@@ -51,55 +51,6 @@ export default function DocumentsPage() {
     void load();
   }, [load]);
 
-  async function onUpload(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!canWrite) return;
-    const form = event.currentTarget;
-    const fileInput = form.elements.namedItem("file") as HTMLInputElement;
-    const file = fileInput.files?.[0];
-    if (!file) return;
-    setUploading(true);
-    setError(null);
-    try {
-      const format = file.name.toLowerCase().endsWith(".pdf")
-        ? "PDF"
-        : file.name.toLowerCase().endsWith(".xlsx")
-          ? "XLSX"
-          : "CSV";
-      const created = await apiFetch<{ upload?: { uploadId: string }; message?: string }>(
-        `/organizations/${orgId}/documents/uploads`,
-        {
-          method: "POST",
-          json: {
-            filename: file.name,
-            declaredMimeType: file.type || undefined,
-            declaredFormat: format,
-            expectedByteSize: file.size,
-          },
-        },
-      );
-      if (created.status >= 400 || !created.body.upload) {
-        throw new Error(created.body.message ?? "Unable to start upload");
-      }
-
-      const formData = new FormData();
-      formData.append("file", file);
-      const completed = await apiFetch<{ message?: string }>(
-        `/organizations/${orgId}/documents/uploads/${created.body.upload.uploadId}/complete`,
-        { method: "POST", formData },
-      );
-      if (completed.status >= 400) {
-        throw new Error(completed.body.message ?? "Upload completion failed");
-      }
-      form.reset();
-      await load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Upload failed");
-    } finally {
-      setUploading(false);
-    }
-  }
-
   return (
     <>
       <SiteHeader mark="Documents" />
@@ -119,25 +70,7 @@ export default function DocumentsPage() {
         </div>
 
         {canWrite ? (
-          <form onSubmit={onUpload} className="mb-10 flex flex-wrap items-end gap-3">
-            <label className="block text-sm text-ink">
-              Financial report
-              <input
-                className="mt-1 block w-full max-w-md border border-line bg-white px-3 py-2"
-                type="file"
-                name="file"
-                accept=".pdf,.xlsx,.csv,application/pdf,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                required
-              />
-            </label>
-            <button
-              className="rounded-full bg-pine px-5 py-2 text-paper disabled:opacity-50"
-              type="submit"
-              disabled={uploading}
-            >
-              {uploading ? "Uploading…" : "Upload"}
-            </button>
-          </form>
+          <DocumentUploadForm orgId={orgId} onUploaded={load} />
         ) : (
           <p className="mb-10 text-sm text-muted">
             View-only access: uploads require Analyst or higher.

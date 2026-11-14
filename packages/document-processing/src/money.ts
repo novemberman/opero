@@ -29,6 +29,10 @@ export function parseFinancialNumber(raw: string): string | null {
   if (value.includes("$")) {
     value = value.replaceAll("$", "");
   }
+  if (value.includes("₦")) {
+    value = value.replaceAll("₦", "");
+  }
+  value = value.replace(/\bNGN\b/gi, "");
   if (value.startsWith("(") && value.endsWith(")")) {
     negative = true;
     value = value.slice(1, -1);

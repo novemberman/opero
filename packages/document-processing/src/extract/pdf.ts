@@ -1,13 +1,16 @@
 import { createHash } from "node:crypto";
 import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
-import { mapLabelToConcept } from "../concepts.js";
+import { checkFinancialConsistency } from "../consistency.js";
+import { interpretExtractedLine } from "../interpret-line.js";
 import { PARSER_LIMITS } from "../limits.js";
-import { neutralizeFormulaLike, parseFinancialNumber } from "../money.js";
+import { neutralizeFormulaLike } from "../money.js";
 import {
+  analyzeDuplicateMappedFigures,
+  detectConsolidationScope,
   detectCurrencies,
+  detectEntityName,
   detectPeriodLabel,
   detectUnitScale,
-  warnDuplicateNormalizedValues,
 } from "../normalize-meta.js";
 import type { ExtractionResult, ExtractedLine } from "../types.js";
 
@@ -18,7 +21,6 @@ export async function extractFromPdf(buffer: Buffer, documentId: string): Promis
   const data = new Uint8Array(buffer);
   const loadingTask = getDocument({
     data,
-    // Disable workers / remote fonts for deterministic local parsing.
     useSystemFonts: true,
     disableFontFace: true,
   });
@@ -29,7 +31,7 @@ export async function extractFromPdf(buffer: Buffer, documentId: string): Promis
   }
 
   let totalChars = 0;
-  const lines: ExtractedLine[] = [];
+  const candidateRows: Array<{ labelRaw: string; rawValue: string; pageNumber: number }> = [];
   let textPages = 0;
   const allText: string[] = [];
 
@@ -50,32 +52,14 @@ export async function extractFromPdf(buffer: Buffer, documentId: string): Promis
       allText.push(pageText);
     }
 
-    // Heuristic: "Label 1,234.56" pairs on a page.
-    const matches = pageText.matchAll(/([A-Za-z][A-Za-z0-9 &'%/.-]{2,80})\s+(-?\$?\(?[\d,]+(?:\.\d+)?\)?)/g);
+    const matches = pageText.matchAll(
+      /([A-Za-z][A-Za-z0-9 &'%/.-]{2,80})\s+(-?₦?\$?\(?[\d,]+(?:\.\d+)?\)?%?)/g,
+    );
     for (const match of matches) {
       const labelRaw = neutralizeFormulaLike((match[1] ?? "").trim());
       const rawValue = neutralizeFormulaLike((match[2] ?? "").trim());
-      const normalizedValue = parseFinancialNumber(rawValue);
-      if (!normalizedValue) continue;
-      const concept = mapLabelToConcept(labelRaw);
-      const evidenceKey = createHash("sha256")
-        .update(`${documentId}:pdf:${pageNumber}:${labelRaw}:${normalizedValue}`)
-        .digest("hex")
-        .slice(0, 32);
-      lines.push({
-        labelRaw,
-        rawValue,
-        normalizedValue,
-        concept,
-        currency: null,
-        unitScale: "ACTUAL",
-        quality: concept === "UNMAPPED" ? "LOW" : "MEDIUM",
-        evidence: {
-          evidenceKey,
-          pageNumber,
-          snippet: `${labelRaw} ${rawValue}`.slice(0, 200),
-        },
-      });
+      if (!labelRaw || !rawValue) continue;
+      candidateRows.push({ labelRaw, rawValue, pageNumber });
     }
   }
 
@@ -83,35 +67,103 @@ export async function extractFromPdf(buffer: Buffer, documentId: string): Promis
   const currencyMeta = detectCurrencies(preview);
   const scaleMeta = detectUnitScale(preview);
   const periodMeta = detectPeriodLabel(preview);
+  const entityMeta = detectEntityName(preview);
+  const consolidationMeta = detectConsolidationScope(preview);
   if (currencyMeta.warning) warnings.push(currencyMeta.warning);
   if (scaleMeta.warning) warnings.push(scaleMeta.warning);
   if (periodMeta.warning) warnings.push(periodMeta.warning);
-  for (const line of lines) {
-    line.currency = currencyMeta.currency;
-    line.unitScale = scaleMeta.unitScale;
+  if (entityMeta.warning) warnings.push(entityMeta.warning);
+  if (consolidationMeta.warning) warnings.push(consolidationMeta.warning);
+
+  const lines: ExtractedLine[] = [];
+  for (const row of candidateRows) {
+    const interpreted = interpretExtractedLine({
+      labelRaw: row.labelRaw,
+      rawValue: row.rawValue,
+      documentUnitScale: scaleMeta.unitScale,
+      documentScaleConfidence: scaleMeta.confidence,
+      documentScaleRequiresReview: scaleMeta.requiresReview,
+    });
+    warnings.push(...interpreted.warnings);
+    if (!interpreted.normalizedValue) continue;
+
+    const evidenceKey = createHash("sha256")
+      .update(
+        `${documentId}:pdf:${row.pageNumber}:${row.labelRaw}:${interpreted.normalizedValue}`,
+      )
+      .digest("hex")
+      .slice(0, 32);
+    lines.push({
+      labelRaw: interpreted.labelRaw,
+      rawValue: interpreted.rawValue,
+      normalizedValue: interpreted.normalizedValue,
+      concept: interpreted.concept,
+      quantityClass: interpreted.quantityClass,
+      currency: currencyMeta.currency,
+      unitScale: interpreted.unitScale,
+      scaleConfidence: interpreted.scaleConfidence,
+      unitScaleRequiresReview: interpreted.unitScaleRequiresReview,
+      quality: interpreted.quality,
+      evidence: {
+        evidenceKey,
+        pageNumber: row.pageNumber,
+        snippet: `${row.labelRaw} ${row.rawValue}`.slice(0, 200),
+      },
+    });
   }
 
-  const manualRequired = textPages === 0;
-  if (manualRequired) {
+  const manualRequired = textPages === 0 || scaleMeta.requiresReview;
+  if (textPages === 0) {
     warnings.push("No extractable text found; OCR is not implemented — manual review required");
   } else if (lines.length === 0) {
     warnings.push("Text extracted but no financial figures matched heuristics");
   }
-  warnings.push(...warnDuplicateNormalizedValues(lines));
+
+  const duplicates = analyzeDuplicateMappedFigures(
+    lines.map((l) => ({
+      concept: l.concept,
+      normalizedValue: l.normalizedValue,
+      periodLabel: periodMeta.periodLabel,
+      consolidationScope: consolidationMeta.consolidationScope,
+      labelRaw: l.labelRaw,
+    })),
+  );
+  warnings.push(...duplicates.warnings);
+
+  const consistency = checkFinancialConsistency(
+    lines.map((l) => ({
+      concept: l.concept,
+      normalizedValue: l.normalizedValue,
+      unitScale: l.unitScale,
+      quantityClass: l.quantityClass,
+      currency: l.currency,
+      periodLabel: periodMeta.periodLabel,
+    })),
+  );
+
+  const monetaryMapped = lines.some(
+    (l) => l.quantityClass === "MONETARY" && l.concept !== "UNMAPPED",
+  );
 
   return {
     method: "pdfjs-text",
-    quality: manualRequired ? "MANUAL" : lines.some((l) => l.concept !== "UNMAPPED") ? "MEDIUM" : "LOW",
+    quality: textPages === 0 ? "MANUAL" : monetaryMapped && !scaleMeta.requiresReview ? "MEDIUM" : "LOW",
     warnings,
     manualRequired,
+    consistency,
+    duplicates: duplicates.findings,
     statements: [
       {
         statementType: "UNKNOWN",
         currency: currencyMeta.currency,
         unitScale: scaleMeta.unitScale,
-        periodStart: null,
-        periodEnd: null,
+        scaleConfidence: scaleMeta.confidence,
+        unitScaleRequiresReview: scaleMeta.requiresReview,
+        periodStart: periodMeta.periodStart,
+        periodEnd: periodMeta.periodEnd,
         periodLabel: periodMeta.periodLabel,
+        entityName: entityMeta.entityName,
+        consolidationScope: consolidationMeta.consolidationScope,
         lines,
       },
     ],

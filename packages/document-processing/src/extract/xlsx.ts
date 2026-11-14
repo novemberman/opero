@@ -1,13 +1,16 @@
 import ExcelJS from "exceljs";
 import { createHash } from "node:crypto";
-import { mapLabelToConcept } from "../concepts.js";
+import { checkFinancialConsistency } from "../consistency.js";
+import { interpretExtractedLine } from "../interpret-line.js";
 import { PARSER_LIMITS } from "../limits.js";
-import { neutralizeFormulaLike, parseFinancialNumber } from "../money.js";
+import { neutralizeFormulaLike } from "../money.js";
 import {
+  analyzeDuplicateMappedFigures,
+  detectConsolidationScope,
   detectCurrencies,
+  detectEntityName,
   detectPeriodLabel,
   detectUnitScale,
-  warnDuplicateNormalizedValues,
 } from "../normalize-meta.js";
 import type { ExtractionResult, ExtractedLine } from "../types.js";
 
@@ -46,14 +49,18 @@ function cellToString(value: ExcelJS.CellValue): string {
 export async function extractFromXlsx(buffer: Buffer, documentId: string): Promise<ExtractionResult> {
   const warnings: string[] = [];
   const workbook = new ExcelJS.Workbook();
-  // exceljs load accepts Buffer
   await workbook.xlsx.load(buffer as never);
 
   if (workbook.worksheets.length > PARSER_LIMITS.maxXlsxSheets) {
     throw new Error("Workbook exceeds maximum worksheet limit");
   }
 
-  const lines: ExtractedLine[] = [];
+  const rawRows: Array<{
+    labelRaw: string;
+    rawValue: string;
+    sheetName: string;
+    rowNumber: number;
+  }> = [];
   let cellsSeen = 0;
   const previewParts: string[] = [];
 
@@ -65,7 +72,6 @@ export async function extractFromXlsx(buffer: Buffer, documentId: string): Promi
         throw new Error(`Sheet ${sheet.name} exceeds maximum row limit`);
       }
       const values = Array.isArray(row.values) ? row.values : [];
-      // exceljs is 1-indexed
       const labelRaw = neutralizeFormulaLike(
         cellToString(values[1] as ExcelJS.CellValue).slice(0, PARSER_LIMITS.maxCellChars),
       );
@@ -82,67 +88,118 @@ export async function extractFromXlsx(buffer: Buffer, documentId: string): Promi
       if (!labelRaw || !rawValue) {
         return;
       }
-      const normalizedValue = parseFinancialNumber(rawValue);
-      if (!normalizedValue) {
-        warnings.push(`Sheet ${sheet.name} ${cellRef(rowNumber, 2)}: could not parse amount "${rawValue}"`);
-        return;
-      }
-      const concept = mapLabelToConcept(labelRaw);
-      const ref = cellRef(rowNumber, 2);
-      const evidenceKey = createHash("sha256")
-        .update(`${documentId}:xlsx:${sheet.name}:${ref}:${normalizedValue}`)
-        .digest("hex")
-        .slice(0, 32);
-      lines.push({
-        labelRaw,
-        rawValue,
-        normalizedValue,
-        concept,
-        currency: null,
-        unitScale: "ACTUAL",
-        quality: concept === "UNMAPPED" ? "LOW" : "HIGH",
-        evidence: {
-          evidenceKey,
-          sheetName: sheet.name,
-          cellRef: ref,
-          rowIndex: rowNumber,
-          columnIndex: 2,
-          snippet: `${labelRaw}=${rawValue}`.slice(0, 200),
-        },
-      });
+      rawRows.push({ labelRaw, rawValue, sheetName: sheet.name, rowNumber });
     });
   }
 
-  const preview = previewParts.join("\n").slice(0, 4000);
+  const preview = previewParts.join("\n").slice(0, 8000);
   const currencyMeta = detectCurrencies(preview);
   const scaleMeta = detectUnitScale(preview);
   const periodMeta = detectPeriodLabel(preview);
+  const entityMeta = detectEntityName(preview);
+  const consolidationMeta = detectConsolidationScope(preview);
   if (currencyMeta.warning) warnings.push(currencyMeta.warning);
   if (scaleMeta.warning) warnings.push(scaleMeta.warning);
   if (periodMeta.warning) warnings.push(periodMeta.warning);
-  for (const line of lines) {
-    line.currency = currencyMeta.currency;
-    line.unitScale = scaleMeta.unitScale;
+  if (entityMeta.warning) warnings.push(entityMeta.warning);
+  if (consolidationMeta.warning) warnings.push(consolidationMeta.warning);
+
+  const lines: ExtractedLine[] = [];
+  for (const row of rawRows) {
+    const interpreted = interpretExtractedLine({
+      labelRaw: row.labelRaw,
+      rawValue: row.rawValue,
+      documentUnitScale: scaleMeta.unitScale,
+      documentScaleConfidence: scaleMeta.confidence,
+      documentScaleRequiresReview: scaleMeta.requiresReview,
+    });
+    warnings.push(...interpreted.warnings);
+    if (!interpreted.normalizedValue) {
+      if (interpreted.quantityClass === "MONETARY") {
+        warnings.push(
+          `Sheet ${row.sheetName} ${cellRef(row.rowNumber, 2)}: could not parse amount "${row.rawValue}"`,
+        );
+      }
+      continue;
+    }
+    const ref = cellRef(row.rowNumber, 2);
+    const evidenceKey = createHash("sha256")
+      .update(`${documentId}:xlsx:${row.sheetName}:${ref}:${interpreted.normalizedValue}`)
+      .digest("hex")
+      .slice(0, 32);
+    lines.push({
+      labelRaw: interpreted.labelRaw,
+      rawValue: interpreted.rawValue,
+      normalizedValue: interpreted.normalizedValue,
+      concept: interpreted.concept,
+      quantityClass: interpreted.quantityClass,
+      currency: currencyMeta.currency,
+      unitScale: interpreted.unitScale,
+      scaleConfidence: interpreted.scaleConfidence,
+      unitScaleRequiresReview: interpreted.unitScaleRequiresReview,
+      quality: interpreted.quality,
+      evidence: {
+        evidenceKey,
+        sheetName: row.sheetName,
+        cellRef: ref,
+        rowIndex: row.rowNumber,
+        columnIndex: 2,
+        snippet: `${row.labelRaw}=${row.rawValue}`.slice(0, 200),
+      },
+    });
   }
 
   if (lines.length === 0) {
-    warnings.push("No financial amounts detected in workbook (expected label in column A, amount in column B)");
+    warnings.push(
+      "No financial amounts detected in workbook (expected label in column A, amount in column B)",
+    );
   }
-  warnings.push(...warnDuplicateNormalizedValues(lines));
+
+  const duplicates = analyzeDuplicateMappedFigures(
+    lines.map((l) => ({
+      concept: l.concept,
+      normalizedValue: l.normalizedValue,
+      periodLabel: periodMeta.periodLabel,
+      consolidationScope: consolidationMeta.consolidationScope,
+      labelRaw: l.labelRaw,
+    })),
+  );
+  warnings.push(...duplicates.warnings);
+
+  const consistency = checkFinancialConsistency(
+    lines.map((l) => ({
+      concept: l.concept,
+      normalizedValue: l.normalizedValue,
+      unitScale: l.unitScale,
+      quantityClass: l.quantityClass,
+      currency: l.currency,
+      periodLabel: periodMeta.periodLabel,
+    })),
+  );
+
+  const monetaryMapped = lines.some(
+    (l) => l.quantityClass === "MONETARY" && l.concept !== "UNMAPPED",
+  );
 
   return {
     method: "exceljs-cached-values",
-    quality: lines.some((l) => l.concept !== "UNMAPPED") ? "HIGH" : "LOW",
+    quality: monetaryMapped && !scaleMeta.requiresReview ? "HIGH" : "LOW",
     warnings,
-    manualRequired: lines.length === 0,
+    manualRequired: lines.length === 0 || scaleMeta.requiresReview,
+    consistency,
+    duplicates: duplicates.findings,
     statements: [
       {
         statementType: "UNKNOWN",
         currency: currencyMeta.currency,
         unitScale: scaleMeta.unitScale,
-        periodStart: null,
-        periodEnd: null,
+        scaleConfidence: scaleMeta.confidence,
+        unitScaleRequiresReview: scaleMeta.requiresReview,
+        periodStart: periodMeta.periodStart,
+        periodEnd: periodMeta.periodEnd,
         periodLabel: periodMeta.periodLabel,
+        entityName: entityMeta.entityName,
+        consolidationScope: consolidationMeta.consolidationScope,
         lines,
       },
     ],

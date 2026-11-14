@@ -25,6 +25,16 @@ export {
   type EntitlementCode,
 } from "./entitlements";
 
+export {
+  PROCESSING_STAGES,
+  PROCESSING_STAGE_LABELS,
+  buildProcessingProgress,
+  type DocumentProcessingProgress,
+  type ProcessingStageId,
+  type ProcessingStageSnapshot,
+  type StageStatus,
+} from "./processing-progress";
+
 export const healthServiceSchema = z.enum(["web", "api", "worker"]);
 
 export type HealthServiceName = z.infer<typeof healthServiceSchema>;

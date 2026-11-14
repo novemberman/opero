@@ -10,6 +10,7 @@ import { ConfigService } from "@nestjs/config";
 import { InjectQueue } from "@nestjs/bullmq";
 import type { PrismaClient } from "@opero/database";
 import { sanitizeOriginalFilename, validateDocumentBuffer } from "@opero/document-processing";
+import { buildProcessingProgress } from "@opero/shared";
 import type { ObjectStoragePort } from "@opero/object-storage";
 import type { Queue } from "bullmq";
 import { createHash, randomUUID } from "node:crypto";
@@ -351,13 +352,27 @@ export class DocumentsService {
       where: { organizationId, documentId },
       orderBy: { createdAt: "desc" },
     });
-    return {
+    const progress = buildProcessingProgress({
       documentId,
+      organizationId,
       processingStatus: document.processingStatus,
       scanStatus: document.scanStatus,
       extractionStatus: document.extractionStatus,
       failureClass: document.failureClass,
       failureMessage: document.failureMessage,
+      jobAttemptCount: job?.attemptCount,
+      jobMaxAttempts: job?.maxAttempts,
+      persistedProgress: (job?.progress as never) ?? null,
+    });
+    return {
+      documentId,
+      organizationId,
+      processingStatus: document.processingStatus,
+      scanStatus: document.scanStatus,
+      extractionStatus: document.extractionStatus,
+      failureClass: document.failureClass,
+      failureMessage: document.failureMessage,
+      progress,
       job: job
         ? {
             id: job.id,
@@ -365,6 +380,7 @@ export class DocumentsService {
             attemptCount: job.attemptCount,
             errorClass: job.errorClass,
             errorMessage: job.errorMessage,
+            progress: job.progress,
           }
         : null,
     };
@@ -447,6 +463,11 @@ export class DocumentsService {
           normalizedValue:
             input.action === "CORRECT" ? input.newValue! : lineItem.normalizedValue,
           concept: (input.newConcept as never) ?? lineItem.concept,
+          // Confirming/correcting a monetary line also confirms its unit scale for diagnostics.
+          unitScaleRequiresReview:
+            input.action === "REJECT" ? lineItem.unitScaleRequiresReview : false,
+          scaleConfidence:
+            input.action === "REJECT" ? lineItem.scaleConfidence : "HIGH",
           // Preserve original extracted rawValue forever.
         },
       });

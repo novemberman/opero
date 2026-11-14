@@ -31,4 +31,34 @@ describe("snapshot", () => {
     });
     expect(snap.lines[0]?.actualValue).toBe("2500");
   });
+
+  it("withholds absolute values when monetary scale still requires review", () => {
+    const confirmed = buildSnapshot({
+      lines: [line("REVENUE", "180", { unitScale: "THOUSANDS", reviewStatus: "CONFIRMED" })],
+    });
+    const blocked = buildSnapshot({
+      lines: [
+        {
+          ...line("REVENUE", "180", { unitScale: "THOUSANDS", reviewStatus: "PENDING" }),
+          unitScaleRequiresReview: true,
+          quantityClass: "MONETARY",
+        },
+      ],
+    });
+    expect(blocked.lines[0]?.actualValue).toBeNull();
+    expect(blocked.warnings.some((w) => /Unconfirmed monetary scale/i.test(w))).toBe(true);
+    expect(confirmed.lines[0]?.actualValue).toBe("180000");
+  });
+
+  it("excludes non-monetary quantity classes from the snapshot", () => {
+    const snap = buildSnapshot({
+      lines: [
+        {
+          ...line("GROSS_PROFIT", "60", { unitScale: "ACTUAL" }),
+          quantityClass: "PERCENTAGE",
+        },
+      ],
+    });
+    expect(snap.lines).toHaveLength(0);
+  });
 });
