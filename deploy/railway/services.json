@@ -15,7 +15,7 @@
         "NEXT_PUBLIC_API_BASE_URL",
         "APP_VERSION"
       ],
-      "notes": "Bind WEB_HOST=0.0.0.0; use Railway $PORT as WEB_PORT."
+      "notes": "Bind WEB_HOST=0.0.0.0; use Railway $PORT as WEB_PORT. Set NEXT_PUBLIC_API_BASE_URL as a runtime service variable (not a Docker build-arg); include /api/v1 or the origin alone (normalized). Same image works for staging/production."
     },
     {
       "name": "opero-api",

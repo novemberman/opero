@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { Fraunces, Source_Sans_3 } from "next/font/google";
+import { PublicEnvScript } from "../components/public-env-script";
 import "./globals.css";
 
 const display = Fraunces({
@@ -22,7 +23,10 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
   return (
     <html lang="en">
-      <body className={`${display.variable} ${sans.variable} antialiased`}>{children}</body>
+      <body className={`${display.variable} ${sans.variable} antialiased`}>
+        <PublicEnvScript />
+        {children}
+      </body>
     </html>
   );
 }

@@ -1,16 +1,16 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:3001/api/v1";
+import { resolveApiBaseUrl } from "./public-env";
 
 let csrfToken: string | null = null;
 
 export function apiBase(): string {
-  return API_BASE;
+  return resolveApiBaseUrl();
 }
 
 export async function ensureCsrfToken(): Promise<string> {
   if (csrfToken) {
     return csrfToken;
   }
-  const response = await fetch(`${API_BASE}/auth/csrf`, {
+  const response = await fetch(`${apiBase()}/auth/csrf`, {
     credentials: "include",
   });
   if (!response.ok) {
@@ -35,7 +35,7 @@ export async function apiFetch<T>(
     headers.set("x-csrf-token", token);
   }
 
-  const response = await fetch(`${API_BASE}${path}`, {
+  const response = await fetch(`${apiBase()}${path}`, {
     ...init,
     headers,
     credentials: "include",
@@ -66,7 +66,7 @@ export async function apiFetch<T>(
 export async function apiDownload(
   path: string,
 ): Promise<{ status: number; blob: Blob | null; message: string | null }> {
-  const response = await fetch(`${API_BASE}${path}`, { credentials: "include" });
+  const response = await fetch(`${apiBase()}${path}`, { credentials: "include" });
   if (!response.ok) {
     let message: string | null = null;
     try {

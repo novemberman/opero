@@ -102,6 +102,7 @@ Create three app services + two plugins (Postgres, Redis) **per environment**.
 - Health: `GET /health`
 - Public networking: yes
 - Env: `WEB_HOST=0.0.0.0`, `WEB_PORT=$PORT`, `NEXT_PUBLIC_API_BASE_URL`, `APP_VERSION`
+- **API URL is runtime-injected** into the HTML (not baked at `next build`). Set `NEXT_PUBLIC_API_BASE_URL` on the Railway **service variables** for `opero-web` (no Docker build-arg required). Example: `https://opero-staging.up.railway.app/api/v1` (origin-only values are normalized to append `/api/v1`). Do not put secrets in `NEXT_PUBLIC_*`.
 
 ### opero-api
 

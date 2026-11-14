@@ -1,5 +1,13 @@
 # syntax=docker/dockerfile:1.7
 # Opero Web — pnpm workspace image for Railway.
+#
+# NEXT_PUBLIC_API_BASE_URL is intentionally NOT a Docker build-arg.
+# The browser API origin is injected at request time from the runtime env
+# (see apps/web/src/components/public-env-script.tsx). Set it on the Railway
+# opero-web service variables, e.g.:
+#   NEXT_PUBLIC_API_BASE_URL=https://opero-staging.up.railway.app/api/v1
+# Origin-only values are accepted and normalized to include /api/v1.
+# No secrets belong in NEXT_PUBLIC_* (or API_BASE_URL).
 FROM node:24-bookworm-slim AS base
 ENV PNPM_HOME=/pnpm
 ENV COREPACK_HOME=/pnpm/corepack
@@ -15,6 +23,7 @@ COPY apps ./apps
 COPY packages ./packages
 COPY scripts ./scripts
 RUN pnpm install --frozen-lockfile
+# Build without NEXT_PUBLIC_* so one image works for staging and production.
 RUN pnpm --filter @opero/web... build
 
 FROM base AS runtime

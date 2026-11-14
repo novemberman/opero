@@ -73,7 +73,7 @@ export function AuthForm({
         router.refresh();
       }
     } catch {
-      setError("Unable to reach the API. Confirm it is running on port 3001.");
+      setError("Unable to reach the API. Confirm it is running and reachable from this site.");
     } finally {
       setPending(false);
     }
