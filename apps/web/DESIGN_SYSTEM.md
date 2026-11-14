@@ -81,6 +81,8 @@ Review specimen: `/design-system` (9A preview only; not a public marketing surfa
 - Premium auth shell (`AuthShell`) with desktop branded panel + form card
 - Auth forms use 9A Input/Button/Alert; removed `.data/mail` development copy
 - Pricing page restyled to match brand (catalog API unchanged)
+- Logo mark: aperture + X-Ray scan beam (`OperoMark` / `OperoLogo`) — favicon, nav, auth, reports-ready
+- Visual refinement: shorter hero, stronger product visual, metric strip, tighter auth/mobile register
 
 ### Later increments
 

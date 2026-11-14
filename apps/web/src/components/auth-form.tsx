@@ -127,17 +127,20 @@ export function AuthForm({
   }
 
   return (
-    <form className="space-y-5" onSubmit={onSubmit} noValidate>
-      <div className="space-y-2">
-        <h1 className="text-2xl font-semibold tracking-tight text-navy sm:text-[1.75rem]">{title}</h1>
+    <form className="space-y-4 sm:space-y-5" onSubmit={onSubmit} noValidate>
+      <div className="space-y-1.5 sm:space-y-2">
+        <h1 className="text-xl font-semibold tracking-tight text-navy sm:text-2xl">{title}</h1>
         <p className="text-sm leading-relaxed text-text-secondary">{subtitle}</p>
       </div>
 
-      <div className="space-y-4">
+      <div className="space-y-3.5 sm:space-y-4">
         {fields.map((field) => {
           const isNewPassword = field.name === "password" && field.autoComplete === "new-password";
+          const progress = isNewPassword
+            ? Math.min(100, Math.round((passwordValue.length / (passwordChecks?.min ?? 12)) * 100))
+            : 0;
           return (
-            <div key={field.name} className="space-y-2">
+            <div key={field.name} className="space-y-1.5">
               <Input
                 name={field.name}
                 label={field.label}
@@ -145,7 +148,7 @@ export function AuthForm({
                 autoComplete={field.autoComplete}
                 required={field.required ?? true}
                 minLength={field.minLength}
-                hint={field.hint}
+                hint={isNewPassword ? undefined : field.hint}
                 error={fieldErrors[field.name]}
                 onChange={
                   isNewPassword
@@ -154,15 +157,32 @@ export function AuthForm({
                 }
               />
               {isNewPassword && passwordChecks ? (
-                <ul className="space-y-1 text-xs" aria-live="polite">
-                  <li
-                    className={
-                      passwordChecks.length ? "text-success" : "text-text-secondary"
-                    }
+                <div className="space-y-1.5" aria-live="polite">
+                  <div
+                    className="h-1.5 overflow-hidden rounded-full bg-border"
+                    role="progressbar"
+                    aria-valuemin={0}
+                    aria-valuemax={passwordChecks.min}
+                    aria-valuenow={Math.min(passwordValue.length, passwordChecks.min)}
+                    aria-label="Password length"
                   >
-                    {passwordChecks.length ? "✓" : "○"} At least {passwordChecks.min} characters
-                  </li>
-                </ul>
+                    <div
+                      className={`h-full rounded-full transition-[width] ${
+                        passwordChecks.length ? "bg-success" : "bg-emerald"
+                      }`}
+                      style={{ width: `${progress}%` }}
+                    />
+                  </div>
+                  <p
+                    className={`text-xs ${
+                      passwordChecks.length ? "font-medium text-success" : "text-text-secondary"
+                    }`}
+                  >
+                    {passwordChecks.length
+                      ? `Ready — at least ${passwordChecks.min} characters`
+                      : `${passwordValue.length}/${passwordChecks.min} characters minimum`}
+                  </p>
+                </div>
               ) : null}
             </div>
           );

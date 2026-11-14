@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AuthNav } from "../auth-nav";
+import { OperoLogo } from "../brand/opero-logo";
 import { cn } from "../../lib/cn";
 
 const links = [
@@ -20,23 +21,17 @@ export function PublicHeader({ compact = false }: { compact?: boolean }) {
       <div
         className={cn(
           "mx-auto flex max-w-6xl items-center justify-between gap-4 px-5 sm:px-8",
-          compact ? "py-4" : "py-5",
+          compact ? "py-3.5" : "py-4",
         )}
       >
         <div className="flex min-w-0 items-center gap-6">
-          <Link
-            href="/"
-            className="font-display text-2xl tracking-tight text-navy no-underline"
-            aria-label="Opero home"
-          >
-            Opero
+          <Link href="/" className="no-underline" aria-label="Opero home">
+            <OperoLogo markClassName="size-8" />
           </Link>
           <nav className="hidden items-center gap-1 lg:flex" aria-label="Product">
             {links.map((link) => {
               const active =
-                link.href === "/pricing"
-                  ? pathname?.startsWith("/pricing")
-                  : false;
+                link.href === "/pricing" ? pathname?.startsWith("/pricing") : false;
               return (
                 <Link
                   key={link.href}

@@ -10,7 +10,7 @@ export default function RegisterPage() {
     >
       <AuthForm
         title="Create your account"
-        subtitle="Register with email and password. Verify your email before signing in."
+        subtitle="Verify your email after registering, then sign in to open a workspace."
         actionPath="/auth/register"
         submitLabel="Create account"
         onSuccessMessage="Account created. Check your email for a verification link, then sign in."
@@ -23,7 +23,6 @@ export default function RegisterPage() {
             type: "password",
             autoComplete: "new-password",
             minLength: 12,
-            hint: "Use at least 12 characters. A unique passphrase works well.",
           },
         ]}
       />

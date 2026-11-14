@@ -1,11 +1,12 @@
 import Link from "next/link";
+import { OperoLogo } from "../brand/opero-logo";
 
 export function PublicFooter() {
   return (
     <footer className="border-t border-border bg-surface">
       <div className="mx-auto flex max-w-6xl flex-col gap-6 px-5 py-10 sm:flex-row sm:items-start sm:justify-between sm:px-8">
-        <div className="max-w-sm space-y-2">
-          <p className="font-display text-xl text-navy">Opero</p>
+        <div className="max-w-sm space-y-3">
+          <OperoLogo markClassName="size-8" />
           <p className="text-sm leading-relaxed text-text-secondary">
             Financial intelligence for operators, finance teams and lenders — grounded in your
             statements, not invented metrics.

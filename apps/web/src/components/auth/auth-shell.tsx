@@ -1,19 +1,11 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { OperoLogo, OperoMark } from "../brand/opero-logo";
 
 const panelPoints = [
-  {
-    title: "Evidence-backed diagnostics",
-    detail: "Ratios and health scores come from reviewed statement figures — never invented.",
-  },
-  {
-    title: "Tenant-isolated workspaces",
-    detail: "Organizations, documents and reports stay separated with permission-aware access.",
-  },
-  {
-    title: "Human review before decisions",
-    detail: "Confirm mapping, scale and quality before publishing immutable reports.",
-  },
+  { title: "Evidence first", detail: "Scores and ratios from reviewed figures only." },
+  { title: "Isolated tenants", detail: "Organizations, documents and reports stay separated." },
+  { title: "Human confirmation", detail: "Mapping and scale reviewed before publish." },
 ] as const;
 
 export function AuthShell({
@@ -28,59 +20,84 @@ export function AuthShell({
       <a className="skip-link" href="#main">
         Skip to content
       </a>
-      <div className="grid min-h-dvh lg:grid-cols-2">
-        <aside className="relative hidden overflow-hidden bg-navy text-text-inverse lg:flex lg:flex-col lg:justify-between lg:px-12 lg:py-12 xl:px-16">
+      <div className="grid min-h-dvh lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+        <aside className="relative hidden overflow-hidden bg-navy text-text-inverse lg:flex lg:flex-col lg:justify-between lg:px-12 lg:py-12 xl:px-14">
           <div
-            className="pointer-events-none absolute inset-0 opacity-40"
+            className="pointer-events-none absolute inset-0"
             style={{
               background:
-                "radial-gradient(ellipse at 20% 0%, rgba(8,127,109,0.45), transparent 55%), radial-gradient(ellipse at 90% 80%, rgba(214,168,91,0.22), transparent 45%)",
+                "radial-gradient(ellipse at 15% 0%, rgba(8,127,109,0.32), transparent 50%), linear-gradient(165deg, #101d32 0%, #0c1626 100%)",
             }}
             aria-hidden
           />
-          <div className="relative">
-            <Link href="/" className="font-display text-3xl text-text-inverse no-underline">
-              Opero
+          <div className="relative space-y-8">
+            <Link href="/" className="inline-block no-underline">
+              <OperoLogo inverse markClassName="size-9" />
             </Link>
-            <p className="mt-8 max-w-md font-display text-3xl leading-snug text-balance xl:text-4xl">
-              Financial intelligence your team can defend.
-            </p>
-            <p className="mt-4 max-w-md text-sm leading-relaxed text-white/70">
-              Opero X-Ray turns statements into diagnostics, readiness checks and board-ready
-              narratives — with source evidence attached.
-            </p>
+            <div>
+              <p className="max-w-sm font-display text-3xl leading-snug text-balance xl:text-[2.35rem]">
+                Clarity you can take to the board.
+              </p>
+              <p className="mt-4 max-w-sm text-sm leading-relaxed text-white/65">
+                Opero X-Ray keeps diagnostics, readiness and reports tied to source evidence.
+              </p>
+            </div>
+            <div className="grid max-w-sm grid-cols-3 gap-2" aria-hidden>
+              {[
+                ["Health", "72"],
+                ["Margin", "58%"],
+                ["Scale", "×1k"],
+              ].map(([label, value]) => (
+                <div
+                  key={label}
+                  className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-3"
+                >
+                  <p className="text-[10px] uppercase tracking-wide text-white/45">{label}</p>
+                  <p className="mt-1 font-data text-lg font-semibold text-white">{value}</p>
+                </div>
+              ))}
+            </div>
+            <p className="text-[10px] text-white/40">Illustrative sample values — not live data.</p>
           </div>
-          <ul className="relative mt-12 space-y-5">
+          <ul className="relative mt-10 space-y-4">
             {panelPoints.map((point) => (
-              <li key={point.title} className="max-w-md border-l-2 border-emerald/60 pl-4">
+              <li key={point.title} className="max-w-sm border-l-2 border-emerald/70 pl-4">
                 <p className="text-sm font-semibold text-white">{point.title}</p>
-                <p className="mt-1 text-sm leading-relaxed text-white/65">{point.detail}</p>
+                <p className="mt-1 text-sm leading-relaxed text-white/60">{point.detail}</p>
               </li>
             ))}
           </ul>
-          <p className="relative mt-12 text-xs text-white/45">
+          <p className="relative mt-10 text-xs text-white/40">
             Secure sessions · CSRF protection · Email verification required
           </p>
         </aside>
 
         <div className="flex flex-col">
-          <div className="flex items-center justify-between border-b border-border px-5 py-4 lg:hidden">
-            <Link href="/" className="font-display text-2xl text-navy no-underline">
-              Opero
+          <div className="flex items-center justify-between border-b border-border px-4 py-3.5 sm:px-5 lg:hidden">
+            <Link href="/" className="no-underline" aria-label="Opero home">
+              <span className="inline-flex items-center gap-2">
+                <OperoMark className="size-8" decorative />
+                <span className="font-display text-xl text-navy">Opero</span>
+              </span>
             </Link>
-            <Link href="/" className="text-sm font-medium text-text-secondary no-underline hover:text-emerald">
-              Back to home
+            <Link
+              href="/"
+              className="text-sm font-medium text-text-secondary no-underline hover:text-emerald"
+            >
+              Home
             </Link>
           </div>
           <main
             id="main"
-            className="flex flex-1 flex-col justify-center px-5 py-10 sm:px-8 lg:px-12 xl:px-16"
+            className="flex flex-1 flex-col justify-center px-4 py-8 sm:px-8 sm:py-10 lg:px-12 xl:px-16"
           >
-            <div className="mx-auto w-full max-w-md">
-              <div className="rounded-2xl border border-border bg-surface p-6 shadow-md sm:p-8">
+            <div className="mx-auto w-full max-w-[26rem]">
+              <div className="rounded-2xl border border-border bg-surface p-5 shadow-md sm:p-7">
                 {children}
               </div>
-              {footer ? <div className="mt-6 text-center text-sm text-text-secondary">{footer}</div> : null}
+              {footer ? (
+                <div className="mt-5 text-center text-sm text-text-secondary">{footer}</div>
+              ) : null}
             </div>
           </main>
         </div>
