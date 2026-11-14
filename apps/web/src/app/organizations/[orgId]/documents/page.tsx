@@ -3,8 +3,23 @@
 import { membershipRoleSchema, roleHasPermission, type MembershipRole } from "@opero/shared";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { DocumentUploadForm } from "../../../../components/document-upload-form";
+import {
+  Alert,
+  Badge,
+  EmptyState,
+  Input,
+  Select,
+  Skeleton,
+  Table,
+  TBody,
+  TD,
+  TH,
+  THead,
+  TR,
+  buttonClassName,
+} from "../../../../components/ui";
 import { apiFetch } from "../../../../lib/api";
 
 type DocumentRow = {
@@ -15,7 +30,20 @@ type DocumentRow = {
   scanStatus: string;
   extractionStatus: string;
   uploadedAt: string;
+  byteSize?: number;
+  failureClass?: string | null;
 };
+
+function statusTone(
+  status: string,
+): "neutral" | "success" | "warning" | "error" | "info" | "emerald" {
+  const value = status.toUpperCase();
+  if (["READY", "SUCCEEDED", "CLEAN", "COMPLETE", "EXTRACTED"].includes(value)) return "success";
+  if (["REVIEW_REQUIRED", "PENDING", "QUEUED", "RUNNING", "SCANNING", "EXTRACTING"].includes(value))
+    return "warning";
+  if (["FAILED", "REJECTED", "INFECTED", "ERROR"].includes(value)) return "error";
+  return "neutral";
+}
 
 export default function DocumentsPage() {
   const params = useParams<{ orgId: string }>();
@@ -23,10 +51,15 @@ export default function DocumentsPage() {
   const [documents, setDocuments] = useState<DocumentRow[]>([]);
   const [role, setRole] = useState<MembershipRole | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("ALL");
+  const [formatFilter, setFormatFilter] = useState("ALL");
 
   const canWrite = role ? roleHasPermission(role, "xray:write") : false;
 
   const load = useCallback(async () => {
+    setLoading(true);
     const [docsRes, orgsRes] = await Promise.all([
       apiFetch<{ documents?: DocumentRow[]; message?: string }>(`/organizations/${orgId}/documents`),
       apiFetch<{
@@ -36,6 +69,7 @@ export default function DocumentsPage() {
     ]);
     if (docsRes.status >= 400) {
       setError(docsRes.body.message ?? "Unable to load documents");
+      setLoading(false);
       return;
     }
     const membership = orgsRes.body.organizations?.find((row) => row.organization.id === orgId);
@@ -43,63 +77,235 @@ export default function DocumentsPage() {
     setRole(parsedRole?.success ? parsedRole.data : null);
     setDocuments(docsRes.body.documents ?? []);
     setError(null);
+    setLoading(false);
   }, [orgId]);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- mount fetch
     void load();
   }, [load]);
 
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return documents.filter((doc) => {
+      if (statusFilter !== "ALL" && doc.processingStatus !== statusFilter) return false;
+      if (formatFilter !== "ALL" && doc.format !== formatFilter) return false;
+      if (!q) return true;
+      return doc.originalFilename.toLowerCase().includes(q);
+    });
+  }, [documents, query, statusFilter, formatFilter]);
+
+  const statusOptions = useMemo(() => {
+    const set = new Set(documents.map((d) => d.processingStatus));
+    return Array.from(set).sort();
+  }, [documents]);
+
+  const existingFilenames = useMemo(
+    () => documents.map((doc) => doc.originalFilename),
+    [documents],
+  );
+
   return (
-    <>
-      <div className="mx-auto max-w-6xl py-10">
-        <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <p className="text-sm uppercase tracking-[0.16em] text-pine">Opero X-Ray</p>
-            <h1 className="mt-2 text-3xl text-ink">Documents</h1>
-            <p className="mt-2 max-w-2xl text-muted">
-              Upload PDF, XLSX, or CSV financial reports (max 20 MB). Files are quarantined, scanned,
-              then extracted with source evidence for review.
-            </p>
-          </div>
-          <Link className="text-pine underline" href={`/organizations/${orgId}`}>
-            Back to organization
-          </Link>
+    <div className="mx-auto max-w-6xl space-y-8" data-testid="documents-library">
+      <header className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="text-sm font-semibold uppercase tracking-[0.14em] text-emerald">
+            Opero X-Ray
+          </p>
+          <h1 className="mt-2 text-3xl text-navy">Documents</h1>
+          <p className="mt-2 max-w-2xl text-sm text-text-secondary">
+            Upload statements, track scanning and extraction, then confirm figures before
+            diagnostics. Reporting period metadata appears after extraction when available on the
+            document detail view.
+          </p>
+        </div>
+      </header>
+
+      {canWrite ? (
+        <DocumentUploadForm
+          orgId={orgId}
+          existingFilenames={existingFilenames}
+          onUploaded={load}
+        />
+      ) : (
+        <Alert tone="info" title="View-only access">
+          Uploads require Analyst or higher.
+        </Alert>
+      )}
+
+      <section className="space-y-4" aria-labelledby="library-heading">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <h2 id="library-heading" className="text-lg font-semibold text-navy">
+            Library
+          </h2>
+          <p className="text-sm text-text-secondary">
+            {filtered.length} of {documents.length} document{documents.length === 1 ? "" : "s"}
+          </p>
         </div>
 
-        {canWrite ? (
-          <DocumentUploadForm orgId={orgId} onUploaded={load} />
-        ) : (
-          <p className="mb-10 text-sm text-muted">
-            View-only access: uploads require Analyst or higher.
-          </p>
-        )}
+        <div className="grid gap-3 sm:grid-cols-[1fr_10rem_8rem]">
+          <Input
+            label="Search filename"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search by name"
+          />
+          <Select
+            label="Processing status"
+            value={statusFilter}
+            onChange={(event) => setStatusFilter(event.target.value)}
+          >
+            <option value="ALL">All statuses</option>
+            {statusOptions.map((status) => (
+              <option key={status} value={status}>
+                {status}
+              </option>
+            ))}
+          </Select>
+          <Select
+            label="Format"
+            value={formatFilter}
+            onChange={(event) => setFormatFilter(event.target.value)}
+          >
+            <option value="ALL">All formats</option>
+            <option value="PDF">PDF</option>
+            <option value="XLSX">XLSX</option>
+            <option value="CSV">CSV</option>
+          </Select>
+        </div>
 
-        {error ? <p className="mb-4 text-sm text-copper">{error}</p> : null}
+        {error ? (
+          <Alert tone="error" title="Unable to load documents">
+            {error}
+          </Alert>
+        ) : null}
 
-        <ul className="divide-y divide-line border border-line">
-          {documents.map((doc) => (
-            <li key={doc.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
-              <div>
-                <Link
-                  className="font-medium text-ink underline"
-                  href={`/organizations/${orgId}/documents/${doc.id}`}
-                >
-                  {doc.originalFilename}
-                </Link>
-                <p className="text-sm text-muted">
-                  {doc.format} · {doc.processingStatus} · scan {doc.scanStatus} · extract{" "}
-                  {doc.extractionStatus}
-                </p>
-              </div>
-              <time className="text-sm text-muted">{new Date(doc.uploadedAt).toLocaleString()}</time>
-            </li>
-          ))}
-          {documents.length === 0 ? (
-            <li className="px-4 py-6 text-muted">No documents uploaded yet.</li>
-          ) : null}
-        </ul>
-      </div>
-    </>
+        {loading ? (
+          <div className="space-y-3" data-testid="documents-loading">
+            <Skeleton className="h-16 w-full" />
+            <Skeleton className="h-16 w-full" />
+          </div>
+        ) : null}
+
+        {!loading && documents.length === 0 ? (
+          <EmptyState
+            title="No documents yet"
+            description="Upload a PDF, XLSX or CSV financial statement to begin scanning and extraction."
+            action={
+              canWrite ? (
+                <p className="text-sm text-text-secondary">Use the upload panel above.</p>
+              ) : undefined
+            }
+          />
+        ) : null}
+
+        {!loading && documents.length > 0 && filtered.length === 0 ? (
+          <EmptyState
+            title="No matching documents"
+            description="Try a different search or clear the status/format filters."
+            action={
+              <button
+                type="button"
+                className={buttonClassName({ variant: "secondary", size: "sm" })}
+                onClick={() => {
+                  setQuery("");
+                  setStatusFilter("ALL");
+                  setFormatFilter("ALL");
+                }}
+              >
+                Clear filters
+              </button>
+            }
+          />
+        ) : null}
+
+        {/* Desktop table */}
+        {!loading && filtered.length > 0 ? (
+          <>
+            <div className="hidden md:block">
+              <Table>
+                <THead>
+                  <TR>
+                    <TH>Document</TH>
+                    <TH>Format</TH>
+                    <TH>Processing</TH>
+                    <TH>Scan</TH>
+                    <TH>Extraction</TH>
+                    <TH>Uploaded</TH>
+                    <TH>Actions</TH>
+                  </TR>
+                </THead>
+                <TBody>
+                  {filtered.map((doc) => (
+                    <TR key={doc.id}>
+                      <TD>
+                        <Link
+                          href={`/organizations/${orgId}/documents/${doc.id}`}
+                          className="font-medium text-navy no-underline hover:text-emerald"
+                        >
+                          {doc.originalFilename}
+                        </Link>
+                      </TD>
+                      <TD>{doc.format}</TD>
+                      <TD>
+                        <Badge tone={statusTone(doc.processingStatus)}>{doc.processingStatus}</Badge>
+                      </TD>
+                      <TD>
+                        <Badge tone={statusTone(doc.scanStatus)}>{doc.scanStatus}</Badge>
+                      </TD>
+                      <TD>
+                        <Badge tone={statusTone(doc.extractionStatus)}>{doc.extractionStatus}</Badge>
+                      </TD>
+                      <TD>
+                        <time className="font-data text-xs text-text-secondary">
+                          {new Date(doc.uploadedAt).toLocaleString()}
+                        </time>
+                      </TD>
+                      <TD>
+                        <Link
+                          href={`/organizations/${orgId}/documents/${doc.id}`}
+                          className="text-sm font-medium text-emerald no-underline hover:underline"
+                        >
+                          {doc.processingStatus === "REVIEW_REQUIRED" ? "Review" : "Open"}
+                        </Link>
+                      </TD>
+                    </TR>
+                  ))}
+                </TBody>
+              </Table>
+            </div>
+
+            {/* Mobile cards */}
+            <ul className="space-y-3 md:hidden">
+              {filtered.map((doc) => (
+                <li key={doc.id} className="rounded-2xl border border-border bg-surface p-4 shadow-sm">
+                  <Link
+                    href={`/organizations/${orgId}/documents/${doc.id}`}
+                    className="font-semibold text-navy no-underline"
+                  >
+                    {doc.originalFilename}
+                  </Link>
+                  <p className="mt-1 text-xs text-text-secondary">
+                    {doc.format} · {new Date(doc.uploadedAt).toLocaleString()}
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Badge tone={statusTone(doc.processingStatus)}>{doc.processingStatus}</Badge>
+                    <Badge tone={statusTone(doc.scanStatus)}>scan {doc.scanStatus}</Badge>
+                    <Badge tone={statusTone(doc.extractionStatus)}>
+                      extract {doc.extractionStatus}
+                    </Badge>
+                  </div>
+                  <Link
+                    href={`/organizations/${orgId}/documents/${doc.id}`}
+                    className="mt-3 inline-flex text-sm font-medium text-emerald no-underline hover:underline"
+                  >
+                    {doc.processingStatus === "REVIEW_REQUIRED" ? "Review figures" : "Open document"}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </>
+        ) : null}
+      </section>
+    </div>
   );
 }

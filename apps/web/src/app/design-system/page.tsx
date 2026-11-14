@@ -64,6 +64,14 @@ function Specimen() {
           Token, typography and component specimen for owner review. Product surfaces adopt these
           primitives in increments 9B–9F.
         </p>
+        <p className="flex flex-wrap gap-4 text-sm font-medium">
+          <a href="/design-system/workspace" className="text-emerald no-underline hover:underline">
+            Workspace (9C)
+          </a>
+          <a href="/design-system/documents" className="text-emerald no-underline hover:underline">
+            Documents (9D)
+          </a>
+        </p>
       </header>
 
       <section className="space-y-4" aria-labelledby="colour-heading">

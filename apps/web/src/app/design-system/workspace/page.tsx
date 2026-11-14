@@ -10,21 +10,23 @@ import {
   Button,
   Card,
   EmptyState,
+  Tooltip,
   buttonClassName,
 } from "../../../components/ui";
+import { NavIcon } from "../../../components/workspace/nav-icons";
 import { cn } from "../../../lib/cn";
 
 const nav = [
-  "Overview",
-  "Documents",
-  "Diagnostics",
-  "Readiness",
-  "Reconciliations",
-  "AI interpretation",
-  "Reports",
-  "Billing",
-  "Members",
-  "Settings",
+  { id: "overview", label: "Overview" },
+  { id: "documents", label: "Documents" },
+  { id: "diagnostics", label: "Diagnostics" },
+  { id: "readiness", label: "Readiness" },
+  { id: "reconciliations", label: "Reconciliations" },
+  { id: "ai", label: "AI interpretation" },
+  { id: "reports", label: "Reports" },
+  { id: "billing", label: "Billing" },
+  { id: "members", label: "Members" },
+  { id: "settings", label: "Settings" },
 ] as const;
 
 function FixtureSidebar({ collapsed }: { collapsed: boolean }) {
@@ -49,18 +51,29 @@ function FixtureSidebar({ collapsed }: { collapsed: boolean }) {
         </div>
       ) : null}
       <nav className="flex-1 space-y-0.5 overflow-y-auto px-2 py-3">
-        {nav.map((label, index) => (
-          <div
-            key={label}
-            className={cn(
-              "flex min-h-10 items-center rounded-lg text-sm font-medium",
-              collapsed ? "justify-center px-2" : "px-3",
-              index === 0 ? "bg-info-surface text-emerald" : "text-text-secondary",
-            )}
-          >
-            {collapsed ? label.slice(0, 1) : label}
-          </div>
-        ))}
+        {nav.map((item, index) => {
+          const row = (
+            <div
+              className={cn(
+                "flex min-h-10 items-center gap-2.5 rounded-lg text-sm font-medium",
+                collapsed ? "justify-center px-2" : "px-3",
+                index === 0 ? "bg-info-surface text-emerald" : "text-text-secondary",
+              )}
+              aria-label={item.label}
+            >
+              <NavIcon id={item.id} />
+              {collapsed ? <span className="sr-only">{item.label}</span> : item.label}
+            </div>
+          );
+          if (!collapsed) {
+            return <div key={item.id}>{row}</div>;
+          }
+          return (
+            <Tooltip key={item.id} content={item.label} className="flex w-full justify-center">
+              {row}
+            </Tooltip>
+          );
+        })}
       </nav>
     </aside>
   );

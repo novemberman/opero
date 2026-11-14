@@ -1,7 +1,15 @@
 "use client";
 
-import { FormEvent, useCallback, useRef, useState } from "react";
+import { FormEvent, useCallback, useMemo, useRef, useState } from "react";
 import { apiBase, apiErrorMessage, apiFetch, ensureCsrfToken, resetCsrfToken } from "../lib/api";
+import {
+  DOCUMENT_UPLOAD_ACCEPT,
+  DOCUMENT_UPLOAD_MAX_BYTES,
+  detectDocumentFormat,
+  formatUploadBytes,
+  validateDocumentUploadClient,
+} from "../lib/document-upload-rules";
+import { Alert, Button, ProgressBar } from "./ui";
 
 type UploadState =
   | { phase: "idle" }
@@ -15,20 +23,8 @@ type UploadState =
       total: number;
     }
   | { phase: "processing"; fileName: string; fileSize: number; fileType: string }
+  | { phase: "success"; fileName: string }
   | { phase: "error"; message: string };
-
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-function detectFormat(fileName: string): "PDF" | "XLSX" | "CSV" {
-  const lower = fileName.toLowerCase();
-  if (lower.endsWith(".pdf")) return "PDF";
-  if (lower.endsWith(".xlsx")) return "XLSX";
-  return "CSV";
-}
 
 async function completeUploadWithProgress(input: {
   orgId: string;
@@ -73,19 +69,33 @@ async function completeUploadWithProgress(input: {
 export function DocumentUploadForm({
   orgId,
   disabled,
+  existingFilenames = [],
   onUploaded,
 }: {
   orgId: string;
   disabled?: boolean;
+  existingFilenames?: string[];
   onUploaded: () => void | Promise<void>;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [state, setState] = useState<UploadState>({ phase: "idle" });
   const [dragOver, setDragOver] = useState(false);
 
+  const busy = state.phase === "uploading" || state.phase === "preparing";
+
+  const uploadProgress = useMemo(() => {
+    if (state.phase !== "uploading") return null;
+    return Math.round((state.loaded / Math.max(state.total, 1)) * 100);
+  }, [state]);
+
   const uploadFile = useCallback(
     async (file: File) => {
-      const format = detectFormat(file.name);
+      const clientError = validateDocumentUploadClient(file, existingFilenames);
+      if (clientError) {
+        setState({ phase: "error", message: clientError });
+        return;
+      }
+      const format = detectDocumentFormat(file.name)!;
       setState({
         phase: "preparing",
         fileName: file.name,
@@ -144,7 +154,7 @@ export function DocumentUploadForm({
           fileType: format,
         });
         await onUploaded();
-        setState({ phase: "idle" });
+        setState({ phase: "success", fileName: file.name });
       } catch (err) {
         setState({
           phase: "error",
@@ -152,93 +162,128 @@ export function DocumentUploadForm({
         });
       }
     },
-    [orgId, onUploaded],
+    [orgId, onUploaded, existingFilenames],
   );
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (disabled) return;
     const file = inputRef.current?.files?.[0];
-    if (!file) return;
+    if (!file) {
+      setState({ phase: "error", message: "Choose a PDF, XLSX or CSV file to upload." });
+      return;
+    }
     await uploadFile(file);
     if (inputRef.current) inputRef.current.value = "";
   }
 
-  const busy = state.phase === "uploading" || state.phase === "preparing";
-
   return (
     <form
       onSubmit={(event) => void onSubmit(event)}
-      className={`mb-10 rounded-2xl border border-dashed p-5 ${
-        dragOver ? "border-pine bg-pine/5" : "border-line bg-white/50"
+      className={`rounded-2xl border border-dashed p-5 sm:p-6 ${
+        dragOver ? "border-emerald bg-emerald/5" : "border-border bg-surface"
       }`}
       onDragOver={(event) => {
         event.preventDefault();
-        setDragOver(true);
+        if (!disabled) setDragOver(true);
       }}
       onDragLeave={() => setDragOver(false)}
       onDrop={(event) => {
         event.preventDefault();
         setDragOver(false);
-        if (disabled) return;
+        if (disabled || busy) return;
         const file = event.dataTransfer.files?.[0];
         if (file) void uploadFile(file);
       }}
+      aria-busy={busy || undefined}
     >
-      <label className="block text-sm text-ink">
-        Financial report (PDF, XLSX, or CSV)
-        <input
-          ref={inputRef}
-          className="mt-2 block w-full max-w-md border border-line bg-white px-3 py-2"
-          type="file"
-          name="file"
-          accept=".pdf,.xlsx,.csv,application/pdf,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-          required
-          disabled={disabled || busy}
-        />
-      </label>
-      <p className="mt-2 text-sm text-muted">Drag and drop a file here, or choose a file to upload.</p>
-
-      {state.phase !== "idle" && state.phase !== "error" ? (
-        <div className="mt-4 text-sm text-muted">
-          <p>
-            {state.fileName} · {state.fileType} · {formatBytes(state.fileSize)}
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold text-navy">Upload financial statement</h2>
+          <p className="mt-1 text-sm text-text-secondary">
+            PDF, XLSX or CSV · max {formatUploadBytes(DOCUMENT_UPLOAD_MAX_BYTES)}. Files are
+            quarantined, scanned, then extracted with source evidence.
           </p>
-          {state.phase === "uploading" ? (
-            <div
-              className="mt-2 h-2 w-full max-w-md overflow-hidden rounded-full bg-line"
-              role="progressbar"
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-valuenow={Math.round((state.loaded / Math.max(state.total, 1)) * 100)}
-            >
-              <div
-                className="h-full bg-pine transition-[width]"
-                style={{
-                  width: `${Math.round((state.loaded / Math.max(state.total, 1)) * 100)}%`,
-                }}
-              />
-            </div>
+        </div>
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          disabled={disabled || busy}
+          onClick={() => inputRef.current?.click()}
+        >
+          Choose file
+        </Button>
+      </div>
+
+      <input
+        ref={inputRef}
+        className="sr-only"
+        type="file"
+        name="file"
+        accept={DOCUMENT_UPLOAD_ACCEPT}
+        disabled={disabled || busy}
+        onChange={(event) => {
+          const file = event.currentTarget.files?.[0];
+          if (file) void uploadFile(file);
+          event.currentTarget.value = "";
+        }}
+      />
+
+      <p className="mt-4 rounded-xl border border-border bg-workspace px-4 py-6 text-center text-sm text-text-secondary">
+        Drag and drop a file here, or use Choose file. Keyboard users can activate Choose file and
+        select from the system picker.
+      </p>
+
+      {state.phase !== "idle" && state.phase !== "error" && state.phase !== "success" ? (
+        <div className="mt-4 space-y-2 text-sm text-text-secondary">
+          <p className="font-medium text-navy">
+            {state.fileName} · {state.fileType} · {formatUploadBytes(state.fileSize)}
+          </p>
+          {state.phase === "uploading" && uploadProgress != null ? (
+            <ProgressBar value={uploadProgress} label={`Uploading ${uploadProgress}%`} />
           ) : null}
-          <p className="mt-2">
+          <p>
             {state.phase === "preparing"
-              ? "Preparing upload…"
+              ? "Preparing secure upload…"
               : state.phase === "uploading"
-                ? `Uploading… ${formatBytes(state.loaded)} / ${formatBytes(state.total)}`
-                : "Upload complete — processing started"}
+                ? `Uploading… ${formatUploadBytes(state.loaded)} / ${formatUploadBytes(state.total)}`
+                : "Upload complete — scanning and extraction will continue in the background"}
           </p>
         </div>
       ) : null}
 
-      {state.phase === "error" ? <p className="mt-3 text-sm text-copper">{state.message}</p> : null}
+      {state.phase === "success" ? (
+        <div className="mt-4">
+          <Alert tone="success" title="Upload received">
+            {state.fileName} is queued for scanning and extraction. Open the document to follow
+            processing.
+          </Alert>
+        </div>
+      ) : null}
 
-      <button
-        className="mt-4 rounded-full bg-pine px-5 py-2 text-paper disabled:opacity-50"
-        type="submit"
-        disabled={disabled || busy}
-      >
-        {busy ? "Uploading…" : "Upload"}
-      </button>
+      {state.phase === "error" ? (
+        <div className="mt-4">
+          <Alert tone="error" title="Upload blocked">
+            {state.message}
+          </Alert>
+        </div>
+      ) : null}
+
+      <div className="mt-4 flex flex-wrap gap-2">
+        <Button type="submit" loading={busy} disabled={disabled}>
+          {busy ? "Uploading…" : "Upload"}
+        </Button>
+        {state.phase === "error" || state.phase === "success" ? (
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => setState({ phase: "idle" })}
+          >
+            Dismiss
+          </Button>
+        ) : null}
+      </div>
     </form>
   );
 }

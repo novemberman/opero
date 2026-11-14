@@ -1,13 +1,15 @@
 "use client";
 
 import type { DocumentProcessingProgress } from "@opero/shared";
+import { Alert, Badge, ProgressBar } from "./ui";
+import { cn } from "../lib/cn";
 
-function stageIcon(status: string, reducedMotion: boolean): string {
-  if (status === "COMPLETED") return "✓";
-  if (status === "FAILED") return "!";
-  if (status === "RUNNING") return reducedMotion ? "•" : "◌";
-  if (status === "SKIPPED") return "–";
-  return "○";
+function stageTone(status: string): "success" | "warning" | "error" | "neutral" | "info" {
+  if (status === "COMPLETED") return "success";
+  if (status === "FAILED") return "error";
+  if (status === "RUNNING") return "info";
+  if (status === "SKIPPED") return "neutral";
+  return "neutral";
 }
 
 export function ProcessingTimeline({
@@ -23,59 +25,57 @@ export function ProcessingTimeline({
 
   const percent = progress.progressPercent;
   const indeterminate = percent == null;
+  const currentLabel =
+    progress.stages.find((s) => s.id === progress.currentStage)?.label ?? progress.currentStage;
 
   return (
     <section
-      className="rounded-2xl border border-line bg-white/70 p-5"
+      className="rounded-2xl border border-border bg-surface p-5 shadow-sm sm:p-6"
       aria-live="polite"
       aria-busy={progress.stageStatus === "RUNNING"}
+      data-testid="processing-timeline"
     >
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="text-sm uppercase tracking-[0.14em] text-pine">Processing</p>
-          <h2 className="mt-1 text-xl text-ink">
-            {progress.stages.find((s) => s.id === progress.currentStage)?.label ??
-              progress.currentStage}
-          </h2>
+          <p className="text-sm font-semibold uppercase tracking-[0.14em] text-emerald">Processing</p>
+          <h2 className="mt-1 text-xl text-navy">{currentLabel}</h2>
           {progress.nextRecommendedAction ? (
-            <p className="mt-1 text-sm text-muted">{progress.nextRecommendedAction}</p>
+            <p className="mt-1 text-sm text-text-secondary">{progress.nextRecommendedAction}</p>
           ) : null}
         </div>
-        {elapsedLabel ? <p className="text-sm text-muted">{elapsedLabel}</p> : null}
+        <div className="text-right">
+          {elapsedLabel ? <p className="text-sm text-text-secondary">{elapsedLabel}</p> : null}
+          <Badge tone={stageTone(progress.stageStatus)} className="mt-1">
+            {progress.stageStatus}
+          </Badge>
+        </div>
       </div>
 
-      <div
-        className="mt-4 h-2 w-full overflow-hidden rounded-full bg-line"
-        role="progressbar"
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-valuenow={indeterminate ? undefined : percent}
-        aria-valuetext={
-          indeterminate ? "Progress indeterminate" : `${percent} percent complete`
-        }
-      >
+      <div className="mt-4">
         {indeterminate ? (
-          <div
-            className={`h-full w-1/3 rounded-full bg-pine ${reducedMotion ? "" : "animate-pulse"}`}
-          />
+          <ProgressBar indeterminate label="Stage in progress" />
         ) : (
-          <div
-            className="h-full rounded-full bg-pine transition-[width] duration-500"
-            style={{ width: `${Math.max(0, Math.min(100, percent))}%` }}
-          />
+          <ProgressBar value={percent ?? 0} label={`${percent}% complete`} />
         )}
+        <p className="mt-2 text-xs text-text-secondary">
+          Progress reflects confirmed backend stages — not a simulated estimate.
+        </p>
       </div>
 
       {progress.humanActionRequired ? (
-        <p className="mt-3 text-sm text-copper" role="status">
-          Action required: review extracted figures before diagnostics.
-        </p>
+        <div className="mt-4">
+          <Alert tone="warning" title="Action required">
+            Review extracted figures before diagnostics can proceed.
+          </Alert>
+        </div>
       ) : null}
       {progress.errorCategory ? (
-        <p className="mt-3 text-sm text-copper" role="alert">
-          {progress.errorCategory}
-          {progress.retryAvailable ? " — retry available" : ""}
-        </p>
+        <div className="mt-4">
+          <Alert tone="error" title="Processing issue">
+            {progress.errorCategory}
+            {progress.retryAvailable ? " — retry may be available." : ""}
+          </Alert>
+        </div>
       ) : null}
 
       <ol className="mt-5 space-y-2">
@@ -84,27 +84,37 @@ export function ProcessingTimeline({
           return (
             <li
               key={stage.id}
-              className={`flex items-start gap-3 text-sm ${
-                current ? "text-ink" : "text-muted"
-              }`}
+              className={cn(
+                "flex items-start gap-3 rounded-xl border px-3 py-2.5 text-sm",
+                current ? "border-emerald/30 bg-emerald/5 text-navy" : "border-transparent text-text-secondary",
+              )}
             >
               <span
-                className={`mt-0.5 inline-flex h-5 w-5 items-center justify-center rounded-full border border-line text-xs ${
-                  stage.status === "COMPLETED"
-                    ? "bg-pine text-paper"
-                    : stage.status === "FAILED"
-                      ? "bg-copper text-paper"
-                      : current && !reducedMotion
-                        ? "animate-pulse"
-                        : ""
-                }`}
+                className={cn(
+                  "mt-0.5 inline-flex size-5 items-center justify-center rounded-full text-[11px] font-bold",
+                  stage.status === "COMPLETED" && "bg-emerald text-text-inverse",
+                  stage.status === "FAILED" && "bg-error text-text-inverse",
+                  stage.status === "RUNNING" && "border border-emerald text-emerald",
+                  stage.status === "PENDING" && "border border-border text-text-secondary",
+                  stage.status === "SKIPPED" && "border border-border text-text-disabled",
+                  current && stage.status === "RUNNING" && !reducedMotion && "animate-pulse",
+                )}
                 aria-hidden
               >
-                {stageIcon(stage.status, Boolean(reducedMotion))}
+                {stage.status === "COMPLETED"
+                  ? "✓"
+                  : stage.status === "FAILED"
+                    ? "!"
+                    : stage.status === "SKIPPED"
+                      ? "–"
+                      : "•"}
               </span>
-              <span>
+              <span className="min-w-0 flex-1">
                 <span className="font-medium">{stage.label}</span>
                 <span className="sr-only"> — {stage.status}</span>
+                <span className="mt-0.5 block text-xs capitalize text-text-secondary">
+                  {stage.status.toLowerCase()}
+                </span>
               </span>
             </li>
           );

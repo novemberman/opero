@@ -9,38 +9,14 @@ import {
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  ExtractionLineCard,
+  type ExtractionLine,
+} from "../../../../../components/extraction-line-card";
 import { ProcessingTimeline } from "../../../../../components/processing-timeline";
 import { StatementMetadataPanel } from "../../../../../components/statement-metadata";
+import { Alert, Badge, EmptyState, buttonClassName } from "../../../../../components/ui";
 import { apiFetch } from "../../../../../lib/api";
-
-type Evidence = {
-  evidenceKey: string;
-  pageNumber?: number | null;
-  sheetName?: string | null;
-  cellRef?: string | null;
-  rowIndex?: number | null;
-  columnIndex?: number | null;
-  snippet?: string | null;
-};
-
-type LineItem = {
-  id: string;
-  concept: string;
-  labelRaw: string;
-  rawValue: string;
-  /** Numeric parse in statement units (no scale multiplier). */
-  normalizedValue: string | null;
-  /** Absolute monetary amount after unit scale (null for non-monetary). */
-  actualMonetaryValue?: string | null;
-  currency?: string | null;
-  quantityClass?: string;
-  unitScale?: string;
-  scaleConfidence?: string;
-  unitScaleRequiresReview?: boolean;
-  quality: string;
-  reviewStatus: string;
-  evidence: Evidence | null;
-};
 
 type Extraction = {
   id: string;
@@ -50,7 +26,7 @@ type Extraction = {
   statements: Array<{
     id: string;
     statementType: string;
-    lineItems: LineItem[];
+    lineItems: ExtractionLine[];
   }>;
 };
 
@@ -96,7 +72,6 @@ export default function DocumentDetailPage() {
       return false;
     }
     if (extractionRes.status >= 400 && extractionRes.status !== 403) {
-      // Extractions may be forbidden until clean scan; keep polling status.
       setExtractions([]);
     } else {
       setExtractions(extractionRes.body.extractions ?? []);
@@ -158,17 +133,16 @@ export default function DocumentDetailPage() {
 
   const statements = extractions.flatMap((extraction) => extraction.statements);
   const lines = statements.flatMap((statement) => statement.lineItems);
-  const warnings = extractions.flatMap((e) =>
-    Array.isArray(e.warnings) ? e.warnings : [],
-  );
+  const warnings = extractions.flatMap((e) => (Array.isArray(e.warnings) ? e.warnings : []));
 
   const priorityLines = useMemo(() => {
     return [...lines].sort((a, b) => {
-      const score = (line: LineItem) => {
+      const score = (line: ExtractionLine) => {
         let s = 0;
         if (line.unitScaleRequiresReview) s += 40;
         if (line.reviewStatus === "PENDING") s += 20;
         if (line.quality === "LOW" || line.quality === "MANUAL") s += 15;
+        if (line.concept === "UNMAPPED") s += 12;
         if (line.quantityClass && line.quantityClass !== "MONETARY") s += 5;
         return s;
       };
@@ -176,160 +150,172 @@ export default function DocumentDetailPage() {
     });
   }, [lines]);
 
+  const pendingCount = lines.filter((line) => line.reviewStatus === "PENDING").length;
+  const confirmedCount = lines.filter((line) =>
+    ["CONFIRMED", "CORRECTED"].includes(line.reviewStatus),
+  ).length;
+  const reviewComplete = lines.length > 0 && pendingCount === 0;
+
   const elapsedLabel = `Elapsed ${Math.max(0, Math.round((now - startedAt) / 1000))}s`;
   const processingStatus = String(status?.processingStatus ?? "");
   const readyForDiagnostics = processingStatus === "READY";
   const needsReview = processingStatus === "REVIEW_REQUIRED";
 
   return (
-    <>
-      <div className="mx-auto max-w-6xl py-10">
-        <Link className="text-pine underline" href={`/organizations/${orgId}/documents`}>
-          All documents
+    <div className="mx-auto max-w-6xl space-y-8" data-testid="document-detail">
+      <header className="space-y-3">
+        <Link
+          className="text-sm font-medium text-emerald no-underline hover:underline"
+          href={`/organizations/${orgId}/documents`}
+        >
+          ← All documents
         </Link>
-        <h1 className="mt-4 text-3xl text-ink">Document processing</h1>
-        <p className="mt-2 text-muted">
-          Extracted figures retain source evidence. Corrections keep the original raw value. Processing
-          continues if you leave this page.
+        <h1 className="text-3xl text-navy">Document processing</h1>
+        <p className="max-w-2xl text-sm text-text-secondary">
+          Extracted figures retain source evidence. Corrections update statement units while
+          preserving the original raw value. Processing continues if you leave this page.
         </p>
+        <div className="flex flex-wrap gap-2">
+          {status?.processingStatus ? (
+            <Badge tone="info">{status.processingStatus}</Badge>
+          ) : null}
+          {status?.scanStatus ? <Badge tone="neutral">scan {status.scanStatus}</Badge> : null}
+          {status?.extractionStatus ? (
+            <Badge tone="neutral">extract {status.extractionStatus}</Badge>
+          ) : null}
+        </div>
+      </header>
 
-        {status?.progress ? (
-          <div className="mt-6">
-            <ProcessingTimeline progress={status.progress} elapsedLabel={elapsedLabel} />
-          </div>
-        ) : status ? (
-          <p className="mt-4 text-sm text-muted">
-            Status: {String(status.processingStatus)} · scan {String(status.scanStatus)} · extract{" "}
-            {String(status.extractionStatus)}
-          </p>
-        ) : null}
+      {status?.progress ? (
+        <ProcessingTimeline progress={status.progress} elapsedLabel={elapsedLabel} />
+      ) : status ? (
+        <Alert tone="info" title="Status">
+          {String(status.processingStatus)} · scan {String(status.scanStatus)} · extract{" "}
+          {String(status.extractionStatus)}
+        </Alert>
+      ) : null}
 
-        <div className="mt-4 flex flex-wrap gap-3">
+      <div className="flex flex-wrap gap-3">
+        <a href="#extracted-figures" className={buttonClassName({ variant: "secondary" })}>
+          View extraction
+        </a>
+        {readyForDiagnostics || needsReview ? (
           <Link
-            className="inline-flex min-h-10 items-center rounded-full border border-line px-4 text-ink no-underline"
-            href={`#extracted-figures`}
+            className={buttonClassName()}
+            href={`/organizations/${orgId}/readiness`}
           >
-            View extraction
+            {needsReview ? "Continue to readiness / review" : "Continue to diagnostics"}
           </Link>
-          {readyForDiagnostics || needsReview ? (
-            <Link
-              className="inline-flex min-h-10 items-center rounded-full bg-pine px-4 text-paper no-underline"
-              href={`/organizations/${orgId}/readiness`}
-            >
-              {needsReview ? "Continue to readiness / review" : "Continue to diagnostics"}
+        ) : null}
+      </div>
+
+      {error ? (
+        <Alert tone="error" title="Something went wrong">
+          {error}
+        </Alert>
+      ) : null}
+      {message ? (
+        <Alert tone="success" title="Saved">
+          {message}
+        </Alert>
+      ) : null}
+      {status?.failureMessage ? (
+        <Alert tone="error" title="Processing failure">
+          {status.failureMessage}
+        </Alert>
+      ) : null}
+
+      {warnings.length > 0 ? (
+        <section>
+          <h2 className="text-lg font-semibold text-navy">Extraction notes</h2>
+          <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-text-secondary">
+            {warnings.slice(0, 12).map((warning) => (
+              <li key={warning}>{warning}</li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      {statements.length > 0 ? (
+        <section>
+          <h2 className="text-lg font-semibold text-navy">Statement metadata</h2>
+          <p className="mt-1 text-sm text-text-secondary">
+            Period, currency and entity details feed{" "}
+            <Link className="text-emerald underline" href={`/organizations/${orgId}/readiness`}>
+              readiness
             </Link>
+            . Corrections remain in review history.
+          </p>
+          <ul className="mt-3 space-y-4">
+            {statements.map((statement) => (
+              <StatementMetadataPanel
+                key={statement.id}
+                orgId={orgId}
+                statementId={statement.id}
+                statementType={statement.statementType}
+                canWrite={canWrite}
+              />
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      <section aria-labelledby="extracted-figures">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h2 id="extracted-figures" className="text-lg font-semibold text-navy">
+              Extracted figures
+            </h2>
+            <p className="mt-1 text-sm text-text-secondary">
+              Prioritized by uncertainty. Raw, statement units and actual monetary amounts are shown
+              separately. Non-monetary lines are never treated as validated NGN figures.
+            </p>
+          </div>
+          {lines.length > 0 ? (
+            <p className="text-sm text-text-secondary">
+              {confirmedCount} confirmed · {pendingCount} pending
+              {reviewComplete ? " · review complete" : ""}
+            </p>
           ) : null}
         </div>
 
-        {error ? <p className="mt-4 text-sm text-copper">{error}</p> : null}
-        {message ? <p className="mt-4 text-sm text-pine">{message}</p> : null}
-        {status?.failureMessage ? (
-          <p className="mt-4 text-sm text-copper">{status.failureMessage}</p>
+        {lines.length > 0 && pendingCount > 0 ? (
+          <div className="mt-4">
+            <Alert tone="warning" title="Human confirmation required">
+              {pendingCount} figure{pendingCount === 1 ? "" : "s"} still pending. Confirm, correct
+              or reject each item. Diagnostics should wait until material lines are reviewed.
+            </Alert>
+          </div>
         ) : null}
 
-        {warnings.length > 0 ? (
-          <section className="mt-8">
-            <h2 className="text-xl text-ink">Extraction notes</h2>
-            <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-muted">
-              {warnings.slice(0, 12).map((warning) => (
-                <li key={warning}>{warning}</li>
-              ))}
-            </ul>
-          </section>
+        {lines.length > 0 && reviewComplete ? (
+          <div className="mt-4">
+            <Alert tone="success" title="Review complete for extracted lines">
+              All current line items are confirmed, corrected or rejected.
+            </Alert>
+          </div>
         ) : null}
 
-        {statements.length > 0 ? (
-          <section className="mt-8">
-            <h2 className="text-xl text-ink">Statement metadata</h2>
-            <p className="mt-1 text-sm text-muted">
-              Period, currency and entity details feed the{" "}
-              <Link className="underline" href={`/organizations/${orgId}/readiness`}>
-                readiness assessment
-              </Link>
-              . Every correction and confirmation is kept in the history.
-            </p>
-            <ul className="mt-3 space-y-4">
-              {statements.map((statement) => (
-                <StatementMetadataPanel
-                  key={statement.id}
-                  orgId={orgId}
-                  statementId={statement.id}
-                  statementType={statement.statementType}
-                  canWrite={canWrite}
-                />
-              ))}
-            </ul>
-          </section>
-        ) : null}
-
-        <h2 id="extracted-figures" className="mt-8 text-xl text-ink">
-          Extracted figures
-        </h2>
-        <p className="mt-1 text-sm text-muted">
-          Prioritized by materiality and uncertainty. Percentages and ratios are kept separate from
-          monetary concepts.
-        </p>
-        <ul className="mt-3 space-y-6">
+        <ul className="mt-4 space-y-4">
           {priorityLines.map((line) => (
-            <li key={line.id} className="border border-line p-4">
-              <p className="text-lg text-ink">{line.labelRaw}</p>
-              <p className="text-sm text-muted">
-                Concept {line.concept}
-                {line.quantityClass ? ` · ${line.quantityClass}` : ""} · raw {line.rawValue}
-                {line.unitScale ? ` · scale ${line.unitScale}` : ""}
-                {line.unitScaleRequiresReview ? " · scale needs confirmation" : ""} · statement units{" "}
-                {line.normalizedValue ?? "—"}
-                {line.quantityClass === "MONETARY" || !line.quantityClass
-                  ? ` · actual ${line.currency ?? "amount"} ${line.actualMonetaryValue ?? "—"}`
-                  : ""}{" "}
-                · {line.quality} · {line.reviewStatus}
-              </p>
-              {line.evidence ? (
-                <p className="mt-2 text-sm text-muted">
-                  Evidence {line.evidence.evidenceKey.slice(0, 8)}…
-                  {line.evidence.pageNumber != null ? ` · page ${line.evidence.pageNumber}` : ""}
-                  {line.evidence.sheetName ? ` · sheet ${line.evidence.sheetName}` : ""}
-                  {line.evidence.cellRef ? ` · cell ${line.evidence.cellRef}` : ""}
-                  {line.evidence.rowIndex != null ? ` · row ${line.evidence.rowIndex}` : ""}
-                  {line.evidence.snippet ? ` · ${line.evidence.snippet}` : ""}
-                </p>
-              ) : null}
-              {canWrite ? (
-                <form
-                  className="mt-4 flex flex-wrap gap-2"
-                  onSubmit={(event) => onReview(event, line.id)}
-                >
-                  <select
-                    name="action"
-                    className="border border-line px-2 py-1"
-                    defaultValue="CONFIRM"
-                  >
-                    <option value="CONFIRM">Confirm</option>
-                    <option value="CORRECT">Correct</option>
-                    <option value="REJECT">Reject</option>
-                  </select>
-                  <input
-                    name="newValue"
-                    className="border border-line px-2 py-1"
-                    placeholder="Corrected value"
-                  />
-                  <input
-                    name="reason"
-                    className="border border-line px-2 py-1"
-                    placeholder="Reason"
-                  />
-                  <button className="rounded-full bg-pine px-4 py-1 text-paper" type="submit">
-                    Save review
-                  </button>
-                </form>
-              ) : null}
-            </li>
+            <ExtractionLineCard
+              key={line.id}
+              line={line}
+              canWrite={canWrite}
+              onReview={onReview}
+            />
           ))}
-          {lines.length === 0 ? (
-            <li className="text-muted">No extracted figures yet. Processing may still be running.</li>
-          ) : null}
         </ul>
-      </div>
-    </>
+
+        {lines.length === 0 ? (
+          <div className="mt-4">
+            <EmptyState
+              title="No extracted figures yet"
+              description="Processing may still be running. The timeline above updates as stages complete."
+            />
+          </div>
+        ) : null}
+      </section>
+    </div>
   );
 }

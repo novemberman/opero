@@ -84,10 +84,24 @@ Review specimen: `/design-system` (9A preview only; not a public marketing surfa
 - Logo mark: aperture + X-Ray scan beam (`OperoMark` / `OperoLogo`) — favicon, nav, auth, reports-ready
 - Visual refinement: shorter hero, stronger product visual, metric strip, tighter auth/mobile register
 
+## 9C — Application shell & organization dashboard
+
+- `WorkspaceShell` on `/organizations/[orgId]/*` with permission-aware nav, collapse and mobile drawer
+- Organization dashboard loads real documents/diagnostics/reports; never fabricates health scores
+- Specimens: `/design-system/workspace`
+
+## 9D — Documents & financial extraction
+
+- Collapsed sidebar uses icons + accessible tooltips (replaces first-letter labels)
+- Document library: search/status/format filters, desktop table + mobile cards, loading/empty/error
+- Upload: drag-and-drop, 20MB/PDF·XLSX·CSV client validation aligned with server, progress, duplicate-name soft block
+- Processing timeline maps `DocumentProcessingProgress` stages (no simulated percentages)
+- Extraction review cards: raw / statement units / scale / actual monetary; non-monetary never shown as NGN
+- Explicit human confirmation summary (pending vs confirmed)
+- Specimens: `/design-system/documents` · evidence: `docs/phase-9d/`
+
 ### Later increments
 
-- **9C** App shell + org dashboard
-- **9D** Documents / extraction
 - **9E** Diagnostics / AI
 - **9F** Reports / billing / settings
 - **9G** Responsive / a11y / visual regression

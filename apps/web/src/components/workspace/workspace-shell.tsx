@@ -18,8 +18,9 @@ import {
 import { apiErrorMessage, apiFetch, resetCsrfToken } from "../../lib/api";
 import { cn } from "../../lib/cn";
 import { OperoLogo, OperoMark } from "../brand/opero-logo";
-import { Alert, Breadcrumbs, Button, Skeleton, buttonClassName } from "../ui";
+import { Alert, Breadcrumbs, Button, Skeleton, Tooltip, buttonClassName } from "../ui";
 import { WORKSPACE_NAV, breadcrumbsForPath } from "./nav-config";
+import { NavIcon } from "./nav-icons";
 
 type OrgRow = {
   role: string;
@@ -118,23 +119,34 @@ function SidebarBody({
       <nav className="flex-1 space-y-0.5 overflow-y-auto px-2 py-3" aria-label="Workspace">
         {navItems.map((item) => {
           const active = item.match(pathname, orgId);
-          return (
+          const linkClass = cn(
+            "flex min-h-10 items-center gap-2.5 rounded-lg text-sm font-medium no-underline transition-colors",
+            "focus-visible:outline focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-focus",
+            collapsed ? "justify-center px-2" : "px-3",
+            active
+              ? "bg-info-surface text-emerald"
+              : "text-text-secondary hover:bg-hover hover:text-navy",
+          );
+          const link = (
             <Link
-              key={item.id}
               href={item.href(orgId)}
               title={item.label}
               onClick={onNavigate}
-              className={cn(
-                "flex min-h-10 items-center rounded-lg text-sm font-medium no-underline transition-colors",
-                collapsed ? "justify-center px-2" : "px-3",
-                active
-                  ? "bg-info-surface text-emerald"
-                  : "text-text-secondary hover:bg-hover hover:text-navy",
-              )}
+              className={linkClass}
+              aria-label={item.label}
               aria-current={active ? "page" : undefined}
             >
-              {collapsed ? item.label.slice(0, 1) : item.label}
+              <NavIcon id={item.id} />
+              {collapsed ? <span className="sr-only">{item.label}</span> : item.label}
             </Link>
+          );
+          if (!collapsed) {
+            return <div key={item.id}>{link}</div>;
+          }
+          return (
+            <Tooltip key={item.id} content={item.label} className="flex w-full justify-center">
+              {link}
+            </Tooltip>
           );
         })}
       </nav>
