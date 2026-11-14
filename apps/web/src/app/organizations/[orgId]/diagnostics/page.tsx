@@ -4,7 +4,6 @@ import { membershipRoleSchema, roleHasPermission, type MembershipRole } from "@o
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useState } from "react";
-import { SiteHeader } from "../../../../components/site-header";
 import { apiFetch } from "../../../../lib/api";
 
 type RunRow = {
@@ -100,8 +99,7 @@ export default function DiagnosticsPage() {
 
   return (
     <>
-      <SiteHeader mark="Diagnostics" />
-      <main className="mx-auto max-w-5xl px-5 py-10 sm:px-8">
+      <div className="mx-auto max-w-6xl py-10">
         <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
           <div>
             <p className="text-sm uppercase tracking-[0.16em] text-pine">Opero X-Ray</p>
@@ -190,7 +188,7 @@ export default function DiagnosticsPage() {
             <li className="px-4 py-6 text-muted">No diagnostic runs yet.</li>
           ) : null}
         </ul>
-      </main>
+      </div>
     </>
   );
 }

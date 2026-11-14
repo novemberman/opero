@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
-import { SiteHeader } from "../../../../../../components/site-header";
 import { apiFetch } from "../../../../../../lib/api";
 
 export default function UnlockReportPage() {
@@ -49,8 +48,7 @@ export default function UnlockReportPage() {
 
   return (
     <>
-      <SiteHeader mark="Unlock" />
-      <main className="mx-auto max-w-lg px-5 py-12 sm:px-8">
+      <div className="mx-auto max-w-lg px-5 py-12 sm:px-8">
         <h1 className="font-[family-name:var(--font-display)] text-4xl text-ink">
           Unlock X-Ray Pro
         </h1>
@@ -74,7 +72,7 @@ export default function UnlockReportPage() {
         >
           Back to report
         </Link>
-      </main>
+      </div>
     </>
   );
 }

@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
-import { SiteHeader } from "../../../../components/site-header";
 import { apiFetch } from "../../../../lib/api";
 
 function BillingInner() {
@@ -68,7 +67,7 @@ function BillingInner() {
   }, [orgId, reference]);
 
   return (
-    <main className="mx-auto max-w-4xl px-5 py-12 sm:px-8">
+    <div className="mx-auto max-w-4xl px-5 py-12 sm:px-8">
       <h1 className="font-[family-name:var(--font-display)] text-4xl text-ink">Billing</h1>
       <p className="mt-2 text-muted">
         Purchases, subscriptions, and entitlements for this organization. Redirect return is not
@@ -107,15 +106,14 @@ function BillingInner() {
           Public pricing
         </Link>
       </div>
-    </main>
+    </div>
   );
 }
 
 export default function BillingPage() {
   return (
     <>
-      <SiteHeader mark="Billing" />
-      <Suspense fallback={<main className="mx-auto max-w-4xl px-5 py-12">Loading billing…</main>}>
+      <Suspense fallback={<div className="mx-auto max-w-4xl px-5 py-12">Loading billing…</div>}>
         <BillingInner />
       </Suspense>
     </>

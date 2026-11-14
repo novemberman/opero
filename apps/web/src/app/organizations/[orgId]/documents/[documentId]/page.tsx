@@ -10,7 +10,6 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ProcessingTimeline } from "../../../../../components/processing-timeline";
-import { SiteHeader } from "../../../../../components/site-header";
 import { StatementMetadataPanel } from "../../../../../components/statement-metadata";
 import { apiFetch } from "../../../../../lib/api";
 
@@ -184,8 +183,7 @@ export default function DocumentDetailPage() {
 
   return (
     <>
-      <SiteHeader mark="Review" />
-      <main className="mx-auto max-w-5xl px-5 py-10 sm:px-8">
+      <div className="mx-auto max-w-6xl py-10">
         <Link className="text-pine underline" href={`/organizations/${orgId}/documents`}>
           All documents
         </Link>
@@ -331,7 +329,7 @@ export default function DocumentDetailPage() {
             <li className="text-muted">No extracted figures yet. Processing may still be running.</li>
           ) : null}
         </ul>
-      </main>
+      </div>
     </>
   );
 }

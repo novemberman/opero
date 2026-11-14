@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import { SiteHeader } from "../../../../../components/site-header";
 import { apiFetch } from "../../../../../lib/api";
 
 type RunDetail = {
@@ -108,8 +107,7 @@ export default function DiagnosticRunPage() {
 
   return (
     <>
-      <SiteHeader mark="Diagnostic run" />
-      <main className="mx-auto max-w-5xl px-5 py-10 sm:px-8">
+      <div className="mx-auto max-w-6xl py-10">
         <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
           <div>
             <p className="text-sm uppercase tracking-[0.16em] text-pine">Opero X-Ray</p>
@@ -287,7 +285,7 @@ export default function DiagnosticRunPage() {
             </p>
           ) : null}
         </section>
-      </main>
+      </div>
     </>
   );
 }

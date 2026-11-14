@@ -150,14 +150,14 @@ body {
   letter-spacing: -0.011em;
 }
 
-/* Operational headings stay UI sans — editorial display is opt-in via .font-display */
+/* Operational headings stay UI sans — editorial display is opt-in via .font-display.
+   Colour inherits from the parent so navy heroes can use light text without fighting globals. */
 h1,
 h2,
 h3 {
   font-family: var(--font-sans);
   font-weight: 650;
   letter-spacing: -0.02em;
-  color: var(--color-text);
   line-height: 1.2;
 }
 

@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { DocumentUploadForm } from "../../../../components/document-upload-form";
-import { SiteHeader } from "../../../../components/site-header";
 import { apiFetch } from "../../../../lib/api";
 
 type DocumentRow = {
@@ -53,8 +52,7 @@ export default function DocumentsPage() {
 
   return (
     <>
-      <SiteHeader mark="Documents" />
-      <main className="mx-auto max-w-5xl px-5 py-10 sm:px-8">
+      <div className="mx-auto max-w-6xl py-10">
         <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
           <div>
             <p className="text-sm uppercase tracking-[0.16em] text-pine">Opero X-Ray</p>
@@ -101,7 +99,7 @@ export default function DocumentsPage() {
             <li className="px-4 py-6 text-muted">No documents uploaded yet.</li>
           ) : null}
         </ul>
-      </main>
+      </div>
     </>
   );
 }

@@ -2,7 +2,6 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { SiteHeader } from "../../../../components/site-header";
 import { apiFetch } from "../../../../lib/api";
 
 export default function OrganizationSettingsPage() {
@@ -40,8 +39,7 @@ export default function OrganizationSettingsPage() {
 
   return (
     <>
-      <SiteHeader mark="Settings" />
-      <main className="mx-auto max-w-5xl px-5 py-12 sm:px-8">
+      <div className="mx-auto max-w-6xl py-12">
         <form className="mx-auto max-w-md space-y-4" onSubmit={onSubmit}>
           <h1 className="text-3xl text-ink">Organization settings</h1>
           <label className="block space-y-1 text-sm">
@@ -59,7 +57,7 @@ export default function OrganizationSettingsPage() {
             Save
           </button>
         </form>
-      </main>
+      </div>
     </>
   );
 }

@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { SiteHeader } from "../../components/site-header";
+import { PublicFooter } from "../../components/marketing/public-footer";
+import { PublicHeader } from "../../components/marketing/public-header";
+import { Alert, EmptyState, Skeleton, buttonClassName } from "../../components/ui";
 import { apiFetch } from "../../lib/api";
 
 type OrgRow = {
@@ -13,6 +15,7 @@ type OrgRow = {
 export default function OrganizationsPage() {
   const [rows, setRows] = useState<OrgRow[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     void (async () => {
@@ -21,51 +24,100 @@ export default function OrganizationsPage() {
       );
       if (status === 401) {
         setError("Sign in required");
+        setLoading(false);
         return;
       }
       if (status >= 400) {
         setError(body.message ?? "Unable to load organizations");
+        setLoading(false);
         return;
       }
       setRows(body.organizations ?? []);
+      setLoading(false);
     })();
   }, []);
 
   return (
     <>
-      <SiteHeader mark="Organizations" />
-      <main className="mx-auto max-w-5xl px-5 py-12 sm:px-8">
+      <a className="skip-link" href="#main">
+        Skip to content
+      </a>
+      <PublicHeader compact />
+      <main id="main" className="mx-auto max-w-5xl px-5 py-12 sm:px-8">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <h1 className="text-3xl text-ink sm:text-4xl">Your organizations</h1>
-            <p className="mt-2 text-muted">Select a tenant you belong to, or create a new one.</p>
+            <p className="text-sm font-semibold uppercase tracking-[0.14em] text-emerald">
+              Workspaces
+            </p>
+            <h1 className="mt-2 text-3xl text-navy sm:text-4xl">Your organizations</h1>
+            <p className="mt-2 text-text-secondary">
+              Select a tenant you belong to, or create a new one.
+            </p>
           </div>
-          <Link
-            className="inline-flex min-h-11 items-center rounded-full bg-pine px-5 text-paper no-underline"
-            href="/organizations/new"
-          >
+          <Link href="/organizations/new" className={buttonClassName()}>
             Create organization
           </Link>
         </div>
-        {error ? <p className="mt-6 text-copper">{error}</p> : null}
+
+        {error ? (
+          <div className="mt-6">
+            <Alert tone="error" title="Unable to load">
+              {error}{" "}
+              {error === "Sign in required" ? (
+                <Link href="/login" className="font-semibold text-emerald underline">
+                  Sign in
+                </Link>
+              ) : null}
+            </Alert>
+          </div>
+        ) : null}
+
+        {loading ? (
+          <div className="mt-8 space-y-3">
+            <Skeleton className="h-20 w-full" />
+            <Skeleton className="h-20 w-full" />
+          </div>
+        ) : null}
+
+        {!loading && !error && rows.length === 0 ? (
+          <div className="mt-8">
+            <EmptyState
+              title="No organizations yet"
+              description="Create an organization to upload statements and run Opero X-Ray."
+              action={
+                <Link href="/organizations/new" className={buttonClassName()}>
+                  Create organization
+                </Link>
+              }
+            />
+          </div>
+        ) : null}
+
         <ul className="mt-8 space-y-3">
           {rows.map((row) => (
-            <li key={row.organization.id} className="rounded-2xl border border-line bg-white/60 p-5">
+            <li
+              key={row.organization.id}
+              className="rounded-2xl border border-border bg-surface p-5 shadow-sm"
+            >
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <h2 className="text-xl text-ink">{row.organization.name}</h2>
-                  <p className="text-sm text-muted">
+                  <h2 className="text-xl text-navy">{row.organization.name}</h2>
+                  <p className="text-sm text-text-secondary">
                     {row.organization.slug} · {row.role}
                   </p>
                 </div>
-                <Link className="text-pine" href={`/organizations/${row.organization.id}`}>
-                  Open
+                <Link
+                  href={`/organizations/${row.organization.id}`}
+                  className={buttonClassName({ variant: "secondary", size: "sm" })}
+                >
+                  Open workspace
                 </Link>
               </div>
             </li>
           ))}
         </ul>
       </main>
+      <PublicFooter />
     </>
   );
 }

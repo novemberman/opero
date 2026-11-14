@@ -4,7 +4,6 @@ import { roleHasPermission, type MembershipRole } from "@opero/shared";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, Suspense, useCallback, useEffect, useState } from "react";
-import { SiteHeader } from "../../../../components/site-header";
 import { apiErrorMessage, apiFetch } from "../../../../lib/api";
 import {
   fetchOrgRole,
@@ -112,8 +111,7 @@ function AiContent() {
 
   return (
     <>
-      <SiteHeader mark="AI interpretation" />
-      <main className="mx-auto max-w-5xl px-5 py-10 sm:px-8">
+      <div className="mx-auto max-w-6xl py-10">
         <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
           <div>
             <p className="text-sm uppercase tracking-[0.16em] text-pine">Opero X-Ray</p>
@@ -242,7 +240,7 @@ function AiContent() {
             <li className="px-4 py-6 text-muted">No AI interpretations yet.</li>
           ) : null}
         </ul>
-      </main>
+      </div>
     </>
   );
 }

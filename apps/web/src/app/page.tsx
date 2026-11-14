@@ -126,7 +126,7 @@ export default function HomePage() {
                   Opero X-Ray
                 </p>
               </div>
-              <h1 className="mt-6 max-w-lg font-display text-[2.5rem] leading-[1.08] text-balance sm:text-5xl lg:text-[3.35rem]">
+              <h1 className="mt-6 max-w-lg font-display text-[2.5rem] leading-[1.08] text-balance text-white sm:text-5xl lg:text-[3.35rem]">
                 See the truth in your numbers.
               </h1>
               <p className="mt-5 max-w-md text-base leading-relaxed text-white/70 sm:text-lg">
@@ -275,7 +275,7 @@ export default function HomePage() {
               <div className="mb-4">
                 <OperoLogo inverse markClassName="size-9" />
               </div>
-              <h2 id="cta-heading" className="font-display text-3xl sm:text-4xl">
+              <h2 id="cta-heading" className="font-display text-3xl text-white sm:text-4xl">
                 Start with evidence, not guesswork.
               </h2>
               <p className="mt-3 text-sm leading-relaxed text-white/65">
