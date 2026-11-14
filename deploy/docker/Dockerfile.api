@@ -2,6 +2,7 @@
 # Opero API — pnpm workspace image for Railway.
 FROM node:24-bookworm-slim AS base
 ENV PNPM_HOME=/pnpm
+ENV COREPACK_HOME=/pnpm/corepack
 ENV PATH=$PNPM_HOME:$PATH
 RUN corepack enable && corepack prepare pnpm@10.34.9 --activate \
   && apt-get update && apt-get install -y --no-install-recommends ca-certificates \
@@ -19,9 +20,15 @@ RUN pnpm --filter @opero/api... build
 FROM base AS runtime
 ENV NODE_ENV=production
 ENV API_HOST=0.0.0.0
+ENV HOME=/home/opero
+ENV PNPM_HOME=/pnpm
+ENV COREPACK_HOME=/pnpm/corepack
+ENV PATH=$PNPM_HOME:$PATH
 WORKDIR /app
 RUN groupadd --system --gid 10001 opero \
-  && useradd --system --uid 10001 --gid opero --home-dir /app --shell /usr/sbin/nologin opero
+  && useradd --system --uid 10001 --gid opero --home-dir /home/opero --create-home --shell /usr/sbin/nologin opero \
+  && mkdir -p "$COREPACK_HOME" \
+  && chown -R opero:opero /pnpm /home/opero
 COPY --from=build --chown=opero:opero /app /app
 USER opero
 EXPOSE 3001
