@@ -13,8 +13,9 @@
 ```
                     ┌─────────────┐
   Browser ─────────►│  opero-web  │  Next.js (public HTTPS)
+                    │  /api/v1/*  │  same-origin proxy (cookies first-party)
                     └──────┬──────┘
-                           │ NEXT_PUBLIC_API_BASE_URL
+                           │ API_PROXY_TARGET (server-side)
                     ┌──────▼──────┐
   Korapay webhook ─►│  opero-api  │  NestJS /api/v1 (public HTTPS)
                     └──────┬──────┘
@@ -31,6 +32,8 @@
                     │  HTTP)      │
                     └─────────────┘
 ```
+
+**Cookie auth note:** Distinct `*.up.railway.app` hosts are cross-site (public suffix). `SameSite=Lax` session/CSRF cookies are not sent on cross-site POSTs, which surfaces as `Invalid CSRF token`. Keep browser calls on the web origin via `/api/v1` proxy, or attach custom domains under one eTLD+1. Do not switch to `SameSite=None` just to paper over Railway default hostnames (Safari ITP / third-party cookie blockers).
 
 | Service | Public? | Role |
 | --- | --- | --- |
@@ -86,7 +89,7 @@ Rollback: redeploy previous Railway deployment; database roll-forward only (see 
 ### Security assumptions
 
 - Railway edge terminates TLS; apps trust `X-Forwarded-*` only behind that proxy.
-- Cookies: `Secure` + `HttpOnly` + `SameSite=Lax` in production (cross-subdomain cookie domain optional via `COOKIE_DOMAIN`).
+- Cookies: `Secure` + `HttpOnly` + `SameSite=Lax` (host-only). Prefer same-origin web proxy; `COOKIE_DOMAIN` only when web+API share a real eTLD+1 you control (never `*.up.railway.app`).
 - Worker has no public HTTP; optional loopback readiness only.
 - Korapay webhooks remain signature-verified; CSRF-exempt path only.
 
@@ -101,8 +104,8 @@ Create three app services + two plugins (Postgres, Redis) **per environment**.
 - Dockerfile: `deploy/docker/Dockerfile.web`
 - Health: `GET /health`
 - Public networking: yes
-- Env: `WEB_HOST=0.0.0.0`, `WEB_PORT=$PORT`, `NEXT_PUBLIC_API_BASE_URL`, `APP_VERSION`
-- **API URL is runtime-injected** into the HTML (not baked at `next build`). Set `NEXT_PUBLIC_API_BASE_URL` on the Railway **service variables** for `opero-web` (no Docker build-arg required). Example: `https://opero-staging.up.railway.app/api/v1` (origin-only values are normalized to append `/api/v1`). Do not put secrets in `NEXT_PUBLIC_*`.
+- Env: `WEB_HOST=0.0.0.0`, `WEB_PORT=$PORT`, `API_PROXY_TARGET`, `APP_VERSION`
+- **Browser uses same-origin `/api/v1`** (injected at request time). Set `API_PROXY_TARGET` on `opero-web` to the API origin (e.g. `https://opero-staging.up.railway.app` or a private Railway URL). Do not point the browser at a separate Railway API hostname.
 
 ### opero-api
 

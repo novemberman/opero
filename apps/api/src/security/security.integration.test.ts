@@ -220,6 +220,65 @@ describe("Phase 3 security integration", () => {
       .expect(403);
   });
 
+  it("rejects invalid CSRF tokens while accepting a fresh login → org create flow", async () => {
+    const user = {
+      email: "csrf.flow@example.com",
+      name: "CSRF Flow",
+      password: "csrf-flow-pass-12",
+    };
+    await request(app.getHttpServer()).post("/api/v1/auth/register").send(user).expect(201);
+    const verifyToken = mail.latestToken("/verify-email");
+    await request(app.getHttpServer())
+      .post("/api/v1/auth/verify-email")
+      .send({ token: verifyToken })
+      .expect(204);
+
+    // Pre-login CSRF is bound to the anonymous session identifier.
+    const preLoginCsrf = await request(app.getHttpServer()).get("/api/v1/auth/csrf").expect(200);
+    const preLoginCsrfCookie = getCookie(
+      preLoginCsrf.headers["set-cookie"],
+      process.env.CSRF_COOKIE_NAME ?? "opero_csrf",
+    );
+    const preLoginToken = preLoginCsrf.body.csrfToken as string;
+
+    const login = await request(app.getHttpServer())
+      .post("/api/v1/auth/login")
+      .send({ email: user.email, password: user.password })
+      .expect(200);
+    const session = getCookie(
+      login.headers["set-cookie"],
+      process.env.SESSION_COOKIE_NAME ?? "opero_session",
+    )!;
+
+    // Stale pre-login CSRF must fail once a real session cookie is present.
+    await request(app.getHttpServer())
+      .post("/api/v1/organizations")
+      .set("Cookie", mergeCookies(session, preLoginCsrfCookie))
+      .set("x-csrf-token", preLoginToken)
+      .send({ name: "Stale CSRF Org", slug: "stale-csrf-org" })
+      .expect(403);
+
+    // Post-login CSRF (as after page refresh / client reset) succeeds.
+    const freshCsrf = await request(app.getHttpServer())
+      .get("/api/v1/auth/csrf")
+      .set("Cookie", session)
+      .expect(200);
+    const freshCookie = getCookie(
+      freshCsrf.headers["set-cookie"],
+      process.env.CSRF_COOKIE_NAME ?? "opero_csrf",
+    );
+    const created = await request(app.getHttpServer())
+      .post("/api/v1/organizations")
+      .set("Cookie", mergeCookies(session, freshCookie))
+      .set("x-csrf-token", freshCsrf.body.csrfToken)
+      .send({ name: "Fresh CSRF Org", slug: "fresh-csrf-org" })
+      .expect(201);
+    expect(created.body.organization.slug).toBe("fresh-csrf-org");
+
+    // Session persists across a subsequent GET (refresh analogue).
+    await request(app.getHttpServer()).get("/api/v1/auth/me").set("Cookie", session).expect(200);
+  });
+
   it("isolates two organizations and enforces final-owner protection", async () => {
     const alpha = await registerVerifyLogin(app, mail, {
       email: "tenant.alpha@example.com",
@@ -411,15 +470,35 @@ describe("Phase 3 security integration", () => {
       password: "logout-password-12",
     });
 
-    await request(app.getHttpServer())
+    const logout = await request(app.getHttpServer())
       .post("/api/v1/auth/logout")
       .set("Cookie", auth.cookies)
       .set("x-csrf-token", auth.csrfToken)
       .expect(204);
 
+    const setCookie = logout.headers["set-cookie"];
+    const headers = Array.isArray(setCookie) ? setCookie : setCookie ? [setCookie] : [];
+    expect(
+      headers.some((h) => h?.startsWith(`${process.env.SESSION_COOKIE_NAME ?? "opero_session"}=`)),
+    ).toBe(true);
+    expect(
+      headers.some((h) => h?.startsWith(`${process.env.CSRF_COOKIE_NAME ?? "opero_csrf"}=`)),
+    ).toBe(true);
+
     await request(app.getHttpServer())
       .get("/api/v1/auth/me")
       .set("Cookie", auth.session)
       .expect(401);
+  });
+
+  it("allows CORS only for configured origins with credentials", async () => {
+    const allowed = (process.env.CORS_ORIGINS ?? "http://127.0.0.1:3000").split(",")[0]!.trim();
+    const response = await request(app.getHttpServer())
+      .options("/api/v1/auth/csrf")
+      .set("Origin", allowed)
+      .set("Access-Control-Request-Method", "GET")
+      .expect(204);
+    expect(response.headers["access-control-allow-origin"]).toBe(allowed);
+    expect(response.headers["access-control-allow-credentials"]).toBe("true");
   });
 });

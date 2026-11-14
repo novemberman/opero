@@ -151,6 +151,7 @@ export class AuthService {
       });
     }
     this.sessions.clearSessionCookie(res);
+    this.sessions.clearCsrfCookie(res);
   }
 
   async verifyEmail(token: string, requestId?: string): Promise<void> {

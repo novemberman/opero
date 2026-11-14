@@ -12,10 +12,10 @@
       "requiredEnv": [
         "WEB_HOST",
         "WEB_PORT",
-        "NEXT_PUBLIC_API_BASE_URL",
+        "API_PROXY_TARGET",
         "APP_VERSION"
       ],
-      "notes": "Bind WEB_HOST=0.0.0.0; use Railway $PORT as WEB_PORT. Set NEXT_PUBLIC_API_BASE_URL as a runtime service variable (not a Docker build-arg); include /api/v1 or the origin alone (normalized). Same image works for staging/production."
+      "notes": "Bind WEB_HOST=0.0.0.0; use Railway $PORT as WEB_PORT. Browser uses same-origin /api/v1; set API_PROXY_TARGET to the API origin (public or private). Do not use cross-origin NEXT_PUBLIC_API_BASE_URL on Railway default domains."
     },
     {
       "name": "opero-api",

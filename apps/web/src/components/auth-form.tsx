@@ -61,10 +61,13 @@ export function AuthForm({
               : "Request failed";
         setError(detail);
         if (status === 403) {
+          // Session may have rotated; drop the cached header token and refetch next time.
           resetCsrfToken();
         }
         return;
       }
+      // Login (and similar) rotate the session cookie; CSRF is bound to that value.
+      resetCsrfToken();
       if (onSuccessMessage) {
         setMessage(onSuccessMessage);
       }

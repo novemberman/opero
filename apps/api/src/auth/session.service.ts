@@ -34,6 +34,10 @@ export class SessionService {
   }
 
   setSessionCookie(res: Response, rawToken: string, expiresAt: Date): void {
+    // Keep SameSite=Lax with host-only cookies. Cross-site API hosts on the
+    // Railway public suffix cannot receive these on POST; the web app proxies
+    // `/api/v1` so cookies stay first-party. Do not set COOKIE_DOMAIN to a
+    // *.up.railway.app suffix (public suffix / third-party cookie failures).
     res.cookie(this.cookieName(), rawToken, {
       httpOnly: true,
       sameSite: "lax",
@@ -46,6 +50,17 @@ export class SessionService {
 
   clearSessionCookie(res: Response): void {
     res.clearCookie(this.cookieName(), {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: this.cookieSecure(),
+      path: "/",
+      ...(this.cookieDomain() ? { domain: this.cookieDomain() } : {}),
+    });
+  }
+
+  clearCsrfCookie(res: Response): void {
+    const name = this.config.get("CSRF_COOKIE_NAME", { infer: true });
+    res.clearCookie(name, {
       httpOnly: true,
       sameSite: "lax",
       secure: this.cookieSecure(),

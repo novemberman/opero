@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
+import { SAME_ORIGIN_API_BASE_URL } from "./api-proxy";
 import {
   DEFAULT_API_BASE_URL,
   getPublicEnvForInjection,
   normalizeApiBaseUrl,
+  preferSameOriginApi,
   readApiBaseUrlFromProcessEnv,
   resolveApiBaseUrl,
 } from "./public-env";
@@ -23,8 +25,13 @@ describe("normalizeApiBaseUrl", () => {
     );
   });
 
+  it("keeps same-origin relative paths", () => {
+    expect(normalizeApiBaseUrl("/api/v1")).toBe("/api/v1");
+    expect(normalizeApiBaseUrl("/api/v1/")).toBe("/api/v1");
+  });
+
   it("falls back for empty input", () => {
-    expect(normalizeApiBaseUrl("   ")).toBe(DEFAULT_API_BASE_URL);
+    expect(normalizeApiBaseUrl("   ")).toBe(SAME_ORIGIN_API_BASE_URL);
   });
 });
 
@@ -38,36 +45,56 @@ describe("resolveApiBaseUrl", () => {
     ).toBe("https://from-window.example/api/v1");
   });
 
-  it("reads NEXT_PUBLIC_API_BASE_URL dynamically from process env", () => {
+  it("defaults to same-origin /api/v1 for browser cookie auth", () => {
     expect(
       resolveApiBaseUrl({
         windowEnv: null,
         processEnv: { NEXT_PUBLIC_API_BASE_URL: "https://opero-staging.up.railway.app" },
       }),
-    ).toBe("https://opero-staging.up.railway.app/api/v1");
+    ).toBe(SAME_ORIGIN_API_BASE_URL);
   });
 
-  it("supports API_BASE_URL as a non-public alias", () => {
+  it("allows absolute cross-origin only when same-origin mode is disabled", () => {
     expect(
       resolveApiBaseUrl({
         windowEnv: null,
-        processEnv: { API_BASE_URL: "https://api.example.com/api/v1" },
+        processEnv: {
+          NEXT_PUBLIC_API_SAME_ORIGIN: "false",
+          NEXT_PUBLIC_API_BASE_URL: "https://opero-staging.up.railway.app",
+        },
       }),
-    ).toBe("https://api.example.com/api/v1");
+    ).toBe("https://opero-staging.up.railway.app/api/v1");
   });
 
-  it("defaults to local development when unset", () => {
-    expect(resolveApiBaseUrl({ windowEnv: null, processEnv: {} })).toBe(DEFAULT_API_BASE_URL);
+  it("defaults to same-origin when unset", () => {
+    expect(resolveApiBaseUrl({ windowEnv: null, processEnv: {} })).toBe(SAME_ORIGIN_API_BASE_URL);
   });
 });
 
 describe("getPublicEnvForInjection", () => {
-  it("exposes a normalized apiBaseUrl for the inline script", () => {
+  it("injects same-origin /api/v1 by default even if an absolute API URL is set", () => {
     expect(
       getPublicEnvForInjection({
         NEXT_PUBLIC_API_BASE_URL: "https://opero-staging.up.railway.app",
+        API_PROXY_TARGET: "https://opero-staging.up.railway.app",
+      }),
+    ).toEqual({ apiBaseUrl: SAME_ORIGIN_API_BASE_URL });
+  });
+
+  it("can inject an absolute URL when same-origin mode is explicitly disabled", () => {
+    expect(
+      getPublicEnvForInjection({
+        NEXT_PUBLIC_API_SAME_ORIGIN: "false",
+        NEXT_PUBLIC_API_BASE_URL: "https://opero-staging.up.railway.app",
       }),
     ).toEqual({ apiBaseUrl: "https://opero-staging.up.railway.app/api/v1" });
+  });
+});
+
+describe("preferSameOriginApi", () => {
+  it("is enabled by default", () => {
+    expect(preferSameOriginApi({})).toBe(true);
+    expect(preferSameOriginApi({ NEXT_PUBLIC_API_SAME_ORIGIN: "false" })).toBe(false);
   });
 });
 
@@ -78,5 +105,9 @@ describe("readApiBaseUrlFromProcessEnv", () => {
         NEXT_PUBLIC_API_BASE_URL: "http://127.0.0.1:3001/api/v1",
       }),
     ).toBe("http://127.0.0.1:3001/api/v1");
+  });
+
+  it("keeps DEFAULT_API_BASE_URL for absolute escape-hatch fallbacks", () => {
+    expect(DEFAULT_API_BASE_URL).toBe("http://127.0.0.1:3001/api/v1");
   });
 });

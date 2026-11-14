@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AuthNav } from "../components/auth-nav";
 
 const surfaces = [
   {
@@ -27,11 +28,16 @@ export default function HomePage() {
       </a>
       <header className="border-b border-line">
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-5 py-5 sm:px-8">
-          <p className="text-lg tracking-tight text-ink">
-            Opero
-            <span className="sr-only">, Business Operating System</span>
-          </p>
-          <p className="rounded-full border border-line px-3 py-1 text-sm text-muted">Foundation</p>
+          <div className="flex min-w-0 items-center gap-4">
+            <p className="text-lg tracking-tight text-ink">
+              Opero
+              <span className="sr-only">, Business Operating System</span>
+            </p>
+            <p className="hidden rounded-full border border-line px-3 py-1 text-sm text-muted sm:block">
+              Foundation
+            </p>
+          </div>
+          <AuthNav />
         </div>
       </header>
       <main id="main" className="mx-auto max-w-5xl px-5 py-14 sm:px-8 sm:py-20">

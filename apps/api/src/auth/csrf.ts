@@ -21,6 +21,9 @@ export function createCsrf(
       return sessionCookie;
     },
     cookieName: env.CSRF_COOKIE_NAME,
+    // SameSite=Lax is correct for same-site / same-origin browser traffic.
+    // Distinct *.up.railway.app hosts are cross-site; use the web same-origin
+    // `/api/v1` proxy (or custom domains under one eTLD+1) instead of SameSite=None.
     cookieOptions: {
       httpOnly: true,
       sameSite: "lax",
