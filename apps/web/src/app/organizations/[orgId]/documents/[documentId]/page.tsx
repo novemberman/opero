@@ -29,7 +29,11 @@ type LineItem = {
   concept: string;
   labelRaw: string;
   rawValue: string;
+  /** Numeric parse in statement units (no scale multiplier). */
   normalizedValue: string | null;
+  /** Absolute monetary amount after unit scale (null for non-monetary). */
+  actualMonetaryValue?: string | null;
+  currency?: string | null;
   quantityClass?: string;
   unitScale?: string;
   scaleConfidence?: string;
@@ -273,11 +277,14 @@ export default function DocumentDetailPage() {
               <p className="text-lg text-ink">{line.labelRaw}</p>
               <p className="text-sm text-muted">
                 Concept {line.concept}
-                {line.quantityClass ? ` · ${line.quantityClass}` : ""} · raw {line.rawValue} ·
-                normalized {line.normalizedValue ?? "—"}
+                {line.quantityClass ? ` · ${line.quantityClass}` : ""} · raw {line.rawValue}
                 {line.unitScale ? ` · scale ${line.unitScale}` : ""}
-                {line.unitScaleRequiresReview ? " · scale needs confirmation" : ""} · {line.quality} ·{" "}
-                {line.reviewStatus}
+                {line.unitScaleRequiresReview ? " · scale needs confirmation" : ""} · statement units{" "}
+                {line.normalizedValue ?? "—"}
+                {line.quantityClass === "MONETARY" || !line.quantityClass
+                  ? ` · actual ${line.currency ?? "amount"} ${line.actualMonetaryValue ?? "—"}`
+                  : ""}{" "}
+                · {line.quality} · {line.reviewStatus}
               </p>
               {line.evidence ? (
                 <p className="mt-2 text-sm text-muted">

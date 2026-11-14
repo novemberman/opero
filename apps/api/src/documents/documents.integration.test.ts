@@ -330,8 +330,19 @@ describe("document ingestion integration", () => {
       rawValue: string;
       reviewStatus: string;
     }>;
-    const revenue = lines.find((line) => line.concept === "REVENUE");
+    const revenue = lines.find((line) => line.concept === "REVENUE") as
+      | {
+          id: string;
+          concept: string;
+          normalizedValue: string;
+          actualMonetaryValue?: string | null;
+          unitScale?: string;
+          evidence: { rowIndex: number };
+        }
+      | undefined;
     expect(revenue?.normalizedValue).toBe("2500");
+    expect(revenue?.actualMonetaryValue).toBe("2500");
+    expect(revenue?.unitScale ?? "ACTUAL").toBe("ACTUAL");
     expect(revenue?.evidence.rowIndex).toBe(2);
 
     await request(app.getHttpServer())
@@ -356,6 +367,90 @@ describe("document ingestion integration", () => {
     expect(updated.rawValue).toBe("2,500.00");
     expect(updated.normalizedValue).toBe("2500.00");
     expect(updated.reviewStatus).toBe("CORRECTED");
+  });
+
+  it("persists Revenue of 144,000 NGN thousands and exposes scaled actualMonetaryValue", async () => {
+    const suffix = `${Date.now()}-fy24`;
+    const auth = await registerVerifyLogin(app, mail, {
+      email: `docs.fy24.${suffix}@example.com`,
+      name: "FY24 Owner",
+      password: "docs-password-123",
+    });
+    const org = await request(app.getHttpServer())
+      .post("/api/v1/organizations")
+      .set("Cookie", auth.cookies)
+      .set("x-csrf-token", auth.csrfToken)
+      .send({ name: "FY24 Org", slug: `fy24-org-${suffix}` })
+      .expect(201);
+    const organizationId = org.body.organization.id as string;
+
+    const upload = await request(app.getHttpServer())
+      .post(`/api/v1/organizations/${organizationId}/documents/uploads`)
+      .set("Cookie", auth.cookies)
+      .set("x-csrf-token", auth.csrfToken)
+      .send({
+        filename: "netshift-fy2024.csv",
+        declaredFormat: "CSV",
+        declaredMimeType: "text/csv",
+      })
+      .expect(201);
+
+    const csv = Buffer.from(
+      [
+        "Netshift Digital Ltd",
+        "Year ended 31 December 2024",
+        "Amounts in ₦'000",
+        "Currency NGN",
+        "",
+        "Label,Amount",
+        'Revenue of,"144,000"',
+        "Gross margin,58.3%",
+      ].join("\n"),
+      "utf8",
+    );
+    const completed = await request(app.getHttpServer())
+      .post(
+        `/api/v1/organizations/${organizationId}/documents/uploads/${upload.body.upload.uploadId}/complete`,
+      )
+      .set("Cookie", auth.cookies)
+      .set("x-csrf-token", auth.csrfToken)
+      .attach("file", csv, "netshift-fy2024.csv")
+      .expect(201);
+
+    const documentId = completed.body.documentId as string;
+    const processingJobId = completed.body.processingJobId as string;
+    await runPipeline({ organizationId, documentId, processingJobId, storage });
+    await runPipeline({ organizationId, documentId, processingJobId, storage });
+
+    const extractions = await request(app.getHttpServer())
+      .get(`/api/v1/organizations/${organizationId}/documents/${documentId}/extractions`)
+      .set("Cookie", auth.session)
+      .expect(200);
+    const lines = extractions.body.extractions[0].statements[0].lineItems as Array<{
+      concept: string;
+      labelRaw: string;
+      rawValue: string;
+      normalizedValue: string | null;
+      actualMonetaryValue: string | null;
+      unitScale: string;
+      quantityClass: string;
+      reviewStatus: string;
+    }>;
+
+    const revenue = lines.find((line) => line.labelRaw === "Revenue of");
+    expect(revenue).toMatchObject({
+      concept: "REVENUE",
+      rawValue: "144,000",
+      normalizedValue: "144000",
+      unitScale: "THOUSANDS",
+      quantityClass: "MONETARY",
+      actualMonetaryValue: "144000000",
+      reviewStatus: "PENDING",
+    });
+
+    const margin = lines.find((line) => /gross margin/i.test(line.labelRaw));
+    expect(margin?.quantityClass).toBe("PERCENTAGE");
+    expect(margin?.actualMonetaryValue).toBeNull();
   });
 
   it("denies cross-tenant document access and blocks upload reuse", async () => {

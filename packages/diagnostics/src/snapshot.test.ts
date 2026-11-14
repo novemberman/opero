@@ -32,6 +32,26 @@ describe("snapshot", () => {
     expect(snap.lines[0]?.actualValue).toBe("2500");
   });
 
+  it("scales Netshift FY2024 Revenue 144,000 thousands to NGN 144,000,000 once", () => {
+    const snap = buildSnapshot({
+      currency: "NGN",
+      lines: [
+        {
+          ...line("REVENUE", "144000", {
+            unitScale: "THOUSANDS",
+            reviewStatus: "PENDING",
+          }),
+          labelRaw: "Revenue of",
+          rawValue: "144,000",
+          quantityClass: "MONETARY",
+          unitScaleRequiresReview: false,
+        },
+      ],
+    });
+    expect(snap.lines[0]?.normalizedValue).toBe("144000");
+    expect(snap.lines[0]?.actualValue).toBe("144000000");
+  });
+
   it("withholds absolute values when monetary scale still requires review", () => {
     const confirmed = buildSnapshot({
       lines: [line("REVENUE", "180", { unitScale: "THOUSANDS", reviewStatus: "CONFIRMED" })],

@@ -13,10 +13,21 @@ type DecimalConstructor = {
 };
 const Decimal = DecimalDefault as unknown as DecimalConstructor;
 
+/**
+ * Monetary value contract (do not double-scale):
+ *
+ * - `rawValue`: original source text (preserved for evidence).
+ * - `normalizedValue`: numeric parse of `rawValue` in **statement units**
+ *   (e.g. 144000 when the statement is in NGN thousands). Never includes the
+ *   unit-scale multiplier.
+ * - Scaled absolute amount (e.g. NGN 144,000,000) = `applyUnitScale(normalizedValue, unitScale)`.
+ *   Diagnostics call this `actualValue`; the API exposes it as `actualMonetaryValue`.
+ * - Non-monetary quantity classes always use unitScale ACTUAL so multipliers are never applied.
+ */
 export type InterpretedLine = {
   labelRaw: string;
   rawValue: string;
-  /** Numeric parse of rawValue without unit-scale multiplication. Never overwrites rawValue. */
+  /** Numeric parse of rawValue in statement units (no scale multiplier). Never overwrites rawValue. */
   normalizedValue: string | null;
   concept: FinancialConceptId;
   quantityClass: QuantityClassId;
@@ -98,7 +109,10 @@ export function interpretExtractedLine(input: {
   };
 }
 
-/** Apply unit scale to a normalized (unscaled) monetary figure using decimal math. */
+/**
+ * Apply unit scale to a statement-unit `normalizedValue`.
+ * Call only for MONETARY quantities — percentages/ratios/dates must stay unscaled.
+ */
 export function applyUnitScale(
   normalizedValue: string | null,
   unitScale: UnitScaleId,
@@ -110,4 +124,18 @@ export function applyUnitScale(
   } catch {
     return null;
   }
+}
+
+/**
+ * Resolve the absolute monetary amount for display / diagnostics.
+ * Returns null for non-monetary quantities so multipliers are never applied.
+ */
+export function resolveActualMonetaryValue(input: {
+  normalizedValue: string | null;
+  unitScale: UnitScaleId;
+  quantityClass: QuantityClassId | string | null | undefined;
+}): string | null {
+  const quantityClass = input.quantityClass ?? "MONETARY";
+  if (quantityClass !== "MONETARY") return null;
+  return applyUnitScale(input.normalizedValue, input.unitScale);
 }

@@ -32,6 +32,7 @@ const LABEL_MAP: Array<{ concept: FinancialConceptId; patterns: RegExp[] }> = [
     concept: "REVENUE",
     patterns: [
       /^total\s+(revenue|turnover|sales)$/i,
+      // Matches bare "Revenue" and prose fragments after canonicalizeLabel ("Revenue of").
       /^(revenue|turnover|net\s+sales|sales)$/i,
     ],
   },
@@ -162,8 +163,20 @@ const KNOWN_UNMAPPED_DISTINCTIONS = [
   /^retained\s+earnings$/i,
 ];
 
+/**
+ * Collapse whitespace and strip trailing prose particles from PDF/text extracts
+ * ("Revenue of", "Cash at", "Equity for the year") without breaking labels that
+ * contain "of" mid-phrase ("Cost of sales", "Cash flows from operating activities").
+ */
+export function canonicalizeLabel(label: string): string {
+  let normalized = label.replace(/\s+/g, " ").trim();
+  normalized = normalized.replace(/\s+for the (year|period|quarter)(\s+ended.*)?$/i, "");
+  normalized = normalized.replace(/\s+(of|at|as at|as of)$/i, "");
+  return normalized;
+}
+
 export function mapLabelToConcept(label: string): FinancialConceptId {
-  const normalized = label.replace(/\s+/g, " ").trim();
+  const normalized = canonicalizeLabel(label);
   for (const entry of LABEL_MAP) {
     if (entry.patterns.some((pattern) => pattern.test(normalized))) {
       return entry.concept;
@@ -173,6 +186,6 @@ export function mapLabelToConcept(label: string): FinancialConceptId {
 }
 
 export function isKnownUnmappedDistinction(label: string): boolean {
-  const normalized = label.replace(/\s+/g, " ").trim();
+  const normalized = canonicalizeLabel(label);
   return KNOWN_UNMAPPED_DISTINCTIONS.some((pattern) => pattern.test(normalized));
 }

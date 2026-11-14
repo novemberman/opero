@@ -5,6 +5,7 @@ describe("mapLabelToConcept", () => {
   it("maps known labels and leaves unknowns unmapped", () => {
     expect(mapLabelToConcept("Total Revenue")).toBe("REVENUE");
     expect(mapLabelToConcept("Turnover")).toBe("REVENUE");
+    expect(mapLabelToConcept("Revenue of")).toBe("REVENUE");
     expect(mapLabelToConcept("Cost of sales")).toBe("COST_OF_GOODS_SOLD");
     expect(mapLabelToConcept("Cost of Goods Sold")).toBe("COST_OF_GOODS_SOLD");
     expect(mapLabelToConcept("Net Income")).toBe("NET_PROFIT");

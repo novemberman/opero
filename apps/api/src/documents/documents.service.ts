@@ -9,7 +9,12 @@ import {
 import { ConfigService } from "@nestjs/config";
 import { InjectQueue } from "@nestjs/bullmq";
 import type { PrismaClient } from "@opero/database";
-import { sanitizeOriginalFilename, validateDocumentBuffer } from "@opero/document-processing";
+import {
+  resolveActualMonetaryValue,
+  sanitizeOriginalFilename,
+  validateDocumentBuffer,
+  type UnitScaleId,
+} from "@opero/document-processing";
 import { buildProcessingProgress } from "@opero/shared";
 import type { ObjectStoragePort } from "@opero/object-storage";
 import type { Queue } from "bullmq";
@@ -406,7 +411,22 @@ export class DocumentsService {
       },
       orderBy: { createdAt: "desc" },
     });
-    return extractions;
+    // Enrich with absolute monetary amount. DB `normalizedValue` stays in statement units
+    // (never double-scaled); `actualMonetaryValue` is derived for API/UI/diagnostics consumers.
+    return extractions.map((extraction) => ({
+      ...extraction,
+      statements: extraction.statements.map((statement) => ({
+        ...statement,
+        lineItems: statement.lineItems.map((line) => ({
+          ...line,
+          actualMonetaryValue: resolveActualMonetaryValue({
+            normalizedValue: line.normalizedValue,
+            unitScale: line.unitScale as UnitScaleId,
+            quantityClass: line.quantityClass,
+          }),
+        })),
+      })),
+    }));
   }
 
   async review(input: {

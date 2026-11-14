@@ -1,5 +1,6 @@
 export {
   FINANCIAL_CONCEPTS,
+  canonicalizeLabel,
   isKnownUnmappedDistinction,
   mapLabelToConcept,
   type FinancialConceptId,
@@ -11,7 +12,11 @@ export {
 } from "./consistency.js";
 export { extractFinancialDocument, extractFromCsv, extractFromPdf, extractFromXlsx } from "./extract/index.js";
 export { assertSafeFilename, sanitizeOriginalFilename } from "./filenames.js";
-export { applyUnitScale, interpretExtractedLine } from "./interpret-line.js";
+export {
+  applyUnitScale,
+  interpretExtractedLine,
+  resolveActualMonetaryValue,
+} from "./interpret-line.js";
 export {
   ALLOWED_MIME_BY_FORMAT,
   DOCUMENT_MAX_BYTES_DEFAULT,
