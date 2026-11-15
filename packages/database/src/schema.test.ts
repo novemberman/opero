@@ -100,6 +100,12 @@ describe("prisma schema", () => {
       "INTEREST_BEARING_DEBT",
       "INTEREST_EXPENSE",
       "CAPITAL_EXPENDITURE",
+      "PROFIT_BEFORE_TAX",
+      "INCOME_TAX_EXPENSE",
+      "OPENING_CASH_AND_EQUIVALENTS",
+      "INVESTING_CASH_FLOW",
+      "FINANCING_CASH_FLOW",
+      "NET_CHANGE_IN_CASH",
     ]) {
       expect(schema).toContain(concept);
     }

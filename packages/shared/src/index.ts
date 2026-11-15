@@ -193,6 +193,12 @@ export const reviewLineItemBodySchema = z
         "INTEREST_EXPENSE",
         "OPERATING_CASH_FLOW",
         "CAPITAL_EXPENDITURE",
+        "PROFIT_BEFORE_TAX",
+        "INCOME_TAX_EXPENSE",
+        "OPENING_CASH_AND_EQUIVALENTS",
+        "INVESTING_CASH_FLOW",
+        "FINANCING_CASH_FLOW",
+        "NET_CHANGE_IN_CASH",
         "UNMAPPED",
       ])
       .optional(),

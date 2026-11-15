@@ -100,8 +100,10 @@ describe("B2.1 extraction hygiene — safe alias", () => {
   it("maps Closing cash and cash equivalents to CASH_AND_EQUIVALENTS only", () => {
     expect(mapLabelToConcept("Closing cash and cash equivalents")).toBe("CASH_AND_EQUIVALENTS");
     expect(mapLabelToConcept("Closing cash")).toBe("CASH_AND_EQUIVALENTS");
-    expect(mapLabelToConcept("Opening cash and cash equivalents")).toBe("UNMAPPED");
-    expect(mapLabelToConcept("Profit before tax")).toBe("UNMAPPED");
+    expect(mapLabelToConcept("Opening cash and cash equivalents")).toBe(
+      "OPENING_CASH_AND_EQUIVALENTS",
+    );
+    expect(mapLabelToConcept("Profit before tax")).toBe("PROFIT_BEFORE_TAX");
     expect(mapLabelToConcept("Total")).toBe("UNMAPPED");
     expect(mapLabelToConcept("Assets")).toBe("UNMAPPED");
 
@@ -113,10 +115,37 @@ describe("B2.1 extraction hygiene — safe alias", () => {
   });
 });
 
-describe("B2.1 extraction hygiene — unsupported remain unmapped", () => {
-  it("keeps verified unsupported / ambiguous B2 labels unmapped", () => {
-    const unsupported = [1, 2, 5, 6, 7, 8, 12, 13, 14, 15, 16, 17, 18, 21, 3, 23];
-    for (const n of unsupported) {
+describe("B2.2 Increment A — approved concept mappings from B2 evidence", () => {
+  it("maps the six approved concepts from evidence labels", () => {
+    expect(interpret("Profit before tax", "24,000").concept).toBe("PROFIT_BEFORE_TAX");
+    expect(interpret("Income tax expense", "(6,000)").concept).toBe("INCOME_TAX_EXPENSE");
+    expect(interpret("Opening cash and cash equivalents", "18,000").concept).toBe(
+      "OPENING_CASH_AND_EQUIVALENTS",
+    );
+    expect(interpret("Net cash used in investing activities", "(15,000)").concept).toBe(
+      "INVESTING_CASH_FLOW",
+    );
+    expect(interpret("Net cash used in financing activities", "(4,000)").concept).toBe(
+      "FINANCING_CASH_FLOW",
+    );
+    expect(interpret("Net change in cash", "7,000").concept).toBe("NET_CHANGE_IN_CASH");
+  });
+
+  it("keeps new mappings monetary and does not auto-confirm amounts", () => {
+    const pbt = interpret("Profit before tax", "24,000");
+    expect(pbt.quantityClass).toBe("MONETARY");
+    expect(pbt.rawValue).toBe("24,000");
+    expect(pbt.normalizedValue).toBe("24000");
+    // interpretExtractedLine has no reviewStatus — persistence defaults to PENDING.
+    expect(pbt.concept).not.toBe("NET_PROFIT");
+  });
+});
+
+describe("B2.1 extraction hygiene — deferred unsupported remain unmapped", () => {
+  it("keeps deferred / ambiguous B2 labels unmapped", () => {
+    // Increment A mapped #2,#5,#15,#16,#17,#21 — remaining unsupported stay UNMAPPED.
+    const deferred = [1, 6, 7, 8, 12, 13, 14, 18, 3, 23];
+    for (const n of deferred) {
       const row = B2_UNMAPPED.find((r) => r.n === n)!;
       const interpreted = interpret(row.label, row.raw);
       if (NOISE_ROWS.has(n) || NARRATIVE_DUP_NOISE_ROWS.has(n)) continue;
@@ -279,11 +308,10 @@ describe("B2.1 before/after fixture counts", () => {
     ).length;
     const afterContextual = after.filter((l) => l.quantityClass !== "MONETARY").length;
 
-    // Noise (6) + narrative dup fragments (3) leave MONETARY; #9 maps; #27/#28 demoted.
-    // Remaining unmapped monetary among B2 set: 28 - 6 - 3 - 1 - 2 = 16
-    // (unsupported 14 + ambiguous 2). #27/#28 become contextual via demotion.
-    expect(afterUnmappedMonetary).toBe(16);
-    expect(afterMappedMonetary).toBeGreaterThanOrEqual(4); // anchors + closing cash
+    // Noise (6) + narrative (3) contextual; #9 closing + Increment A (#2,#5,#15–17,#21) map;
+    // #27/#28 demoted. Remaining unmapped monetary: deferred unsupported (8) + ambiguous (2) = 10.
+    expect(afterUnmappedMonetary).toBe(10);
+    expect(afterMappedMonetary).toBeGreaterThanOrEqual(10); // anchors + closing + Increment A
     expect(afterContextual).toBeGreaterThanOrEqual(9); // 6 noise + 3 narrative (+ demoted)
 
     // Scale axes remain distinct on the safe alias line.

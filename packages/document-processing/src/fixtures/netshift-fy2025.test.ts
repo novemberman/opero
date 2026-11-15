@@ -56,11 +56,18 @@ describe("Netshift Digital Ltd FY2025 regression fixture", () => {
     expect(netMargin?.quantityClass).toBe("PERCENTAGE");
   });
 
-  it("keeps profit before tax as a known unmapped distinction", () => {
+  it("maps B2.2 Increment A PBT / investing / financing without collapsing to PAT or CapEx", () => {
     const pbt = statement.lines.find((l) => /profit before tax/i.test(l.labelRaw));
-    expect(pbt?.concept).toBe("UNMAPPED");
+    expect(pbt?.concept).toBe("PROFIT_BEFORE_TAX");
     expect(pbt?.quantityClass).toBe("MONETARY");
     expect(applyUnitScale(pbt!.normalizedValue, pbt!.unitScale)).toBe("36000000");
+
+    const investing = statement.lines.find((l) => /investing cash flow/i.test(l.labelRaw));
+    expect(investing?.concept).toBe("INVESTING_CASH_FLOW");
+    expect(investing?.concept).not.toBe("CAPITAL_EXPENDITURE");
+
+    const financing = statement.lines.find((l) => /financing cash flow/i.test(l.labelRaw));
+    expect(financing?.concept).toBe("FINANCING_CASH_FLOW");
   });
 
   it("reports balance-sheet consistency for the fixture", () => {

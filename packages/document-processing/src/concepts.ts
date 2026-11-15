@@ -18,6 +18,13 @@ export const FINANCIAL_CONCEPTS = [
   "INTEREST_EXPENSE",
   "OPERATING_CASH_FLOW",
   "CAPITAL_EXPENDITURE",
+  // B2.2 Increment A — extraction/review taxonomy only (not KPI inputs yet).
+  "PROFIT_BEFORE_TAX",
+  "INCOME_TAX_EXPENSE",
+  "OPENING_CASH_AND_EQUIVALENTS",
+  "INVESTING_CASH_FLOW",
+  "FINANCING_CASH_FLOW",
+  "NET_CHANGE_IN_CASH",
   "UNMAPPED",
 ] as const;
 
@@ -59,6 +66,19 @@ const LABEL_MAP: Array<{ concept: FinancialConceptId; patterns: RegExp[] }> = [
     ],
   },
   {
+    concept: "PROFIT_BEFORE_TAX",
+    patterns: [/^profit\s+before\s+tax$/i, /^pbt$/i, /^profit\s+before\s+taxation$/i],
+  },
+  {
+    concept: "INCOME_TAX_EXPENSE",
+    patterns: [
+      /^income\s+tax\s+expense$/i,
+      /^tax\s+expense$/i,
+      /^taxation\s+expense$/i,
+      /^corporation\s+tax\s+expense$/i,
+    ],
+  },
+  {
     concept: "NET_PROFIT",
     patterns: [
       /^net\s+(profit|income|earnings)$/i,
@@ -66,6 +86,10 @@ const LABEL_MAP: Array<{ concept: FinancialConceptId; patterns: RegExp[] }> = [
       /^profit\s+for\s+the\s+(year|period)$/i,
       /^pat$/i,
     ],
+  },
+  {
+    concept: "OPENING_CASH_AND_EQUIVALENTS",
+    patterns: [/^opening\s+cash(\s+and\s+cash\s+equivalents)?$/i],
   },
   {
     concept: "CASH_AND_EQUIVALENTS",
@@ -137,6 +161,30 @@ const LABEL_MAP: Array<{ concept: FinancialConceptId; patterns: RegExp[] }> = [
     ],
   },
   {
+    concept: "INVESTING_CASH_FLOW",
+    patterns: [
+      /^investing\s+cash\s+flow$/i,
+      /^net\s+cash\s+(used\s+in|from|provided\s+by|generated\s+from)\s+investing/i,
+      /^cash\s+flows?\s+from\s+investing(\s+activities)?$/i,
+    ],
+  },
+  {
+    concept: "FINANCING_CASH_FLOW",
+    patterns: [
+      /^financing\s+cash\s+flow$/i,
+      /^net\s+cash\s+(used\s+in|from|provided\s+by|generated\s+from)\s+financing/i,
+      /^cash\s+flows?\s+from\s+financing(\s+activities)?$/i,
+    ],
+  },
+  {
+    concept: "NET_CHANGE_IN_CASH",
+    patterns: [
+      /^net\s+change\s+in\s+cash(\s+and\s+cash\s+equivalents)?$/i,
+      /^net\s+(increase|decrease)\s+in\s+cash(\s+and\s+cash\s+equivalents)?$/i,
+      /^increase\s+\/\s+\(decrease\)\s+in\s+cash$/i,
+    ],
+  },
+  {
     concept: "CAPITAL_EXPENDITURE",
     patterns: [
       /^capital\s+expenditures?$/i,
@@ -150,21 +198,21 @@ const LABEL_MAP: Array<{ concept: FinancialConceptId; patterns: RegExp[] }> = [
 /**
  * Labels that look financial but are intentionally left UNMAPPED because the
  * diagnostics engine has no dedicated concept yet (preserve distinctions).
+ * B2.2 Increment A moved PBT / tax expense / opening cash / ICF / FCF / Δcash
+ * into dedicated concepts above.
  */
 const KNOWN_UNMAPPED_DISTINCTIONS = [
-  /^profit\s+before\s+tax$/i,
-  /^pbt$/i,
-  /^profit\s+before\s+taxation$/i,
-  /^investing\s+cash\s+flow$/i,
-  /^cash\s+flows?\s+from\s+investing/i,
-  /^financing\s+cash\s+flow$/i,
-  /^cash\s+flows?\s+from\s+financing/i,
   /^non[- ]current\s+assets$/i,
   /^total\s+non[- ]current\s+assets$/i,
   /^share\s+capital$/i,
   /^retained\s+earnings$/i,
-  // Opening cash is a CF period-start balance — not interchangeable with BS cash.
-  /^opening\s+cash(\s+and\s+cash\s+equivalents)?$/i,
+  /^current\s+tax\s+payable$/i,
+  /^tax\s+payable$/i,
+  /^total\s+liabilities\s+and\s+equity$/i,
+  /^increase\s+in\s+inventory$/i,
+  /^increase\s+in\s+trade\s+payables?$/i,
+  /^increase\s+in\s+trade\s+receivables?$/i,
+  /^net\s+repayment\s+of\s+borrowings$/i,
 ];
 
 /**
