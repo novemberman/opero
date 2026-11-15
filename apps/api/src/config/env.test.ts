@@ -276,6 +276,13 @@ describe("parseApiEnv", () => {
     expect(env.EMERGENCY_DISABLE_CHECKOUT).toBe(false);
     expect(env.EMERGENCY_DISABLE_UPLOADS).toBe(false);
     expect(env.ENABLE_API_DOCS).toBeUndefined();
+    expect(env.OPS_STATUS_TOKEN).toBeUndefined();
+  });
+
+  it("rejects short OPS_STATUS_TOKEN values", () => {
+    expect(() => parseApiEnv({ ...valid, OPS_STATUS_TOKEN: "too-short" })).toThrow(
+      /OPS_STATUS_TOKEN/,
+    );
   });
 
   it("forbids open registration when PILOT_MODE is true in production", () => {

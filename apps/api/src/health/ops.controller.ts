@@ -1,16 +1,24 @@
-import { Controller, Get, Inject, Optional } from "@nestjs/common";
+import {
+  Controller,
+  Get,
+  Headers,
+  Inject,
+  Optional,
+  UnauthorizedException,
+} from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { InjectQueue } from "@nestjs/bullmq";
+import { Throttle } from "@nestjs/throttler";
 import type { PrismaClient } from "@opero/database";
 import { AI_QUEUE, DIAGNOSTICS_QUEUE, DOCUMENTS_QUEUE, REPORTS_QUEUE } from "@opero/shared";
 import type { Queue } from "bullmq";
-import { Redis } from "ioredis";
 import {
   resolveAppEnv,
   resolveEnableApiDocs,
   type ApiEnv,
 } from "../config/env";
 import { PRISMA_CLIENT } from "../database/database.constants";
+import { timingSafeStringEqual } from "../security/timing-safe-equal";
 
 type QueueDepths = {
   waiting: number;
@@ -29,14 +37,15 @@ async function queueDepths(queue: Queue | undefined): Promise<QueueDepths | { er
       queue.getDelayedCount(),
     ]);
     return { waiting, active, failed, delayed };
-  } catch (error) {
-    return { error: error instanceof Error ? error.message : "queue_probe_failed" };
+  } catch {
+    // Never surface provider/driver error strings to anonymous scrapers.
+    return { error: "probe_failed" };
   }
 }
 
 /**
  * Staging-verifiable ops snapshot: non-secret config + dependency probes + queue depths.
- * Does not expose secrets, keys, or customer data. Alert recipients are not configured here.
+ * Does not expose secrets, keys, customer data, or raw infrastructure errors.
  */
 @Controller("ops")
 export class OpsController {
@@ -57,8 +66,49 @@ export class OpsController {
     );
   }
 
+  private assertOpsAuthorized(headers: Record<string, string | string[] | undefined>): void {
+    const expected = this.config.get("OPS_STATUS_TOKEN", { infer: true });
+    if (!expected) return;
+
+    const rawHeader = headers["x-ops-token"];
+    const headerToken = Array.isArray(rawHeader) ? rawHeader[0] : rawHeader;
+    const auth = headers.authorization;
+    const authValue = Array.isArray(auth) ? auth[0] : auth;
+    const bearer =
+      typeof authValue === "string" && authValue.toLowerCase().startsWith("bearer ")
+        ? authValue.slice(7).trim()
+        : undefined;
+    const provided = (headerToken?.trim() || bearer || "").trim();
+    if (!provided || !timingSafeStringEqual(provided, expected)) {
+      throw new UnauthorizedException({
+        message: "Ops status token required",
+        code: "OPS_STATUS_UNAUTHORIZED",
+      });
+    }
+  }
+
+  /**
+   * Probe Redis via BullMQ queue getters (shared connection) instead of opening
+   * a new TCP client on every scrape.
+   */
+  private async probeRedis(): Promise<"ok" | "fail"> {
+    const queue = this.documentsQueue ?? this.diagnosticsQueue ?? this.aiQueue ?? this.reportsQueue;
+    if (!queue) return "fail";
+    try {
+      await queue.getWaitingCount();
+      return "ok";
+    } catch {
+      return "fail";
+    }
+  }
+
   @Get("status")
-  async getStatus() {
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  async getStatus(
+    @Headers() headers: Record<string, string | string[] | undefined>,
+  ) {
+    this.assertOpsAuthorized(headers);
+
     const appEnv = resolveAppEnv({
       APP_ENV: this.config.get("APP_ENV", { infer: true }),
       NODE_ENV: this.config.get("NODE_ENV", { infer: true }),
@@ -76,22 +126,7 @@ export class OpsController {
       checks.database = "fail";
     }
 
-    const redis = new Redis({
-      host: this.config.get("REDIS_HOST", { infer: true }),
-      port: this.config.get("REDIS_PORT", { infer: true }),
-      password: this.config.get("REDIS_PASSWORD", { infer: true }),
-      maxRetriesPerRequest: 1,
-      lazyConnect: true,
-      connectTimeout: 2000,
-    });
-    try {
-      await redis.connect();
-      checks.redis = (await redis.ping()) === "PONG" ? "ok" : "fail";
-    } catch {
-      checks.redis = "fail";
-    } finally {
-      redis.disconnect();
-    }
+    checks.redis = await this.probeRedis();
 
     const queues = {
       documents: await queueDepths(this.documentsQueue),
@@ -100,8 +135,10 @@ export class OpsController {
       reports: await queueDepths(this.reportsQueue),
     };
 
+    const status = checks.database === "ok" && checks.redis === "ok" ? "ok" : "degraded";
+
     return {
-      status: checks.database === "ok" && checks.redis === "ok" ? "ok" : "degraded",
+      status,
       service: "api",
       timestamp: new Date().toISOString(),
       version: this.version(),

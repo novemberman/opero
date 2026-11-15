@@ -94,6 +94,11 @@ export const apiEnvSchema = z
     PILOT_MAX_USERS: z.coerce.number().int().min(1).max(1_000_000).optional(),
     EMERGENCY_DISABLE_CHECKOUT: boolFromEnv.default(false),
     EMERGENCY_DISABLE_UPLOADS: boolFromEnv.default(false),
+    /**
+     * When set, GET /api/v1/ops/status requires matching X-Ops-Token (or Bearer).
+     * Unset keeps staging scrapers working with the non-secret payload only.
+     */
+    OPS_STATUS_TOKEN: z.string().min(16).max(256).optional(),
   })
   .superRefine((env, ctx) => {
     // Prefer APP_ENV when set so Railway staging can use NODE_ENV=production runtime

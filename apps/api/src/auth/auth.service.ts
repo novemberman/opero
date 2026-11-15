@@ -12,6 +12,7 @@ import { AuditService } from "../audit/audit.service";
 import type { ApiEnv } from "../config/env";
 import { PRISMA_CLIENT } from "../database/database.constants";
 import { hashPassword, verifyPassword } from "../security/passwords";
+import { timingSafeStringEqual } from "../security/timing-safe-equal";
 import { generateOpaqueToken, hashToken } from "../security/tokens";
 import { EmailPort } from "./email/email.port";
 import { buildPasswordResetEmail, buildVerificationEmail } from "./email/email.templates";
@@ -19,6 +20,8 @@ import { SessionService } from "./session.service";
 
 const GENERIC_AUTH_FAILURE = "Invalid email or password";
 const GENERIC_TOKEN_FAILURE = "Invalid or expired token";
+/** Stable Postgres advisory lock key for pilot user-cap serialization. */
+const PILOT_USER_CAP_LOCK = 8_720_140_1;
 
 @Injectable()
 export class AuthService {
@@ -59,7 +62,7 @@ export class AuthService {
     const requiredInvite = this.config.get("PILOT_INVITE_CODE", { infer: true });
     if (requiredInvite) {
       const provided = input.inviteCode?.trim() ?? "";
-      if (provided !== requiredInvite) {
+      if (!provided || !timingSafeStringEqual(provided, requiredInvite)) {
         throw new ForbiddenException({
           message: "A valid invitation code is required to register.",
           code: "PILOT_INVITE_REQUIRED",
@@ -67,40 +70,45 @@ export class AuthService {
       }
     }
 
-    const maxUsers = this.config.get("PILOT_MAX_USERS", { infer: true });
-    if (maxUsers != null) {
-      const userCount = await this.prisma.user.count();
-      if (userCount >= maxUsers) {
-        throw new ForbiddenException({
-          message: "Pilot user limit reached. Contact the operator for access.",
-          code: "PILOT_USER_LIMIT",
-        });
-      }
-    }
-
     const email = input.email.trim().toLowerCase();
-    const existing = await this.prisma.user.findUnique({ where: { email } });
-    if (existing) {
-      // Constant-looking response path: do not reveal that the email exists.
-      throw new BadRequestException("Unable to register with the provided details");
-    }
-
     const passwordHash = await hashPassword(input.password);
-    const user = await this.prisma.user.create({
-      data: {
-        email,
-        name: input.name.trim(),
-        passwordHash,
-      },
-    });
-
     const rawToken = generateOpaqueToken();
-    await this.prisma.emailVerificationToken.create({
-      data: {
-        userId: user.id,
-        tokenHash: hashToken(rawToken),
-        expiresAt: new Date(Date.now() + this.tokenTtlMs()),
-      },
+    const maxUsers = this.config.get("PILOT_MAX_USERS", { infer: true });
+
+    const user = await this.prisma.$transaction(async (tx) => {
+      // Serialize pilot user-cap checks against concurrent registrations.
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(${PILOT_USER_CAP_LOCK})`;
+      if (maxUsers != null) {
+        const userCount = await tx.user.count();
+        if (userCount >= maxUsers) {
+          throw new ForbiddenException({
+            message: "Pilot user limit reached. Contact the operator for access.",
+            code: "PILOT_USER_LIMIT",
+          });
+        }
+      }
+
+      const existing = await tx.user.findUnique({ where: { email } });
+      if (existing) {
+        // Constant-looking response path: do not reveal that the email exists.
+        throw new BadRequestException("Unable to register with the provided details");
+      }
+
+      const created = await tx.user.create({
+        data: {
+          email,
+          name: input.name.trim(),
+          passwordHash,
+        },
+      });
+      await tx.emailVerificationToken.create({
+        data: {
+          userId: created.id,
+          tokenHash: hashToken(rawToken),
+          expiresAt: new Date(Date.now() + this.tokenTtlMs()),
+        },
+      });
+      return { id: created.id, email: created.email, name: created.name };
     });
 
     await this.email.send(

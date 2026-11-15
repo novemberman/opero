@@ -67,7 +67,7 @@ describe("GET /api/v1/ops/status", () => {
     await app.close();
   });
 
-  it("returns non-secret pilot and queue snapshot", async () => {
+  it("returns non-secret pilot and queue snapshot without a token when unset", async () => {
     const response = await request(app.getHttpServer()).get("/api/v1/ops/status");
     expect([200]).toContain(response.status);
     expect(response.body.service).toBe("api");
@@ -78,6 +78,8 @@ describe("GET /api/v1/ops/status", () => {
     expect(response.body.emergency.disableCheckout).toBe(false);
     expect(response.body.queues.documents.failed).toBe(1);
     expect(response.body.paymentProvider).toBe("mock");
+    expect(["ok", "fail"]).toContain(response.body.checks.redis);
     expect(String(JSON.stringify(response.body))).not.toMatch(/CSRF_SECRET|password|sk_/i);
   });
 });
+

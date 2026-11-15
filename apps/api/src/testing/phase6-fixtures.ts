@@ -114,12 +114,14 @@ export async function signUp(
   app: INestApplication,
   mail: MemoryEmailService,
   label: string,
+  options?: { inviteCode?: string },
 ): Promise<TestSession> {
   userCounter += 1;
   const user = {
     email: `p6.${label}.${Date.now()}.${userCounter}@example.com`,
     name: `P6 ${label}`,
     password: `p6-${label}-password-1`,
+    ...(options?.inviteCode ? { inviteCode: options.inviteCode } : {}),
   };
   await request(app.getHttpServer()).post("/api/v1/auth/register").send(user).expect(201);
   const token = mail.latestToken("/verify-email");

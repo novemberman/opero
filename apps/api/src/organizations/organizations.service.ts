@@ -16,6 +16,11 @@ import { hashPassword } from "../security/passwords";
 import { generateOpaqueToken, hashToken } from "../security/tokens";
 import type { AuthenticatedUser } from "../types/express";
 
+/** Stable Postgres advisory lock key for pilot organization-cap serialization. */
+const PILOT_ORG_CAP_LOCK = 8_720_140_2;
+/** Shared with AuthService user-cap lock so invitation user-create respects the same ceiling. */
+const PILOT_USER_CAP_LOCK = 8_720_140_1;
+
 /** Lock all OWNER rows for an org so concurrent demote/remove cannot drop the last owner. */
 async function lockOrganizationOwners(
   tx: Prisma.TransactionClient,
@@ -47,24 +52,26 @@ export class OrganizationsService {
     input: { name: string; slug: string },
     requestId?: string,
   ) {
-    const maxOrgs = this.config.get("PILOT_MAX_ORGANIZATIONS", { infer: true });
-    if (maxOrgs != null) {
-      const orgCount = await this.prisma.organization.count();
-      if (orgCount >= maxOrgs) {
-        throw new ForbiddenException({
-          message: "Pilot organization limit reached. Contact the operator for access.",
-          code: "PILOT_ORG_LIMIT",
-        });
-      }
-    }
-
     const slug = input.slug.trim().toLowerCase();
-    const existing = await this.prisma.organization.findUnique({ where: { slug } });
-    if (existing) {
-      throw new ConflictException("Organization slug is already taken");
-    }
+    const maxOrgs = this.config.get("PILOT_MAX_ORGANIZATIONS", { infer: true });
 
     const organization = await this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(${PILOT_ORG_CAP_LOCK})`;
+      if (maxOrgs != null) {
+        const orgCount = await tx.organization.count();
+        if (orgCount >= maxOrgs) {
+          throw new ForbiddenException({
+            message: "Pilot organization limit reached. Contact the operator for access.",
+            code: "PILOT_ORG_LIMIT",
+          });
+        }
+      }
+
+      const existing = await tx.organization.findUnique({ where: { slug } });
+      if (existing) {
+        throw new ConflictException("Organization slug is already taken");
+      }
+
       const org = await tx.organization.create({
         data: { name: input.name.trim(), slug },
       });
@@ -278,13 +285,27 @@ export class OrganizationsService {
       if (!input.name || !input.password) {
         throw new BadRequestException("Name and password are required to accept this invitation");
       }
-      user = await this.prisma.user.create({
-        data: {
-          email: invitation.email,
-          name: input.name.trim(),
-          passwordHash: await hashPassword(input.password),
-          emailVerifiedAt: new Date(),
-        },
+      const passwordHash = await hashPassword(input.password);
+      const maxUsers = this.config.get("PILOT_MAX_USERS", { infer: true });
+      user = await this.prisma.$transaction(async (tx) => {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(${PILOT_USER_CAP_LOCK})`;
+        if (maxUsers != null) {
+          const userCount = await tx.user.count();
+          if (userCount >= maxUsers) {
+            throw new ForbiddenException({
+              message: "Pilot user limit reached. Contact the operator for access.",
+              code: "PILOT_USER_LIMIT",
+            });
+          }
+        }
+        return tx.user.create({
+          data: {
+            email: invitation.email,
+            name: input.name!.trim(),
+            passwordHash,
+            emailVerifiedAt: new Date(),
+          },
+        });
       });
     }
 
