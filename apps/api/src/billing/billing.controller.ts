@@ -47,6 +47,13 @@ const verifySchema = z
   })
   .strict();
 
+const mockSettleSchema = z
+  .object({
+    reference: z.string().trim().min(8).max(120),
+    outcome: z.enum(["success", "failed", "abandoned"]).default("success"),
+  })
+  .strict();
+
 const enterpriseSchema = z
   .object({
     contactName: z.string().trim().min(1).max(120),
@@ -174,6 +181,30 @@ export class BillingController {
     return this.checkout.verifyAndFulfill({
       organizationId,
       reference: body.reference,
+      actor,
+      requestId: req.requestId,
+    });
+  }
+
+  /**
+   * Staging/local only: settle a mock provider charge then verify+fulfill.
+   * Returns 404 when PAYMENT_PROVIDER is not mock — never a production bypass.
+   */
+  @Post("organizations/:organizationId/billing/payments/mock-settle")
+  @HttpCode(200)
+  @UseGuards(SessionAuthGuard, OrgMembershipGuard, PermissionsGuard)
+  @RequirePermissions("billing:manage")
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  async mockSettlePayment(
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @CurrentUser() actor: AuthenticatedUser,
+    @Body(new ZodBodyPipe(mockSettleSchema)) body: z.infer<typeof mockSettleSchema>,
+    @Req() req: Request,
+  ) {
+    return this.checkout.mockSettleAndFulfill({
+      organizationId,
+      reference: body.reference,
+      outcome: body.outcome,
       actor,
       requestId: req.requestId,
     });

@@ -9,7 +9,12 @@ import { ConfigService } from "@nestjs/config";
 import { randomUUID } from "node:crypto";
 import type { PrismaClient } from "@opero/database";
 import type { PaymentProvider } from "@opero/payments";
-import { buildKorapayNotificationUrl, minorToMajorUnits } from "@opero/payments";
+import {
+  buildKorapayNotificationUrl,
+  minorToMajorUnits,
+  MockKorapayProvider,
+  type MockChargeState,
+} from "@opero/payments";
 import { AuditService } from "../audit/audit.service";
 import type { ApiEnv } from "../config/env";
 import { PRISMA_CLIENT } from "../database/database.constants";
@@ -19,6 +24,8 @@ import { FulfillmentService } from "./fulfillment.service";
 import { PAYMENT_PROVIDER } from "./payment.tokens";
 
 const CHECKOUT_TTL_MS = 60 * 60 * 1000;
+const MOCK_SETTLE_OUTCOMES = ["success", "failed", "abandoned"] as const;
+type MockSettleOutcome = (typeof MOCK_SETTLE_OUTCOMES)[number];
 
 @Injectable()
 export class CheckoutService {
@@ -60,7 +67,10 @@ export class CheckoutService {
       if (existing.organizationId !== input.organizationId) {
         throw new ForbiddenException("Idempotency key belongs to another organization");
       }
-      return this.toCheckoutResponse(existing);
+      return this.toCheckoutResponse(existing, {
+        organizationId: input.organizationId,
+        reportId: existing.reportId,
+      });
     }
 
     const { version, product, price } =
@@ -140,10 +150,14 @@ export class CheckoutService {
         reportId: input.reportId,
         reference: initialized.reference,
         pricingVersion: version.code,
+        provider: this.payments.name,
       },
     });
 
-    return this.toCheckoutResponse(intent);
+    return this.toCheckoutResponse(intent, {
+      organizationId: input.organizationId,
+      reportId: input.reportId,
+    });
   }
 
   async startSubscriptionCheckout(input: {
@@ -163,7 +177,10 @@ export class CheckoutService {
       if (existing.organizationId !== input.organizationId) {
         throw new ForbiddenException("Idempotency key belongs to another organization");
       }
-      return this.toCheckoutResponse(existing);
+      return this.toCheckoutResponse(existing, {
+        organizationId: input.organizationId,
+        reportId: existing.reportId,
+      });
     }
 
     const { version, product, price, plan } =
@@ -250,7 +267,69 @@ export class CheckoutService {
       },
     });
 
-    return this.toCheckoutResponse(intent);
+    return this.toCheckoutResponse(intent, {
+      organizationId: input.organizationId,
+      reportId: null,
+    });
+  }
+
+  /**
+   * Staging/local mock settlement. Settles the in-memory mock charge then runs
+   * the same verify+fulfill path as production. Unavailable unless the live
+   * payment provider is mock (forbidden in production by env validation).
+   */
+  async mockSettleAndFulfill(input: {
+    organizationId: string;
+    reference: string;
+    outcome: MockSettleOutcome;
+    actor: AuthenticatedUser;
+    requestId?: string;
+  }) {
+    if (this.payments.name !== "mock" || !(this.payments instanceof MockKorapayProvider)) {
+      // Do not advertise a settlement bypass when Korapay (or any non-mock) is live.
+      throw new NotFoundException();
+    }
+    if (!MOCK_SETTLE_OUTCOMES.includes(input.outcome)) {
+      throw new BadRequestException("Invalid mock settlement outcome");
+    }
+
+    const payment = await this.prisma.payment.findFirst({
+      where: { reference: input.reference, organizationId: input.organizationId },
+      include: { checkoutIntent: true },
+    });
+    if (!payment) throw new NotFoundException("Payment not found");
+
+    try {
+      this.payments.settle(input.reference, input.outcome as MockChargeState["status"]);
+    } catch {
+      throw new BadRequestException({
+        message: "Mock charge is unknown or cannot be settled",
+        code: "MOCK_CHARGE_UNKNOWN",
+      });
+    }
+
+    await this.audit.record({
+      action: "billing.mock_settled",
+      entityType: "payment",
+      entityId: payment.id,
+      organizationId: input.organizationId,
+      actorUserId: input.actor.id,
+      requestId: input.requestId,
+      metadata: {
+        reference: input.reference,
+        outcome: input.outcome,
+        purpose: payment.checkoutIntent.purpose,
+        reportId: payment.checkoutIntent.reportId,
+        // Never log checkout URLs, secrets, or storage keys.
+      },
+    });
+
+    return this.verifyAndFulfill({
+      organizationId: input.organizationId,
+      reference: input.reference,
+      actor: input.actor,
+      requestId: input.requestId,
+    });
   }
 
   /**
@@ -312,22 +391,38 @@ export class CheckoutService {
       include: { payment: true },
     });
     if (!intent) throw new NotFoundException("Checkout not found");
-    return this.toCheckoutResponse(intent);
+    return this.toCheckoutResponse(intent, {
+      organizationId,
+      reportId: intent.reportId,
+    });
   }
 
-  private toCheckoutResponse(intent: {
-    id: string;
-    status: string;
-    purpose: string;
-    amountMinor: number;
-    currency: string;
-    productCode: string;
-    reportId: string | null;
-    checkoutUrl: string | null;
-    paymentReference: string;
-    expiresAt: Date;
-    pricingVersionCode: string;
-  }) {
+  private toCheckoutResponse(
+    intent: {
+      id: string;
+      status: string;
+      purpose: string;
+      amountMinor: number;
+      currency: string;
+      productCode: string;
+      reportId: string | null;
+      checkoutUrl: string | null;
+      paymentReference: string;
+      expiresAt: Date;
+      pricingVersionCode: string;
+    },
+    ctx: { organizationId: string; reportId: string | null },
+  ) {
+    const mockSettlementAvailable = this.payments.name === "mock";
+    const checkoutUrl = mockSettlementAvailable
+      ? this.mockCheckoutUrl({
+          organizationId: ctx.organizationId,
+          reference: intent.paymentReference,
+          reportId: ctx.reportId ?? intent.reportId,
+          checkoutId: intent.id,
+        })
+      : intent.checkoutUrl;
+
     return {
       checkout: {
         id: intent.id,
@@ -338,13 +433,31 @@ export class CheckoutService {
         amountDisplayMajor: minorToMajorUnits(intent.amountMinor, intent.currency),
         productCode: intent.productCode,
         reportId: intent.reportId,
-        checkoutUrl: intent.checkoutUrl,
+        checkoutUrl,
         reference: intent.paymentReference,
         expiresAt: intent.expiresAt,
         pricingVersionCode: intent.pricingVersionCode,
+        provider: this.payments.name,
+        mockSettlementAvailable,
         // Explicit: redirect is not confirmation of payment.
         paymentConfirmed: intent.status === "SUCCEEDED",
       },
     };
+  }
+
+  /** Browser-facing mock pay page on the web app — never a public settle bypass. */
+  private mockCheckoutUrl(input: {
+    organizationId: string;
+    reference: string;
+    reportId: string | null;
+    checkoutId: string;
+  }): string {
+    const origin = this.config.get("APP_ORIGIN", { infer: true }).replace(/\/$/, "");
+    const params = new URLSearchParams({
+      reference: input.reference,
+      checkoutId: input.checkoutId,
+    });
+    if (input.reportId) params.set("reportId", input.reportId);
+    return `${origin}/organizations/${input.organizationId}/billing/mock-pay?${params.toString()}`;
   }
 }

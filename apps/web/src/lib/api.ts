@@ -95,18 +95,35 @@ export async function apiFetch<T>(
  */
 export async function apiDownload(
   path: string,
-): Promise<{ status: number; blob: Blob | null; message: string | null }> {
+): Promise<{ status: number; blob: Blob | null; message: string | null; code: string | null }> {
   const response = await fetch(`${apiBase()}${path}`, { credentials: "include" });
   if (!response.ok) {
     let message: string | null = null;
+    let code: string | null = null;
     try {
-      message = apiErrorMessage(await response.json(), "");
+      const body = (await response.json()) as {
+        message?: unknown;
+        code?: unknown;
+      };
+      // Nest may nest `{ message, code }` inside `message` when throwing object exceptions.
+      if (body && typeof body.message === "object" && body.message) {
+        const nested = body.message as { message?: unknown; code?: unknown };
+        message =
+          typeof nested.message === "string"
+            ? nested.message
+            : apiErrorMessage(body, "");
+        code = typeof nested.code === "string" ? nested.code : null;
+      } else {
+        message = apiErrorMessage(body, "");
+        code = typeof body.code === "string" ? body.code : null;
+      }
     } catch {
       message = null;
+      code = null;
     }
-    return { status: response.status, blob: null, message: message || null };
+    return { status: response.status, blob: null, message: message || null, code };
   }
-  return { status: response.status, blob: await response.blob(), message: null };
+  return { status: response.status, blob: await response.blob(), message: null, code: null };
 }
 
 /** Reads the error text of an API response body, including validation issues. */

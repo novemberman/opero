@@ -112,7 +112,11 @@ describe("Phase 7A billing (mock Korapay)", () => {
     expect(checkout.body.checkout.paymentConfirmed).toBe(false);
     expect(checkout.body.checkout.amountMinor).toBe(1_500_000);
     expect(checkout.body.checkout.currency).toBe("NGN");
+    expect(checkout.body.checkout.provider).toBe("mock");
+    expect(checkout.body.checkout.mockSettlementAvailable).toBe(true);
+    expect(String(checkout.body.checkout.checkoutUrl)).toContain("/billing/mock-pay?");
     const reference = checkout.body.checkout.reference as string;
+    expect(String(checkout.body.checkout.checkoutUrl)).toContain(reference);
 
     const again = await post(
       app,
@@ -491,5 +495,94 @@ describe("Phase 7A billing (mock Korapay)", () => {
       .expect(201);
     expect(response.body.quote.status).toBe("RECEIVED");
     expect(JSON.stringify(response.body)).not.toMatch(/sk_|secret/i);
+  });
+
+  it("mock-settle unlocks PDF once, rejects unauthorized/cross-tenant, and fails closed", async () => {
+    const ctx = await draftReport("mock-settle");
+    await get(app, ctx.viewer, `${ctx.path}/pdf`).expect(403);
+
+    const checkout = await post(
+      app,
+      ctx.owner,
+      `/organizations/${ctx.organizationId}/billing/checkout/xray-pro`,
+    )
+      .send({ reportId: ctx.reportId, idempotencyKey: `ms-${randomUUID()}` })
+      .expect(201);
+    const reference = checkout.body.checkout.reference as string;
+
+    // Viewer cannot settle.
+    await post(app, ctx.viewer, `/organizations/${ctx.organizationId}/billing/payments/mock-settle`)
+      .send({ reference, outcome: "success" })
+      .expect(403);
+
+    // Wrong reference for this org.
+    await post(app, ctx.owner, `/organizations/${ctx.organizationId}/billing/payments/mock-settle`)
+      .send({ reference: `opero_${"0".repeat(32)}`, outcome: "success" })
+      .expect(404);
+
+    // Failed outcome must not unlock.
+    const failed = await post(
+      app,
+      ctx.owner,
+      `/organizations/${ctx.organizationId}/billing/payments/mock-settle`,
+    )
+      .send({ reference, outcome: "failed" })
+      .expect(200);
+    expect(failed.body.providerStatus).toBe("failed");
+    expect(failed.body.fulfillment.status).toBe("FAILED");
+    await get(app, ctx.viewer, `${ctx.path}/pdf`).expect(403);
+
+    // Fresh checkout for success path (prior payment marked FAILED).
+    const checkout2 = await post(
+      app,
+      ctx.owner,
+      `/organizations/${ctx.organizationId}/billing/checkout/xray-pro`,
+    )
+      .send({ reportId: ctx.reportId, idempotencyKey: `ms2-${randomUUID()}` })
+      .expect(201);
+    const reference2 = checkout2.body.checkout.reference as string;
+
+    const settled = await post(
+      app,
+      ctx.owner,
+      `/organizations/${ctx.organizationId}/billing/payments/mock-settle`,
+    )
+      .send({ reference: reference2, outcome: "success" })
+      .expect(200);
+    expect(settled.body.providerStatus).toBe("success");
+    expect(settled.body.fulfillment.status).toBe("FULFILLED");
+    expect(JSON.stringify(settled.body)).not.toMatch(/sk_|secret|storageKey|checkout\.mock/i);
+
+    const replay = await post(
+      app,
+      ctx.owner,
+      `/organizations/${ctx.organizationId}/billing/payments/mock-settle`,
+    )
+      .send({ reference: reference2, outcome: "success" })
+      .expect(200);
+    expect(replay.body.fulfillment.status).toBe("ALREADY_FULFILLED");
+    expect(
+      await prisma.entitlementGrant.count({
+        where: { organizationId: ctx.organizationId, scopeId: ctx.reportId, revokedAt: null },
+      }),
+    ).toBe(2);
+
+    await get(app, ctx.viewer, `${ctx.path}/pdf`).expect(200);
+
+    // Cross-tenant settle denied.
+    await post(
+      app,
+      ctx.outsider,
+      `/organizations/${ctx.otherOrganizationId}/billing/payments/mock-settle`,
+    )
+      .send({ reference: reference2, outcome: "success" })
+      .expect(404);
+    await get(app, ctx.outsider, `${ctx.path}/pdf`).expect(404);
+
+    const audits = await prisma.auditEvent.findMany({
+      where: { organizationId: ctx.organizationId, action: "billing.mock_settled" },
+    });
+    expect(audits.length).toBeGreaterThanOrEqual(1);
+    expect(JSON.stringify(audits)).not.toMatch(/sk_|secret|storageKey/i);
   });
 });

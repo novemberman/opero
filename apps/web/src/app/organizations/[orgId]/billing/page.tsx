@@ -14,34 +14,40 @@ function BillingInner() {
   const [subscriptions, setSubscriptions] = useState<unknown[]>([]);
   const [entitlements, setEntitlements] = useState<unknown[]>([]);
   const [verifyNote, setVerifyNote] = useState<string | null>(null);
+  const [verifyTone, setVerifyTone] = useState<"pine" | "copper" | "muted">("muted");
   const [error, setError] = useState<string | null>(null);
+  const reportId = search.get("reportId");
+
+  async function reloadBilling() {
+    const [p, s, e] = await Promise.all([
+      apiFetch<{ purchases?: unknown[]; message?: string }>(
+        `/organizations/${orgId}/billing/purchases`,
+      ),
+      apiFetch<{ subscriptions?: unknown[]; message?: string }>(
+        `/organizations/${orgId}/billing/subscriptions`,
+      ),
+      apiFetch<{ entitlements?: unknown[]; message?: string }>(
+        `/organizations/${orgId}/billing/entitlements`,
+      ),
+    ]);
+    if (p.status >= 400 || s.status >= 400 || e.status >= 400) {
+      setError("Unable to load billing data");
+      return;
+    }
+    setPurchases(p.body.purchases ?? []);
+    setSubscriptions(s.body.subscriptions ?? []);
+    setEntitlements(e.body.entitlements ?? []);
+  }
 
   useEffect(() => {
-    void (async () => {
-      const [p, s, e] = await Promise.all([
-        apiFetch<{ purchases?: unknown[]; message?: string }>(
-          `/organizations/${orgId}/billing/purchases`,
-        ),
-        apiFetch<{ subscriptions?: unknown[]; message?: string }>(
-          `/organizations/${orgId}/billing/subscriptions`,
-        ),
-        apiFetch<{ entitlements?: unknown[]; message?: string }>(
-          `/organizations/${orgId}/billing/entitlements`,
-        ),
-      ]);
-      if (p.status >= 400 || s.status >= 400 || e.status >= 400) {
-        setError("Unable to load billing data");
-        return;
-      }
-      setPurchases(p.body.purchases ?? []);
-      setSubscriptions(s.body.subscriptions ?? []);
-      setEntitlements(e.body.entitlements ?? []);
-    })();
+    void reloadBilling();
   }, [orgId]);
 
   useEffect(() => {
     if (!reference) return;
     void (async () => {
+      setVerifyNote("Payment pending verification…");
+      setVerifyTone("muted");
       const { status, body } = await apiFetch<{
         providerStatus?: string;
         fulfillment?: { status?: string };
@@ -51,16 +57,27 @@ function BillingInner() {
         json: { reference },
       });
       if (status >= 400) {
+        setVerifyTone("copper");
         setVerifyNote(body.message ?? "Verification failed");
         return;
       }
       if (body.providerStatus === "success" && body.fulfillment?.status === "FULFILLED") {
-        setVerifyNote("Payment verified. Entitlements are active.");
+        setVerifyTone("pine");
+        setVerifyNote("Payment successful. Entitlements are active — report unlocked.");
+        await reloadBilling();
       } else if (body.fulfillment?.status === "ALREADY_FULFILLED") {
-        setVerifyNote("Payment was already fulfilled.");
-      } else {
+        setVerifyTone("pine");
+        setVerifyNote("Payment was already fulfilled. Download remains available.");
+        await reloadBilling();
+      } else if (body.providerStatus === "failed" || body.fulfillment?.status === "FAILED") {
+        setVerifyTone("copper");
         setVerifyNote(
-          `Payment not confirmed yet (provider: ${body.providerStatus ?? "unknown"}). This page never treats a redirect alone as success.`,
+          `Payment failed or was not successful (provider: ${body.providerStatus ?? "unknown"}). The report stays locked.`,
+        );
+      } else {
+        setVerifyTone("muted");
+        setVerifyNote(
+          `Payment pending (provider: ${body.providerStatus ?? "unknown"}). This page never treats a redirect alone as success.`,
         );
       }
     })();
@@ -73,7 +90,21 @@ function BillingInner() {
         Purchases, subscriptions, and entitlements for this organization. Redirect return is not
         payment confirmation — the API verifies with Korapay (or the mock provider) first.
       </p>
-      {verifyNote ? <p className="mt-4 text-sm text-pine">{verifyNote}</p> : null}
+      {verifyNote ? (
+        <p
+          className={`mt-4 text-sm ${verifyTone === "pine" ? "text-pine" : verifyTone === "copper" ? "text-copper" : "text-muted"}`}
+        >
+          {verifyNote}
+        </p>
+      ) : null}
+      {reportId && verifyTone === "pine" ? (
+        <Link
+          className="mt-3 inline-block text-pine underline"
+          href={`/organizations/${orgId}/reports/${reportId}`}
+        >
+          Open unlocked report
+        </Link>
+      ) : null}
       {error ? <p className="mt-4 text-copper">{error}</p> : null}
 
       <section className="mt-10">

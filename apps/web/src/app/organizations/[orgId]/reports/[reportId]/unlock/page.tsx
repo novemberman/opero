@@ -20,7 +20,12 @@ export default function UnlockReportPage() {
         : `web-${Date.now()}`;
     const redirectUrl = `${window.location.origin}/organizations/${params.orgId}/billing?reportId=${params.reportId}`;
     const { status, body } = await apiFetch<{
-      checkout?: { checkoutUrl?: string; paymentConfirmed?: boolean };
+      checkout?: {
+        checkoutUrl?: string;
+        paymentConfirmed?: boolean;
+        mockSettlementAvailable?: boolean;
+        provider?: string;
+      };
       message?: string;
     }>(`/organizations/${params.orgId}/billing/checkout/xray-pro`, {
       method: "POST",
@@ -53,8 +58,9 @@ export default function UnlockReportPage() {
           Unlock X-Ray Pro
         </h1>
         <p className="mt-3 text-muted">
-          One-time purchase at NGN 15,000 for this report. You will be redirected to Korapay checkout
-          (or the local mock provider). Success is confirmed only after server-side verification.
+          Payment required: one-time NGN 15,000 for this report. You will be redirected to Korapay
+          checkout (or the staging mock payment page). The report stays locked until the API
+          confirms payment and grants entitlement — a redirect alone never unlocks the PDF.
         </p>
         {error ? <p className="mt-4 text-copper">{error}</p> : null}
         <button

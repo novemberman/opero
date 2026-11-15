@@ -88,7 +88,11 @@ type Report = {
   approvals: Approval[];
 };
 
-type Detail = { report: Report; preview: ReportModel | null };
+type Detail = {
+  report: Report;
+  preview: ReportModel | null;
+  access?: "FULL" | "FREE_PREVIEW";
+};
 
 type ActionError = { message: string; code: string | null };
 
@@ -370,8 +374,11 @@ export default function ReportDetailPage() {
     const result = await apiDownload(`${path}/pdf?versionId=${version.id}`);
     if (!result.blob) {
       setActionError({
-        message: result.message ?? "Unable to download the PDF",
-        code: null,
+        message:
+          result.code === "ENTITLEMENT_REQUIRED"
+            ? "Payment required to download this PDF. Unlock X-Ray Pro for this report first."
+            : (result.message ?? "Unable to download the PDF"),
+        code: result.code,
       });
       if (result.status === 404 || result.status === 409) setMissingPdf(version.id);
       return;
@@ -432,6 +439,23 @@ export default function ReportDetailPage() {
 
         {loadError ? <p className="mb-4 text-sm text-copper">{loadError}</p> : null}
         {!detail && !loadError ? <p className="text-muted">Loading report…</p> : null}
+
+        {detail?.access === "FREE_PREVIEW" && report?.status === "PUBLISHED" ? (
+          <section className="mb-6 border border-line p-4">
+            <h2 className="text-lg text-ink">Payment required</h2>
+            <p className="mt-1 text-sm text-muted">
+              Full report content and PDF download stay locked until X-Ray Pro is purchased for this
+              report (or an active Opero OS plan covers it). Nothing is shown as unlocked before the
+              API confirms entitlement.
+            </p>
+            <Link
+              className="mt-3 inline-block text-pine underline"
+              href={`/organizations/${orgId}/reports/${reportId}/unlock`}
+            >
+              Unlock X-Ray Pro
+            </Link>
+          </section>
+        ) : null}
 
         {report ? (
           <section className="mb-8 border border-line p-4">
@@ -536,6 +560,11 @@ export default function ReportDetailPage() {
                     href={`/organizations/${orgId}/readiness?run=${report.diagnosticRunId}`}
                   >
                     Open the readiness checklist
+                  </Link>
+                ) : null}
+                {actionError.code === "ENTITLEMENT_REQUIRED" ? (
+                  <Link className="underline" href={`/organizations/${orgId}/reports/${reportId}/unlock`}>
+                    Unlock X-Ray Pro — payment required
                   </Link>
                 ) : null}
               </div>
