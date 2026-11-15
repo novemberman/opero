@@ -136,7 +136,8 @@ describe("Phase 7A billing (mock Korapay)", () => {
       .send({ reference })
       .expect(200);
     expect(forged.body.providerStatus).toBe("pending");
-    expect(forged.body.fulfillment.status).toBe("FAILED");
+    expect(forged.body.fulfillment.status).toBe("PENDING");
+    expect(forged.body.payment.status).toBe("PENDING");
     await get(app, ctx.viewer, `${ctx.path}/pdf`).expect(403);
 
     payments.settle(reference, "success");

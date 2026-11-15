@@ -393,11 +393,14 @@ export class CheckoutService {
       payment: {
         id: payment.id,
         reference: payment.reference,
-        status: result.status === "FULFILLED" || result.status === "ALREADY_FULFILLED"
-          ? "SUCCEEDED"
-          : result.status === "FAILED"
-            ? "FAILED"
-            : payment.status,
+        status:
+          result.status === "FULFILLED" || result.status === "ALREADY_FULFILLED"
+            ? "SUCCEEDED"
+            : result.status === "FAILED"
+              ? "FAILED"
+              : result.status === "PENDING"
+                ? "PENDING"
+                : payment.status,
       },
       fulfillment: result,
       // Never claim success from the client redirect alone.

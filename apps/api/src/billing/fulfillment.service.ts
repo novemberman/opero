@@ -55,6 +55,16 @@ export class FulfillmentService {
       });
     }
 
+    // Pending / abandoned: never grant, and do not poison the ledger as FAILED
+    // while the customer may still complete checkout (redirect-before-settle).
+    if (input.verified.status === "pending" || input.verified.status === "abandoned") {
+      return {
+        fulfilled: false,
+        paymentId: payment.id,
+        status: "PENDING" as const,
+      };
+    }
+
     if (input.verified.status !== "success") {
       await this.prisma.payment.update({
         where: { id: payment.id },
