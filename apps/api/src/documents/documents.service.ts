@@ -71,6 +71,12 @@ export class DocumentsService {
     expectedByteSize?: number;
     requestId?: string;
   }) {
+    if (this.config.get("EMERGENCY_DISABLE_UPLOADS", { infer: true })) {
+      throw new BadRequestException({
+        message: "Document uploads are temporarily disabled by the operator.",
+        code: "EMERGENCY_DISABLE_UPLOADS",
+      });
+    }
     if (input.expectedByteSize && input.expectedByteSize > this.maxBytes()) {
       throw new BadRequestException(`File exceeds maximum size of ${this.maxBytes()} bytes`);
     }

@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Inject,
   Injectable,
   UnauthorizedException,
@@ -45,8 +46,38 @@ export class AuthService {
     email: string;
     name: string;
     password: string;
+    inviteCode?: string;
     requestId?: string;
   }): Promise<{ id: string; email: string; name: string }> {
+    if (!this.config.get("PUBLIC_REGISTRATION_ENABLED", { infer: true })) {
+      throw new ForbiddenException({
+        message: "Public registration is disabled. Use an organization invitation to join.",
+        code: "PUBLIC_REGISTRATION_DISABLED",
+      });
+    }
+
+    const requiredInvite = this.config.get("PILOT_INVITE_CODE", { infer: true });
+    if (requiredInvite) {
+      const provided = input.inviteCode?.trim() ?? "";
+      if (provided !== requiredInvite) {
+        throw new ForbiddenException({
+          message: "A valid invitation code is required to register.",
+          code: "PILOT_INVITE_REQUIRED",
+        });
+      }
+    }
+
+    const maxUsers = this.config.get("PILOT_MAX_USERS", { infer: true });
+    if (maxUsers != null) {
+      const userCount = await this.prisma.user.count();
+      if (userCount >= maxUsers) {
+        throw new ForbiddenException({
+          message: "Pilot user limit reached. Contact the operator for access.",
+          code: "PILOT_USER_LIMIT",
+        });
+      }
+    }
+
     const email = input.email.trim().toLowerCase();
     const existing = await this.prisma.user.findUnique({ where: { email } });
     if (existing) {

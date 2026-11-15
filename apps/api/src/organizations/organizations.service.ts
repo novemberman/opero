@@ -47,6 +47,17 @@ export class OrganizationsService {
     input: { name: string; slug: string },
     requestId?: string,
   ) {
+    const maxOrgs = this.config.get("PILOT_MAX_ORGANIZATIONS", { infer: true });
+    if (maxOrgs != null) {
+      const orgCount = await this.prisma.organization.count();
+      if (orgCount >= maxOrgs) {
+        throw new ForbiddenException({
+          message: "Pilot organization limit reached. Contact the operator for access.",
+          code: "PILOT_ORG_LIMIT",
+        });
+      }
+    }
+
     const slug = input.slug.trim().toLowerCase();
     const existing = await this.prisma.organization.findUnique({ where: { slug } });
     if (existing) {

@@ -34,12 +34,32 @@ export function PublicFooter() {
           >
             Enterprise
           </Link>
+          <Link className="text-text-secondary no-underline hover:text-emerald" href="/legal/terms">
+            Terms (draft)
+          </Link>
+          <Link className="text-text-secondary no-underline hover:text-emerald" href="/legal/privacy">
+            Privacy (draft)
+          </Link>
+          <Link
+            className="text-text-secondary no-underline hover:text-emerald"
+            href="/legal/financial-disclaimers"
+          >
+            Financial disclaimers
+          </Link>
+          <Link
+            className="text-text-secondary no-underline hover:text-emerald"
+            href="/legal/payments"
+          >
+            Payments &amp; refunds
+          </Link>
         </nav>
       </div>
       <div className="border-t border-border">
         <div className="mx-auto flex max-w-6xl flex-col gap-1 px-5 py-4 text-xs text-text-secondary sm:flex-row sm:justify-between sm:px-8">
           <p>© {new Date().getFullYear()} Opero. All rights reserved.</p>
-          <p>Secure multi-tenant workspace · Evidence-backed diagnostics</p>
+          <p>
+            Draft legal pages require qualified review · Secure multi-tenant workspace
+          </p>
         </div>
       </div>
     </footer>

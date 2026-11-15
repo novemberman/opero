@@ -52,6 +52,7 @@ export class AuthController {
       email: string;
       name: string;
       password: string;
+      inviteCode?: string;
     };
     const user = await this.auth.register({ ...input, requestId: req.requestId });
     return { user };

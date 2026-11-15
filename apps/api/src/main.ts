@@ -20,6 +20,8 @@ async function bootstrap(): Promise<void> {
   const port = Number(process.env.PORT) || config.get("API_PORT", { infer: true });
   const env = {
     NODE_ENV: config.get("NODE_ENV", { infer: true }),
+    APP_ENV: config.get("APP_ENV", { infer: true }),
+    ENABLE_API_DOCS: config.get("ENABLE_API_DOCS", { infer: true }),
     API_HOST: config.get("API_HOST", { infer: true }),
     API_PORT: port,
     CORS_ORIGINS: config.get("CORS_ORIGINS", { infer: true }),

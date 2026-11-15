@@ -73,6 +73,27 @@ export const apiEnvSchema = z
     KORAPAY_PUBLIC_KEY: z.string().min(8).optional(),
     KORAPAY_BASE_URL: z.string().url().default("https://api.korapay.com"),
     BILLING_WEBHOOK_BASE_URL: z.string().url().optional(),
+    /**
+     * When unset: API docs enabled outside production, disabled in production.
+     * Set explicitly to force enable/disable in any environment.
+     */
+    ENABLE_API_DOCS: z
+      .union([z.boolean(), z.enum(["true", "false", "1", "0"])])
+      .optional()
+      .transform((value) => {
+        if (value === undefined) return undefined;
+        return value === true || value === "true" || value === "1";
+      }),
+    /** Invitation-only pilot mode (documentation + production registration defaults). */
+    PILOT_MODE: boolFromEnv.default(false),
+    /** Self-serve /auth/register. Defaults true so staging/dev stay usable; set false for pilot. */
+    PUBLIC_REGISTRATION_ENABLED: boolFromEnv.default(true),
+    /** When set, /auth/register requires matching inviteCode (org invitations still work). */
+    PILOT_INVITE_CODE: z.string().min(1).max(128).optional(),
+    PILOT_MAX_ORGANIZATIONS: z.coerce.number().int().min(1).max(100_000).optional(),
+    PILOT_MAX_USERS: z.coerce.number().int().min(1).max(1_000_000).optional(),
+    EMERGENCY_DISABLE_CHECKOUT: boolFromEnv.default(false),
+    EMERGENCY_DISABLE_UPLOADS: boolFromEnv.default(false),
   })
   .superRefine((env, ctx) => {
     // Prefer APP_ENV when set so Railway staging can use NODE_ENV=production runtime
@@ -230,9 +251,38 @@ export const apiEnvSchema = z
         message: "sk_live_ keys are forbidden in staging; use sk_test_",
       });
     }
+    if (isProduction && env.PILOT_MODE && env.PUBLIC_REGISTRATION_ENABLED) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["PUBLIC_REGISTRATION_ENABLED"],
+        message:
+          "PUBLIC_REGISTRATION_ENABLED must be false when PILOT_MODE=true in production (invitation-only pilot)",
+      });
+    }
   });
 
 export type ApiEnv = z.infer<typeof apiEnvSchema>;
+
+export type AppEnvName = "development" | "test" | "staging" | "production";
+
+export function resolveAppEnv(
+  env: Pick<ApiEnv, "NODE_ENV"> & Partial<Pick<ApiEnv, "APP_ENV">>,
+): AppEnvName {
+  if (env.APP_ENV) return env.APP_ENV;
+  return env.NODE_ENV === "production" ? "production" : env.NODE_ENV;
+}
+
+/** Swagger/OpenAPI UI: off in production unless ENABLE_API_DOCS=true. */
+export function resolveEnableApiDocs(
+  env: Pick<ApiEnv, "NODE_ENV"> &
+    Partial<Pick<ApiEnv, "APP_ENV" | "ENABLE_API_DOCS">>,
+): boolean {
+  if (env.ENABLE_API_DOCS != null) return env.ENABLE_API_DOCS;
+  return resolveAppEnv({
+    APP_ENV: env.APP_ENV,
+    NODE_ENV: env.NODE_ENV,
+  }) !== "production";
+}
 
 export function parseApiEnv(source: unknown): ApiEnv {
   const parsed = apiEnvSchema.safeParse(source);

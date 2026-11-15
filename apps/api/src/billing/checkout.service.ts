@@ -16,7 +16,7 @@ import {
   type MockChargeState,
 } from "@opero/payments";
 import { AuditService } from "../audit/audit.service";
-import type { ApiEnv } from "../config/env";
+import { resolveAppEnv, type ApiEnv } from "../config/env";
 import { PRISMA_CLIENT } from "../database/database.constants";
 import type { AuthenticatedUser } from "../types/express";
 import { CatalogService } from "./catalog.service";
@@ -45,6 +45,15 @@ export class CheckoutService {
     );
   }
 
+  private assertCheckoutEnabled(): void {
+    if (this.config.get("EMERGENCY_DISABLE_CHECKOUT", { infer: true })) {
+      throw new BadRequestException({
+        message: "Checkout is temporarily disabled by the operator.",
+        code: "EMERGENCY_DISABLE_CHECKOUT",
+      });
+    }
+  }
+
   async startXrayProCheckout(input: {
     organizationId: string;
     actor: AuthenticatedUser;
@@ -53,6 +62,7 @@ export class CheckoutService {
     redirectUrl?: string;
     requestId?: string;
   }) {
+    this.assertCheckoutEnabled();
     const report = await this.prisma.xRayReport.findFirst({
       where: { id: input.reportId, organizationId: input.organizationId },
       select: { id: true },
@@ -170,6 +180,7 @@ export class CheckoutService {
     redirectUrl?: string;
     requestId?: string;
   }) {
+    this.assertCheckoutEnabled();
     const existing = await this.prisma.checkoutIntent.findUnique({
       where: { idempotencyKey: input.idempotencyKey },
     });
@@ -285,6 +296,15 @@ export class CheckoutService {
     actor: AuthenticatedUser;
     requestId?: string;
   }) {
+    // Defense in depth: production must never expose mock settlement even if misconfigured.
+    if (
+      resolveAppEnv({
+        APP_ENV: this.config.get("APP_ENV", { infer: true }),
+        NODE_ENV: this.config.get("NODE_ENV", { infer: true }),
+      }) === "production"
+    ) {
+      throw new NotFoundException();
+    }
     if (this.payments.name !== "mock" || !(this.payments instanceof MockKorapayProvider)) {
       // Do not advertise a settlement bypass when Korapay (or any non-mock) is live.
       throw new NotFoundException();

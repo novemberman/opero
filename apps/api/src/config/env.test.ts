@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { parseApiEnv, resolveCookieSecure } from "./env";
+import {
+  parseApiEnv,
+  resolveAppEnv,
+  resolveCookieSecure,
+  resolveEnableApiDocs,
+} from "./env";
 
 const valid = {
   DATABASE_URL: "postgresql://opero:secret@127.0.0.1:54329/opero",
@@ -262,5 +267,84 @@ describe("parseApiEnv", () => {
     expect(resolveCookieSecure({ NODE_ENV: "development", COOKIE_SECURE: undefined })).toBe(false);
     expect(resolveCookieSecure({ NODE_ENV: "production", COOKIE_SECURE: undefined })).toBe(true);
     expect(resolveCookieSecure({ NODE_ENV: "development", COOKIE_SECURE: true })).toBe(true);
+  });
+
+  it("defaults pilot and emergency flags for local/dev", () => {
+    const env = parseApiEnv(valid);
+    expect(env.PILOT_MODE).toBe(false);
+    expect(env.PUBLIC_REGISTRATION_ENABLED).toBe(true);
+    expect(env.EMERGENCY_DISABLE_CHECKOUT).toBe(false);
+    expect(env.EMERGENCY_DISABLE_UPLOADS).toBe(false);
+    expect(env.ENABLE_API_DOCS).toBeUndefined();
+  });
+
+  it("forbids open registration when PILOT_MODE is true in production", () => {
+    expect(() =>
+      parseApiEnv({
+        ...valid,
+        NODE_ENV: "production",
+        APP_ENV: "production",
+        DOCUMENT_STORAGE_DRIVER: "s3",
+        S3_ENDPOINT: "https://s3.example.com",
+        S3_ACCESS_KEY_ID: "AKIAEXAMPLE",
+        S3_SECRET_ACCESS_KEY: "secretsecret",
+        ...deployedResend,
+        PAYMENT_PROVIDER: "korapay",
+        KORAPAY_SECRET_KEY: "sk_live_examplekey",
+        APP_ORIGIN: "https://app.example.com",
+        REDIS_PASSWORD: "prod-redis-password",
+        PILOT_MODE: "true",
+        PUBLIC_REGISTRATION_ENABLED: "true",
+      }),
+    ).toThrow(/PUBLIC_REGISTRATION_ENABLED/);
+  });
+
+  it("accepts invitation-only pilot production config", () => {
+    const env = parseApiEnv({
+      ...valid,
+      NODE_ENV: "production",
+      APP_ENV: "production",
+      DOCUMENT_STORAGE_DRIVER: "s3",
+      S3_ENDPOINT: "https://s3.example.com",
+      S3_ACCESS_KEY_ID: "AKIAEXAMPLE",
+      S3_SECRET_ACCESS_KEY: "secretsecret",
+      ...deployedResend,
+      PAYMENT_PROVIDER: "korapay",
+      KORAPAY_SECRET_KEY: "sk_live_examplekey",
+      APP_ORIGIN: "https://app.example.com",
+      REDIS_PASSWORD: "prod-redis-password",
+      PILOT_MODE: "true",
+      PUBLIC_REGISTRATION_ENABLED: "false",
+      PILOT_MAX_ORGANIZATIONS: "25",
+      PILOT_MAX_USERS: "100",
+    });
+    expect(env.PILOT_MODE).toBe(true);
+    expect(env.PUBLIC_REGISTRATION_ENABLED).toBe(false);
+    expect(env.PILOT_MAX_ORGANIZATIONS).toBe(25);
+  });
+
+  it("resolves API docs off by default in production", () => {
+    expect(
+      resolveEnableApiDocs({
+        NODE_ENV: "production",
+        APP_ENV: "production",
+        ENABLE_API_DOCS: undefined,
+      }),
+    ).toBe(false);
+    expect(
+      resolveEnableApiDocs({
+        NODE_ENV: "production",
+        APP_ENV: "staging",
+        ENABLE_API_DOCS: undefined,
+      }),
+    ).toBe(true);
+    expect(
+      resolveEnableApiDocs({
+        NODE_ENV: "production",
+        APP_ENV: "production",
+        ENABLE_API_DOCS: true,
+      }),
+    ).toBe(true);
+    expect(resolveAppEnv({ NODE_ENV: "production", APP_ENV: "staging" })).toBe("staging");
   });
 });

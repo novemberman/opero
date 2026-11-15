@@ -82,6 +82,8 @@ export const registerBodySchema = z
     email: z.email().max(320),
     name: z.string().trim().min(1).max(120),
     password: z.string().min(12).max(200),
+    /** Optional pilot bootstrap code when PILOT_INVITE_CODE is configured on the API. */
+    inviteCode: z.string().trim().min(1).max(128).optional(),
   })
   .strict();
 

@@ -72,6 +72,24 @@ export default function UnlockReportPage() {
           {pending ? "Starting checkout…" : "Pay NGN 15,000"}
         </button>
         <p className="mt-4 text-xs text-muted">OWNER or ADMIN billing permission required.</p>
+        <p className="mt-4 text-xs leading-relaxed text-muted">
+          Draft disclosures (not final legal terms):{" "}
+          <Link href="/legal/payments" className="text-pine no-underline hover:underline">
+            Payments &amp; refunds
+          </Link>
+          ,{" "}
+          <Link href="/legal/terms" className="text-pine no-underline hover:underline">
+            Terms
+          </Link>
+          ,{" "}
+          <Link
+            href="/legal/financial-disclaimers"
+            className="text-pine no-underline hover:underline"
+          >
+            financial disclaimers
+          </Link>
+          .
+        </p>
         <Link
           className="mt-8 inline-block text-pine no-underline"
           href={`/organizations/${params.orgId}/reports/${params.reportId}`}

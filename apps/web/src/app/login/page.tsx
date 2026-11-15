@@ -1,16 +1,20 @@
 import { AuthLinks, AuthForm } from "../../components/auth-form";
 import { AuthShell } from "../../components/auth/auth-shell";
+import { LegalLinksInline } from "../../components/legal/legal-nav";
 
 export default function LoginPage() {
   return (
     <AuthShell
       footer={
-        <AuthLinks
-          links={[
-            { href: "/register", label: "Create account" },
-            { href: "/forgot-password", label: "Forgot password" },
-          ]}
-        />
+        <div className="space-y-3">
+          <AuthLinks
+            links={[
+              { href: "/register", label: "Create account" },
+              { href: "/forgot-password", label: "Forgot password" },
+            ]}
+          />
+          <LegalLinksInline />
+        </div>
       }
     >
       <AuthForm

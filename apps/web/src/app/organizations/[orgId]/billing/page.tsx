@@ -136,6 +136,12 @@ function BillingInner() {
         <Link className="text-pine no-underline" href="/pricing">
           Public pricing
         </Link>
+        <Link className="text-pine no-underline" href="/legal/payments">
+          Payments &amp; refunds (draft)
+        </Link>
+        <Link className="text-pine no-underline" href="/legal/terms">
+          Terms (draft)
+        </Link>
       </div>
     </div>
   );
