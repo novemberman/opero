@@ -3,6 +3,7 @@ import {
   ForbiddenException,
   Inject,
   Injectable,
+  Logger,
   UnauthorizedException,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
@@ -14,6 +15,10 @@ import { PRISMA_CLIENT } from "../database/database.constants";
 import { hashPassword, verifyPassword } from "../security/passwords";
 import { timingSafeStringEqual } from "../security/timing-safe-equal";
 import { generateOpaqueToken, hashToken } from "../security/tokens";
+import {
+  isEmailProviderError,
+  mapEmailProviderError,
+} from "./email/map-email-provider-error";
 import { EmailPort } from "./email/email.port";
 import { buildPasswordResetEmail, buildVerificationEmail } from "./email/email.templates";
 import { SessionService } from "./session.service";
@@ -25,6 +30,8 @@ const PILOT_USER_CAP_LOCK = 8_720_140_1;
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     @Inject(PRISMA_CLIENT) private readonly prisma: PrismaClient,
     private readonly sessions: SessionService,
@@ -111,14 +118,30 @@ export class AuthService {
       return { id: created.id, email: created.email, name: created.name };
     });
 
-    await this.email.send(
-      buildVerificationEmail({
-        to: user.email,
-        appOrigin: this.appOrigin(),
-        token: rawToken,
-        ttlHours: this.tokenTtlHours(),
-      }),
-    );
+    try {
+      await this.email.send(
+        buildVerificationEmail({
+          to: user.email,
+          appOrigin: this.appOrigin(),
+          token: rawToken,
+          ttlHours: this.tokenTtlHours(),
+        }),
+      );
+    } catch (error) {
+      // Compensate: do not leave an unverified account when delivery fails.
+      await this.prisma.user
+        .delete({ where: { id: user.id } })
+        .catch((cleanupError) => {
+          this.logger.error(
+            `Failed to roll back user ${user.id} after email delivery error`,
+            cleanupError instanceof Error ? cleanupError.stack : cleanupError,
+          );
+        });
+      if (isEmailProviderError(error)) {
+        throw mapEmailProviderError(error);
+      }
+      throw error;
+    }
 
     await this.audit.record({
       action: "auth.register",
@@ -231,7 +254,7 @@ export class AuthService {
     }
 
     const rawToken = generateOpaqueToken();
-    await this.prisma.passwordResetToken.create({
+    const reset = await this.prisma.passwordResetToken.create({
       data: {
         userId: user.id,
         tokenHash: hashToken(rawToken),
@@ -239,14 +262,27 @@ export class AuthService {
       },
     });
 
-    await this.email.send(
-      buildPasswordResetEmail({
-        to: user.email,
-        appOrigin: this.appOrigin(),
-        token: rawToken,
-        ttlHours: this.tokenTtlHours(),
-      }),
-    );
+    try {
+      await this.email.send(
+        buildPasswordResetEmail({
+          to: user.email,
+          appOrigin: this.appOrigin(),
+          token: rawToken,
+          ttlHours: this.tokenTtlHours(),
+        }),
+      );
+    } catch (error) {
+      await this.prisma.passwordResetToken
+        .delete({ where: { id: reset.id } })
+        .catch(() => undefined);
+      // Enumeration-safe: do not leak delivery failures on forgot-password.
+      this.logger.warn(
+        `Password-reset email delivery failed for user ${user.id}: ${
+          isEmailProviderError(error) ? error.code : "unknown"
+        }`,
+      );
+      return;
+    }
 
     await this.audit.record({
       action: "auth.password_reset_requested",
