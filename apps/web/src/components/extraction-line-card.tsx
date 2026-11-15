@@ -1,8 +1,9 @@
 "use client";
 
 import { FormEvent } from "react";
-import { Alert, Badge, Button, Input, Select } from "./ui";
+import { resolveMonetaryPresentation } from "../lib/monetary-presentation";
 import { cn } from "../lib/cn";
+import { Alert, Badge, Button, Input, Select } from "./ui";
 
 export type ExtractionLine = {
   id: string;
@@ -36,6 +37,15 @@ function toneForReview(status: string): "warning" | "success" | "error" | "neutr
   return "neutral";
 }
 
+function amountTone(
+  kind: ReturnType<typeof resolveMonetaryPresentation>["kind"],
+): "success" | "warning" | "neutral" | "info" {
+  if (kind === "confirmed") return "success";
+  if (kind === "provisional") return "warning";
+  if (kind === "non_monetary") return "info";
+  return "neutral";
+}
+
 export function ExtractionLineCard({
   line,
   canWrite,
@@ -45,13 +55,15 @@ export function ExtractionLineCard({
   canWrite: boolean;
   onReview: (event: FormEvent<HTMLFormElement>, lineItemId: string) => void | Promise<void>;
 }) {
-  const isMonetary = !line.quantityClass || line.quantityClass === "MONETARY";
+  const presentation = resolveMonetaryPresentation(line);
   const needsAttention =
     line.reviewStatus === "PENDING" ||
     Boolean(line.unitScaleRequiresReview) ||
     line.quality === "LOW" ||
     line.quality === "MANUAL" ||
-    line.concept === "UNMAPPED";
+    line.concept === "UNMAPPED" ||
+    presentation.kind === "provisional" ||
+    presentation.kind === "undetermined";
 
   return (
     <li
@@ -60,6 +72,7 @@ export function ExtractionLineCard({
         needsAttention ? "border-warning/40" : "border-border",
       )}
       data-testid="extraction-line-card"
+      data-amount-kind={presentation.kind}
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
@@ -71,6 +84,15 @@ export function ExtractionLineCard({
             {line.quantityClass ? <Badge tone="neutral">{line.quantityClass}</Badge> : null}
             <Badge tone={toneForReview(line.reviewStatus)}>{line.reviewStatus}</Badge>
             <Badge tone={line.quality === "HIGH" ? "success" : "warning"}>{line.quality}</Badge>
+            <Badge tone={amountTone(presentation.kind)}>
+              {presentation.kind === "confirmed"
+                ? "Confirmed amount"
+                : presentation.kind === "provisional"
+                  ? "Provisional amount"
+                  : presentation.kind === "undetermined"
+                    ? "Undetermined amount"
+                    : "Non-monetary"}
+            </Badge>
           </div>
         </div>
       </div>
@@ -97,37 +119,45 @@ export function ExtractionLineCard({
             {line.scaleConfidence ? ` · ${line.scaleConfidence}` : ""}
           </dd>
         </div>
-        <div>
+        <div className="sm:col-span-2 lg:col-span-3">
           <dt className="text-[11px] font-semibold uppercase tracking-[0.12em] text-text-secondary">
-            Actual monetary amount
+            {presentation.fieldLabel}
           </dt>
-          <dd className="mt-1 font-data text-sm text-navy">
-            {isMonetary
-              ? `${line.currency ?? ""} ${line.actualMonetaryValue ?? "—"}`.trim()
-              : "Not applicable — non-monetary"}
+          <dd
+            className={cn(
+              "mt-1 font-data text-sm",
+              presentation.isEstablished ? "text-navy" : "text-text-secondary",
+            )}
+            data-testid="monetary-amount-display"
+            data-established={presentation.isEstablished ? "true" : "false"}
+          >
+            {presentation.amountText}
           </dd>
         </div>
       </dl>
 
-      {!isMonetary ? (
+      {presentation.cautionTitle && presentation.cautionBody ? (
         <div className="mt-3">
-          <Alert tone="info" title="Non-monetary quantity">
-            This line is classified as {line.quantityClass}. It is not treated as a validated NGN
-            figure and is not scale-multiplied.
+          <Alert
+            tone={presentation.kind === "non_monetary" ? "info" : "warning"}
+            title={presentation.cautionTitle}
+          >
+            {presentation.cautionBody}
           </Alert>
         </div>
       ) : null}
 
-      {line.unitScaleRequiresReview ? (
+      {line.unitScaleRequiresReview && presentation.kind !== "confirmed" ? (
         <div className="mt-3">
           <Alert tone="warning" title="Scale needs confirmation">
             Confirm whether statement units require a thousands/millions multiplier before treating
-            the actual amount as final.
+            any calculated amount as final. An ambiguous scale must not be shown as an established
+            NGN figure.
           </Alert>
         </div>
       ) : null}
 
-      {line.concept === "UNMAPPED" && isMonetary ? (
+      {line.concept === "UNMAPPED" && presentation.kind !== "non_monetary" ? (
         <div className="mt-3">
           <Alert tone="warning" title="Unmapped concept">
             Mapping is not confirmed. Do not treat this as a validated diagnostic input until

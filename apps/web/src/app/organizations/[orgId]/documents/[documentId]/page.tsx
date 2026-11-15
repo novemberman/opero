@@ -267,8 +267,10 @@ export default function DocumentDetailPage() {
               Extracted figures
             </h2>
             <p className="mt-1 text-sm text-text-secondary">
-              Prioritized by uncertainty. Raw, statement units and actual monetary amounts are shown
-              separately. Non-monetary lines are never treated as validated NGN figures.
+              Prioritized by uncertainty. Raw values and statement units are always preserved.
+              Monetary amounts are shown as confirmed, provisional or undetermined based on mapping,
+              scale confirmation and review status — never from extraction confidence alone.
+              Non-monetary quantities never appear as NGN amounts.
             </p>
           </div>
           {lines.length > 0 ? (

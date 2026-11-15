@@ -20,6 +20,7 @@ import {
   EmptyState,
   buttonClassName,
 } from "../../../components/ui";
+import { documentStatusLabel, documentStatusTone } from "../../../lib/document-status-labels";
 
 const now = "2026-11-14T18:00:00.000Z";
 
@@ -58,6 +59,12 @@ const fixtureProgress: DocumentProcessingProgress = {
   }),
 };
 
+const fixtureProgressIndeterminate: DocumentProcessingProgress = {
+  ...fixtureProgress,
+  progressPercent: null,
+  nextRecommendedAction: "Processing without a reliable percentage",
+};
+
 const fixtureLines: ExtractionLine[] = [
   {
     id: "1",
@@ -72,7 +79,7 @@ const fixtureLines: ExtractionLine[] = [
     scaleConfidence: "HIGH",
     unitScaleRequiresReview: false,
     quality: "HIGH",
-    reviewStatus: "PENDING",
+    reviewStatus: "CONFIRMED",
     evidence: {
       evidenceKey: "abcd1234evidence",
       pageNumber: 2,
@@ -119,6 +126,26 @@ const fixtureLines: ExtractionLine[] = [
       snippet: "Gross margin 58.3%",
     },
   },
+  {
+    id: "4",
+    concept: "COST_OF_SALES",
+    labelRaw: "Cost of sales",
+    rawValue: "—",
+    normalizedValue: null,
+    actualMonetaryValue: null,
+    currency: "NGN",
+    quantityClass: "MONETARY",
+    unitScale: "THOUSANDS",
+    scaleConfidence: "LOW",
+    unitScaleRequiresReview: true,
+    quality: "LOW",
+    reviewStatus: "PENDING",
+    evidence: {
+      evidenceKey: "mnop3456evidence",
+      pageNumber: 2,
+      snippet: "Cost of sales (illegible)",
+    },
+  },
 ];
 
 export default function DocumentsDesignSpecimen() {
@@ -148,36 +175,92 @@ export default function DocumentsDesignSpecimen() {
           <Alert tone="info" title="Fixture preview">
             Sample filenames and statuses — not live tenant data.
           </Alert>
-          <div className="overflow-hidden rounded-2xl border border-border bg-surface">
-            <div className="grid gap-2 border-b border-border px-4 py-3 sm:grid-cols-[1.4fr_5rem_8rem_8rem]">
+          <div
+            className="hidden overflow-hidden rounded-2xl border border-border bg-surface md:block"
+            data-testid="fixture-library-desktop"
+          >
+            <div className="grid gap-2 border-b border-border px-4 py-3 grid-cols-[1.4fr_5rem_9rem_8rem]">
               <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
                 Document
               </p>
-              <p className="hidden text-xs font-semibold uppercase tracking-wide text-text-secondary sm:block">
+              <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
                 Format
               </p>
-              <p className="hidden text-xs font-semibold uppercase tracking-wide text-text-secondary sm:block">
+              <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
                 Processing
               </p>
-              <p className="hidden text-xs font-semibold uppercase tracking-wide text-text-secondary sm:block">
+              <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
                 Uploaded
               </p>
             </div>
-            {[
-              ["Netshift-FY2024.pdf", "PDF", "REVIEW_REQUIRED", "warning"],
-              ["Netshift-FY2025.csv", "CSV", "READY", "success"],
-            ].map(([name, format, status, tone]) => (
+            {(
+              [
+                ["Netshift-FY2024.pdf", "PDF", "REVIEW_REQUIRED"],
+                ["Netshift-FY2025.csv", "CSV", "READY"],
+              ] as const
+            ).map(([name, format, status]) => (
               <div
                 key={name}
-                className="grid gap-2 border-b border-border px-4 py-3 last:border-b-0 sm:grid-cols-[1.4fr_5rem_8rem_8rem]"
+                className="grid gap-2 border-b border-border px-4 py-3 last:border-b-0 grid-cols-[1.4fr_5rem_9rem_8rem]"
               >
                 <p className="font-medium text-navy">{name}</p>
                 <p className="text-sm text-text-secondary">{format}</p>
-                <Badge tone={tone as "warning" | "success"}>{status}</Badge>
+                <Badge
+                  tone={documentStatusTone(status)}
+                  title={`processing status: ${status}`}
+                  data-status={status}
+                  className="max-w-full truncate"
+                >
+                  {documentStatusLabel("processing", status)}
+                </Badge>
                 <p className="font-data text-xs text-text-secondary">14 Nov 2026, 18:02</p>
               </div>
             ))}
           </div>
+
+          <ul className="space-y-3 md:hidden" data-testid="fixture-library-mobile">
+            {(
+              [
+                ["Netshift-FY2024.pdf", "PDF", "REVIEW_REQUIRED", "CLEAN", "SUCCEEDED"],
+                ["Netshift-FY2025.csv", "CSV", "READY", "CLEAN", "SUCCEEDED"],
+              ] as const
+            ).map(([name, format, processing, scan, extraction]) => (
+              <li key={name} className="rounded-2xl border border-border bg-surface p-4 shadow-sm">
+                <p className="break-words font-semibold text-navy">{name}</p>
+                <p className="mt-1 text-xs text-text-secondary">{format} · 14 Nov 2026, 18:02</p>
+                <div className="mt-3 flex flex-wrap gap-2 overflow-hidden">
+                  <Badge
+                    tone={documentStatusTone(processing)}
+                    title={`processing status: ${processing}`}
+                    data-status={processing}
+                    className="max-w-full truncate"
+                  >
+                    <span className="truncate">
+                      {documentStatusLabel("processing", processing)}
+                    </span>
+                  </Badge>
+                  <Badge
+                    tone={documentStatusTone(scan)}
+                    title={`scan status: ${scan}`}
+                    data-status={scan}
+                    className="max-w-full truncate"
+                  >
+                    <span className="truncate">Scan: {documentStatusLabel("scan", scan)}</span>
+                  </Badge>
+                  <Badge
+                    tone={documentStatusTone(extraction)}
+                    title={`extraction status: ${extraction}`}
+                    data-status={extraction}
+                    className="max-w-full truncate"
+                  >
+                    <span className="truncate">
+                      Extract: {documentStatusLabel("extraction", extraction)}
+                    </span>
+                  </Badge>
+                </div>
+              </li>
+            ))}
+          </ul>
         </section>
 
         <section className="space-y-3" data-testid="fixture-upload">
@@ -192,20 +275,23 @@ export default function DocumentsDesignSpecimen() {
             type="button"
             className={buttonClassName({ variant: "secondary", size: "sm" })}
             onClick={() => setShowUploadError((v) => !v)}
+            data-testid="fixture-toggle-duplicate"
           >
-            Toggle duplicate-name guard list
+            Toggle duplicate-name advisory list (fixture only)
           </button>
         </section>
 
         <section className="space-y-3" data-testid="fixture-timeline">
           <h2 className="text-xl text-navy">Active processing timeline</h2>
           <ProcessingTimeline progress={fixtureProgress} elapsedLabel="Elapsed 42s" />
+          <h3 className="text-base font-semibold text-navy">Stage-only progress (no percent)</h3>
+          <ProcessingTimeline progress={fixtureProgressIndeterminate} elapsedLabel="Elapsed 12s" />
         </section>
 
         <section className="space-y-3" data-testid="fixture-extraction-review">
           <h2 className="text-xl text-navy">Extraction review</h2>
           <Alert tone="warning" title="Human confirmation required">
-            Mixed mapped, unmapped and non-monetary lines — fixture sample.
+            Confirmed, provisional, undetermined and non-monetary lines — fixture sample.
           </Alert>
           <ul className="space-y-4">
             {fixtureLines.map((line) => (
@@ -219,18 +305,37 @@ export default function DocumentsDesignSpecimen() {
           </ul>
         </section>
 
+        <section className="space-y-3" data-testid="fixture-scale-warning">
+          <h2 className="text-xl text-navy">Ambiguous scale warning</h2>
+          <ExtractionLineCard
+            line={fixtureLines[1]!}
+            canWrite={false}
+            onReview={async () => undefined}
+          />
+        </section>
+
         <section className="space-y-3" data-testid="fixture-docs-empty">
           <h2 className="text-xl text-navy">Empty state</h2>
           <EmptyState
             title="No documents yet"
             description="Upload a PDF, XLSX or CSV financial statement to begin scanning and extraction."
+            action={
+              <button type="button" className={buttonClassName({ variant: "primary", size: "sm" })}>
+                Upload document
+              </button>
+            }
           />
         </section>
 
         <section className="space-y-3" data-testid="fixture-docs-error">
           <h2 className="text-xl text-navy">Error state</h2>
           <Alert tone="error" title="Unable to load documents">
-            The documents API returned an error. Retry or check your connection.
+            <div className="space-y-3">
+              <p>The documents API returned an error. Retry or check your connection.</p>
+              <button type="button" className={buttonClassName({ variant: "secondary", size: "sm" })}>
+                Retry
+              </button>
+            </div>
           </Alert>
         </section>
       </div>

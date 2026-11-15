@@ -11,20 +11,27 @@ import {
 } from "../lib/document-upload-rules";
 import { Alert, Button, ProgressBar } from "./ui";
 
+type SelectedFile = {
+  file: File;
+  fileName: string;
+  fileSize: number;
+  fileType: string;
+  advisoryWarning: string | null;
+};
+
 type UploadState =
   | { phase: "idle" }
-  | { phase: "preparing"; fileName: string; fileSize: number; fileType: string }
+  | { phase: "selected"; selected: SelectedFile }
+  | { phase: "preparing"; selected: SelectedFile }
   | {
       phase: "uploading";
-      fileName: string;
-      fileSize: number;
-      fileType: string;
+      selected: SelectedFile;
       loaded: number;
       total: number;
     }
-  | { phase: "processing"; fileName: string; fileSize: number; fileType: string }
+  | { phase: "processing"; selected: SelectedFile }
   | { phase: "success"; fileName: string }
-  | { phase: "error"; message: string };
+  | { phase: "error"; message: string; selected?: SelectedFile };
 
 async function completeUploadWithProgress(input: {
   orgId: string;
@@ -66,6 +73,19 @@ async function completeUploadWithProgress(input: {
   });
 }
 
+function toSelectedFile(file: File, existingFilenames: string[]): SelectedFile | { error: string } {
+  const validation = validateDocumentUploadClient(file, existingFilenames);
+  if (validation.error) return { error: validation.error };
+  const format = detectDocumentFormat(file.name)!;
+  return {
+    file,
+    fileName: file.name,
+    fileSize: file.size,
+    fileType: format,
+    advisoryWarning: validation.advisoryWarning,
+  };
+}
+
 export function DocumentUploadForm({
   orgId,
   disabled,
@@ -88,30 +108,31 @@ export function DocumentUploadForm({
     return Math.round((state.loaded / Math.max(state.total, 1)) * 100);
   }, [state]);
 
-  const uploadFile = useCallback(
-    async (file: File) => {
-      const clientError = validateDocumentUploadClient(file, existingFilenames);
-      if (clientError) {
-        setState({ phase: "error", message: clientError });
+  const selectFile = useCallback(
+    (file: File) => {
+      const result = toSelectedFile(file, existingFilenames);
+      if ("error" in result) {
+        setState({ phase: "error", message: result.error });
         return;
       }
-      const format = detectDocumentFormat(file.name)!;
-      setState({
-        phase: "preparing",
-        fileName: file.name,
-        fileSize: file.size,
-        fileType: format,
-      });
+      setState({ phase: "selected", selected: result });
+    },
+    [existingFilenames],
+  );
+
+  const uploadSelected = useCallback(
+    async (selected: SelectedFile) => {
+      setState({ phase: "preparing", selected });
       try {
         const created = await apiFetch<{ upload?: { uploadId: string }; message?: string }>(
           `/organizations/${orgId}/documents/uploads`,
           {
             method: "POST",
             json: {
-              filename: file.name,
-              declaredMimeType: file.type || undefined,
-              declaredFormat: format,
-              expectedByteSize: file.size,
+              filename: selected.fileName,
+              declaredMimeType: selected.file.type || undefined,
+              declaredFormat: selected.fileType,
+              expectedByteSize: selected.fileSize,
             },
           },
         );
@@ -121,23 +142,19 @@ export function DocumentUploadForm({
 
         setState({
           phase: "uploading",
-          fileName: file.name,
-          fileSize: file.size,
-          fileType: format,
+          selected,
           loaded: 0,
-          total: file.size,
+          total: selected.fileSize,
         });
 
         const completed = await completeUploadWithProgress({
           orgId,
           uploadId: created.body.upload.uploadId,
-          file,
+          file: selected.file,
           onProgress: (loaded, total) => {
             setState({
               phase: "uploading",
-              fileName: file.name,
-              fileSize: file.size,
-              fileType: format,
+              selected,
               loaded,
               total,
             });
@@ -147,40 +164,60 @@ export function DocumentUploadForm({
           throw new Error(apiErrorMessage(completed.body, "Upload completion failed"));
         }
 
-        setState({
-          phase: "processing",
-          fileName: file.name,
-          fileSize: file.size,
-          fileType: format,
-        });
+        setState({ phase: "processing", selected });
         await onUploaded();
-        setState({ phase: "success", fileName: file.name });
+        setState({ phase: "success", fileName: selected.fileName });
       } catch (err) {
         setState({
           phase: "error",
           message: err instanceof Error ? err.message : "Upload failed",
+          selected,
         });
       }
     },
-    [orgId, onUploaded, existingFilenames],
+    [orgId, onUploaded],
   );
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (disabled) return;
-    const file = inputRef.current?.files?.[0];
-    if (!file) {
-      setState({ phase: "error", message: "Choose a PDF, XLSX or CSV file to upload." });
+    if (disabled || busy) return;
+    if (state.phase === "selected") {
+      await uploadSelected(state.selected);
+      if (inputRef.current) inputRef.current.value = "";
       return;
     }
-    await uploadFile(file);
+    const file = inputRef.current?.files?.[0];
+    if (!file) {
+      setState({
+        phase: "error",
+        message: "Choose a PDF, XLSX or CSV file to upload.",
+      });
+      return;
+    }
+    const result = toSelectedFile(file, existingFilenames);
+    if ("error" in result) {
+      setState({ phase: "error", message: result.error });
+      return;
+    }
+    await uploadSelected(result);
     if (inputRef.current) inputRef.current.value = "";
   }
 
+  const selectedSummary =
+    state.phase === "selected" ||
+    state.phase === "preparing" ||
+    state.phase === "uploading" ||
+    state.phase === "processing"
+      ? state.selected
+      : state.phase === "error" && state.selected
+        ? state.selected
+        : null;
+
   return (
     <form
+      id="document-upload"
       onSubmit={(event) => void onSubmit(event)}
-      className={`rounded-2xl border border-dashed p-5 sm:p-6 ${
+      className={`rounded-2xl border p-5 shadow-sm sm:p-6 ${
         dragOver ? "border-emerald bg-emerald/5" : "border-border bg-surface"
       }`}
       onDragOver={(event) => {
@@ -193,9 +230,10 @@ export function DocumentUploadForm({
         setDragOver(false);
         if (disabled || busy) return;
         const file = event.dataTransfer.files?.[0];
-        if (file) void uploadFile(file);
+        if (file) selectFile(file);
       }}
       aria-busy={busy || undefined}
+      data-testid="document-upload-form"
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
@@ -225,32 +263,64 @@ export function DocumentUploadForm({
         disabled={disabled || busy}
         onChange={(event) => {
           const file = event.currentTarget.files?.[0];
-          if (file) void uploadFile(file);
+          if (file) selectFile(file);
           event.currentTarget.value = "";
         }}
       />
 
-      <p className="mt-4 rounded-xl border border-border bg-workspace px-4 py-6 text-center text-sm text-text-secondary">
-        Drag and drop a file here, or use Choose file. Keyboard users can activate Choose file and
-        select from the system picker.
-      </p>
+      <div
+        className={`mt-4 rounded-xl border-2 border-dashed px-4 py-8 text-center transition-colors ${
+          dragOver
+            ? "border-emerald bg-emerald/10"
+            : "border-border bg-workspace"
+        }`}
+        role="presentation"
+      >
+        <p className="text-sm font-medium text-navy">
+          {dragOver ? "Drop to select file" : "Drag and drop a statement here"}
+        </p>
+        <p className="mt-1 text-xs text-text-secondary">
+          Or use Choose file. Keyboard users can activate Choose file and select from the system
+          picker.
+        </p>
+      </div>
 
-      {state.phase !== "idle" && state.phase !== "error" && state.phase !== "success" ? (
-        <div className="mt-4 space-y-2 text-sm text-text-secondary">
-          <p className="font-medium text-navy">
-            {state.fileName} · {state.fileType} · {formatUploadBytes(state.fileSize)}
+      {selectedSummary ? (
+        <div
+          className="mt-4 rounded-xl border border-border bg-workspace px-4 py-3 text-sm"
+          data-testid="selected-file-summary"
+        >
+          <p className="font-medium text-navy">{selectedSummary.fileName}</p>
+          <p className="mt-1 text-text-secondary">
+            Format {selectedSummary.fileType} · {formatUploadBytes(selectedSummary.fileSize)}
           </p>
-          {state.phase === "uploading" && uploadProgress != null ? (
-            <ProgressBar value={uploadProgress} label={`Uploading ${uploadProgress}%`} />
+          {selectedSummary.advisoryWarning ? (
+            <div className="mt-3">
+              <Alert tone="warning" title="Filename already used">
+                {selectedSummary.advisoryWarning}
+              </Alert>
+            </div>
           ) : null}
+        </div>
+      ) : null}
+
+      {state.phase === "uploading" && uploadProgress != null ? (
+        <div className="mt-4 space-y-2 text-sm text-text-secondary">
+          <ProgressBar value={uploadProgress} label={`Uploading ${uploadProgress}%`} />
           <p>
-            {state.phase === "preparing"
-              ? "Preparing secure upload…"
-              : state.phase === "uploading"
-                ? `Uploading… ${formatUploadBytes(state.loaded)} / ${formatUploadBytes(state.total)}`
-                : "Upload complete — scanning and extraction will continue in the background"}
+            Uploading… {formatUploadBytes(state.loaded)} / {formatUploadBytes(state.total)}
           </p>
         </div>
+      ) : null}
+
+      {state.phase === "preparing" ? (
+        <p className="mt-4 text-sm text-text-secondary">Preparing secure upload…</p>
+      ) : null}
+
+      {state.phase === "processing" ? (
+        <p className="mt-4 text-sm text-text-secondary">
+          Upload complete — scanning and extraction will continue in the background.
+        </p>
       ) : null}
 
       {state.phase === "success" ? (
@@ -271,16 +341,20 @@ export function DocumentUploadForm({
       ) : null}
 
       <div className="mt-4 flex flex-wrap gap-2">
-        <Button type="submit" loading={busy} disabled={disabled}>
+        <Button
+          type="submit"
+          loading={busy}
+          disabled={disabled || (state.phase !== "selected" && !busy)}
+        >
           {busy ? "Uploading…" : "Upload"}
         </Button>
-        {state.phase === "error" || state.phase === "success" ? (
+        {state.phase === "selected" || state.phase === "error" || state.phase === "success" ? (
           <Button
             type="button"
             variant="ghost"
             onClick={() => setState({ phase: "idle" })}
           >
-            Dismiss
+            {state.phase === "selected" ? "Clear selection" : "Dismiss"}
           </Button>
         ) : null}
       </div>

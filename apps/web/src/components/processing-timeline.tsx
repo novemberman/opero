@@ -1,8 +1,9 @@
 "use client";
 
 import type { DocumentProcessingProgress } from "@opero/shared";
-import { Alert, Badge, ProgressBar } from "./ui";
+import { resolveProgressDisplay } from "../lib/processing-progress-display";
 import { cn } from "../lib/cn";
+import { Alert, Badge, ProgressBar } from "./ui";
 
 function stageTone(status: string): "success" | "warning" | "error" | "neutral" | "info" {
   if (status === "COMPLETED") return "success";
@@ -23,8 +24,7 @@ export function ProcessingTimeline({
     typeof window !== "undefined" &&
     window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
-  const percent = progress.progressPercent;
-  const indeterminate = percent == null;
+  const display = resolveProgressDisplay(progress);
   const currentLabel =
     progress.stages.find((s) => s.id === progress.currentStage)?.label ?? progress.currentStage;
 
@@ -34,6 +34,7 @@ export function ProcessingTimeline({
       aria-live="polite"
       aria-busy={progress.stageStatus === "RUNNING"}
       data-testid="processing-timeline"
+      data-progress-mode={display.mode}
     >
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
@@ -52,13 +53,15 @@ export function ProcessingTimeline({
       </div>
 
       <div className="mt-4">
-        {indeterminate ? (
-          <ProgressBar indeterminate label="Stage in progress" />
+        {display.mode === "stage" ? (
+          <ProgressBar indeterminate label={display.label} />
         ) : (
-          <ProgressBar value={percent ?? 0} label={`${percent}% complete`} />
+          <ProgressBar value={display.percent ?? 0} label={display.label} />
         )}
         <p className="mt-2 text-xs text-text-secondary">
-          Progress reflects confirmed backend stages — not a simulated estimate.
+          {display.mode === "percent"
+            ? "Numeric progress comes from the backend processing contract."
+            : "No reliable backend percentage — showing stage-based progress only."}
         </p>
       </div>
 
@@ -86,7 +89,9 @@ export function ProcessingTimeline({
               key={stage.id}
               className={cn(
                 "flex items-start gap-3 rounded-xl border px-3 py-2.5 text-sm",
-                current ? "border-emerald/30 bg-emerald/5 text-navy" : "border-transparent text-text-secondary",
+                current
+                  ? "border-emerald/30 bg-emerald/5 text-navy"
+                  : "border-transparent text-text-secondary",
               )}
             >
               <span

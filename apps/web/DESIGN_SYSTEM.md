@@ -93,10 +93,10 @@ Review specimen: `/design-system` (9A preview only; not a public marketing surfa
 ## 9D — Documents & financial extraction
 
 - Collapsed sidebar uses icons + accessible tooltips (replaces first-letter labels)
-- Document library: search/status/format filters, desktop table + mobile cards, loading/empty/error
-- Upload: drag-and-drop, 20MB/PDF·XLSX·CSV client validation aligned with server, progress, duplicate-name soft block
-- Processing timeline maps `DocumentProcessingProgress` stages (no simulated percentages)
-- Extraction review cards: raw / statement units / scale / actual monetary; non-monetary never shown as NGN
+- Document library: readable status labels (raw codes preserved), search/status/format filters, desktop table + mobile cards, loading/empty/error with Upload + Retry
+- Upload: drag-and-drop hierarchy, selected file summary, 20MB/PDF·XLSX·CSV validation, advisory duplicate-filename warnings (backend owns content duplicates)
+- Processing timeline maps `DocumentProcessingProgress`; numeric % only when backend supplies it
+- Extraction review: confirmed / provisional / undetermined / non-monetary amount presentation from review+mapping+scale contracts (not confidence alone)
 - Explicit human confirmation summary (pending vs confirmed)
 - Specimens: `/design-system/documents` · evidence: `docs/phase-9d/`
 

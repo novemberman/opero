@@ -8,6 +8,7 @@ import { DocumentUploadForm } from "../../../../components/document-upload-form"
 import {
   Alert,
   Badge,
+  Button,
   EmptyState,
   Input,
   Select,
@@ -21,6 +22,10 @@ import {
   buttonClassName,
 } from "../../../../components/ui";
 import { apiFetch } from "../../../../lib/api";
+import {
+  documentStatusLabel,
+  documentStatusTone,
+} from "../../../../lib/document-status-labels";
 
 type DocumentRow = {
   id: string;
@@ -34,15 +39,27 @@ type DocumentRow = {
   failureClass?: string | null;
 };
 
-function statusTone(
-  status: string,
-): "neutral" | "success" | "warning" | "error" | "info" | "emerald" {
-  const value = status.toUpperCase();
-  if (["READY", "SUCCEEDED", "CLEAN", "COMPLETE", "EXTRACTED"].includes(value)) return "success";
-  if (["REVIEW_REQUIRED", "PENDING", "QUEUED", "RUNNING", "SCANNING", "EXTRACTING"].includes(value))
-    return "warning";
-  if (["FAILED", "REJECTED", "INFECTED", "ERROR"].includes(value)) return "error";
-  return "neutral";
+function StatusBadge({
+  kind,
+  status,
+  prefix,
+}: {
+  kind: "processing" | "scan" | "extraction";
+  status: string;
+  prefix?: string;
+}) {
+  const label = documentStatusLabel(kind, status);
+  const text = prefix ? `${prefix}: ${label}` : label;
+  return (
+    <Badge
+      tone={documentStatusTone(status)}
+      title={`${kind} status: ${status}`}
+      data-status={status}
+      className="max-w-full truncate"
+    >
+      <span className="truncate">{text}</span>
+    </Badge>
+  );
 }
 
 export default function DocumentsPage() {
@@ -104,6 +121,13 @@ export default function DocumentsPage() {
     [documents],
   );
 
+  function focusUpload() {
+    const el = document.getElementById("document-upload");
+    el?.scrollIntoView({ behavior: "smooth", block: "start" });
+    const choose = el?.querySelector<HTMLButtonElement>("button");
+    choose?.focus();
+  }
+
   return (
     <div className="mx-auto max-w-6xl space-y-8" data-testid="documents-library">
       <header className="flex flex-wrap items-end justify-between gap-4">
@@ -157,7 +181,7 @@ export default function DocumentsPage() {
             <option value="ALL">All statuses</option>
             {statusOptions.map((status) => (
               <option key={status} value={status}>
-                {status}
+                {documentStatusLabel("processing", status)}
               </option>
             ))}
           </Select>
@@ -175,7 +199,12 @@ export default function DocumentsPage() {
 
         {error ? (
           <Alert tone="error" title="Unable to load documents">
-            {error}
+            <div className="space-y-3">
+              <p>{error}</p>
+              <Button type="button" size="sm" variant="secondary" onClick={() => void load()}>
+                Retry
+              </Button>
+            </div>
           </Alert>
         ) : null}
 
@@ -186,19 +215,25 @@ export default function DocumentsPage() {
           </div>
         ) : null}
 
-        {!loading && documents.length === 0 ? (
+        {!loading && !error && documents.length === 0 ? (
           <EmptyState
             title="No documents yet"
             description="Upload a PDF, XLSX or CSV financial statement to begin scanning and extraction."
             action={
               canWrite ? (
-                <p className="text-sm text-text-secondary">Use the upload panel above.</p>
+                <button
+                  type="button"
+                  className={buttonClassName({ variant: "primary", size: "sm" })}
+                  onClick={focusUpload}
+                >
+                  Upload document
+                </button>
               ) : undefined
             }
           />
         ) : null}
 
-        {!loading && documents.length > 0 && filtered.length === 0 ? (
+        {!loading && !error && documents.length > 0 && filtered.length === 0 ? (
           <EmptyState
             title="No matching documents"
             description="Try a different search or clear the status/format filters."
@@ -218,8 +253,7 @@ export default function DocumentsPage() {
           />
         ) : null}
 
-        {/* Desktop table */}
-        {!loading && filtered.length > 0 ? (
+        {!loading && !error && filtered.length > 0 ? (
           <>
             <div className="hidden md:block">
               <Table>
@@ -247,13 +281,13 @@ export default function DocumentsPage() {
                       </TD>
                       <TD>{doc.format}</TD>
                       <TD>
-                        <Badge tone={statusTone(doc.processingStatus)}>{doc.processingStatus}</Badge>
+                        <StatusBadge kind="processing" status={doc.processingStatus} />
                       </TD>
                       <TD>
-                        <Badge tone={statusTone(doc.scanStatus)}>{doc.scanStatus}</Badge>
+                        <StatusBadge kind="scan" status={doc.scanStatus} />
                       </TD>
                       <TD>
-                        <Badge tone={statusTone(doc.extractionStatus)}>{doc.extractionStatus}</Badge>
+                        <StatusBadge kind="extraction" status={doc.extractionStatus} />
                       </TD>
                       <TD>
                         <time className="font-data text-xs text-text-secondary">
@@ -274,25 +308,25 @@ export default function DocumentsPage() {
               </Table>
             </div>
 
-            {/* Mobile cards */}
             <ul className="space-y-3 md:hidden">
               {filtered.map((doc) => (
-                <li key={doc.id} className="rounded-2xl border border-border bg-surface p-4 shadow-sm">
+                <li
+                  key={doc.id}
+                  className="rounded-2xl border border-border bg-surface p-4 shadow-sm"
+                >
                   <Link
                     href={`/organizations/${orgId}/documents/${doc.id}`}
-                    className="font-semibold text-navy no-underline"
+                    className="break-words font-semibold text-navy no-underline"
                   >
                     {doc.originalFilename}
                   </Link>
                   <p className="mt-1 text-xs text-text-secondary">
                     {doc.format} · {new Date(doc.uploadedAt).toLocaleString()}
                   </p>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <Badge tone={statusTone(doc.processingStatus)}>{doc.processingStatus}</Badge>
-                    <Badge tone={statusTone(doc.scanStatus)}>scan {doc.scanStatus}</Badge>
-                    <Badge tone={statusTone(doc.extractionStatus)}>
-                      extract {doc.extractionStatus}
-                    </Badge>
+                  <div className="mt-3 flex flex-wrap gap-2 overflow-hidden">
+                    <StatusBadge kind="processing" status={doc.processingStatus} />
+                    <StatusBadge kind="scan" status={doc.scanStatus} prefix="Scan" />
+                    <StatusBadge kind="extraction" status={doc.extractionStatus} prefix="Extract" />
                   </div>
                   <Link
                     href={`/organizations/${orgId}/documents/${doc.id}`}

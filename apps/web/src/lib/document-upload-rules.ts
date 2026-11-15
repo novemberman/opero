@@ -17,21 +17,43 @@ export function detectDocumentFormat(fileName: string): "PDF" | "XLSX" | "CSV" |
   return null;
 }
 
+export type ClientUploadValidation = {
+  /** Hard client-side block (format / size). */
+  error: string | null;
+  /**
+   * Advisory-only filename collision warning.
+   * Does not block upload — authoritative duplicate-content detection remains on the backend.
+   */
+  advisoryWarning: string | null;
+};
+
 export function validateDocumentUploadClient(
   file: { name: string; size: number },
   existingNames: string[],
-): string | null {
+): ClientUploadValidation {
   const format = detectDocumentFormat(file.name);
-  if (!format) return "Unsupported format. Use PDF, XLSX or CSV.";
-  if (file.size <= 0) return "File appears empty.";
-  if (file.size > DOCUMENT_UPLOAD_MAX_BYTES) {
-    return `File exceeds the ${formatUploadBytes(DOCUMENT_UPLOAD_MAX_BYTES)} limit.`;
+  if (!format) {
+    return { error: "Unsupported format. Use PDF, XLSX or CSV.", advisoryWarning: null };
   }
+  if (file.size <= 0) {
+    return { error: "File appears empty.", advisoryWarning: null };
+  }
+  if (file.size > DOCUMENT_UPLOAD_MAX_BYTES) {
+    return {
+      error: `File exceeds the ${formatUploadBytes(DOCUMENT_UPLOAD_MAX_BYTES)} limit.`,
+      advisoryWarning: null,
+    };
+  }
+
   const duplicate = existingNames.some(
     (name) => name.localeCompare(file.name, undefined, { sensitivity: "accent" }) === 0,
   );
   if (duplicate) {
-    return `A document named “${file.name}” is already in this workspace. Rename the file or open the existing document.`;
+    return {
+      error: null,
+      advisoryWarning: `A document named “${file.name}” is already in this workspace. You can still upload; the server detects duplicate content separately. Consider renaming if this is a different file.`,
+    };
   }
-  return null;
+
+  return { error: null, advisoryWarning: null };
 }

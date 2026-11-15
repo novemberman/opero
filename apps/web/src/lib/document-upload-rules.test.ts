@@ -15,23 +15,29 @@ describe("document-upload-rules", () => {
   });
 
   it("rejects oversized and empty files", () => {
-    expect(
-      validateDocumentUploadClient({ name: "a.pdf", size: 0 }, []),
-    ).toMatch(/empty/i);
+    expect(validateDocumentUploadClient({ name: "a.pdf", size: 0 }, []).error).toMatch(
+      /empty/i,
+    );
     expect(
       validateDocumentUploadClient(
         { name: "a.pdf", size: DOCUMENT_UPLOAD_MAX_BYTES + 1 },
         [],
-      ),
+      ).error,
     ).toContain(formatUploadBytes(DOCUMENT_UPLOAD_MAX_BYTES));
   });
 
-  it("soft-blocks duplicate filenames", () => {
-    expect(
-      validateDocumentUploadClient({ name: "Statement.pdf", size: 100 }, ["statement.pdf"]),
-    ).toMatch(/already in this workspace/i);
-    expect(
-      validateDocumentUploadClient({ name: "Statement.pdf", size: 100 }, ["other.pdf"]),
-    ).toBeNull();
+  it("treats duplicate filenames as advisory warnings, not hard blocks", () => {
+    const duplicate = validateDocumentUploadClient(
+      { name: "Statement.pdf", size: 100 },
+      ["statement.pdf"],
+    );
+    expect(duplicate.error).toBeNull();
+    expect(duplicate.advisoryWarning).toMatch(/already in this workspace/i);
+
+    const unique = validateDocumentUploadClient({ name: "Statement.pdf", size: 100 }, [
+      "other.pdf",
+    ]);
+    expect(unique.error).toBeNull();
+    expect(unique.advisoryWarning).toBeNull();
   });
 });
