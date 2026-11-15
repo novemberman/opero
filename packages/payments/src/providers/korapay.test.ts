@@ -117,6 +117,29 @@ describe("KorapayProvider", () => {
     expect(parsed.reference).toBe("opero_charge_abc");
   });
 
+  it("maps chargeback.pending to nested payment.reference (not chargeback id)", () => {
+    const provider = new KorapayProvider({ secretKey: secret });
+    const signed = signedWebhook(secret, {
+      event: "chargeback.pending",
+      data: {
+        status: "pending",
+        reference: "KPY-CHG-xYvpQYHw7wYIfzs",
+        currency: "NGN",
+        chargeback_amount: 300,
+        payment: {
+          status: "success",
+          reference: "opero_charge_abc",
+          amount_paid: 15000,
+        },
+      },
+    });
+    expect(provider.verifyWebhookSignature(signed)).toBe(true);
+    const parsed = provider.parseWebhookEvent(signed);
+    expect(parsed.eventType).toBe("chargeback.pending");
+    expect(parsed.reference).toBe("opero_charge_abc");
+    expect(parsed.providerEventKey).toContain("KPY-CHG-xYvpQYHw7wYIfzs");
+  });
+
   it("sends the secret only as Bearer auth, never in JSON bodies or query strings", async () => {
     const fetchImpl = vi.fn(async (url: RequestInfo) => {
       if (String(url).includes("/charges/initialize")) {

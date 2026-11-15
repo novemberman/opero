@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { korapayAmountMajor } from "../korapay-urls.js";
 import { majorToMinorUnits } from "../money/amount.js";
+import { extractKorapayWebhookPaymentReference } from "../webhook-references.js";
 import type {
   InitializeCheckoutInput,
   InitializeCheckoutResult,
@@ -168,27 +169,24 @@ export class KorapayProvider implements PaymentProvider {
   parseWebhookEvent(input: WebhookVerificationInput): ParsedWebhookEvent {
     const body = input.body as {
       event?: string;
-      data?: {
-        reference?: string;
-        payment_reference?: string;
-        status?: string;
-        amount?: number | string;
-        currency?: string;
-      };
+      data?: Record<string, unknown>;
     };
     const eventType = body.event ?? "unknown";
-    // Refund payloads use `reference` for the refund id and `payment_reference`
-    // for the original charge — fulfill/revoke against the payment reference.
-    const isRefund = eventType.startsWith("refund.");
-    const reference = isRefund
-      ? (body.data?.payment_reference ?? body.data?.reference ?? "")
-      : (body.data?.reference ?? body.data?.payment_reference ?? "");
-    const currency = body.data?.currency ? String(body.data.currency).toUpperCase() : null;
+    const data = body.data ?? {};
+    // Charge / refund / chargeback each use different reference fields — see webhook-references.ts
+    const reference = extractKorapayWebhookPaymentReference(eventType, data);
+    const currency = data.currency != null ? String(data.currency).toUpperCase() : null;
+    const amountMajor =
+      data.chargeback_amount != null
+        ? Number(data.chargeback_amount)
+        : data.amount != null
+          ? Number(data.amount)
+          : null;
     const amountMinor =
-      body.data?.amount != null && currency
-        ? majorToMinorUnits(Number(body.data.amount), currency)
+      amountMajor != null && currency && Number.isFinite(amountMajor)
+        ? majorToMinorUnits(amountMajor, currency)
         : null;
-    const statusRaw = (body.data?.status ?? "").toLowerCase();
+    const statusRaw = String(data.status ?? "").toLowerCase();
     const status: ParsedWebhookEvent["status"] =
       statusRaw === "success"
         ? "success"
@@ -198,7 +196,9 @@ export class KorapayProvider implements PaymentProvider {
             ? "pending"
             : "unknown";
     const dedupeRef =
-      body.data?.reference ?? body.data?.payment_reference ?? (reference || "unknown");
+      (typeof data.reference === "string" && data.reference) ||
+      reference ||
+      "unknown";
     return {
       provider: "korapay",
       eventType,

@@ -7,6 +7,7 @@ import type { PrismaClient } from "@opero/database";
  */
 export async function deletePhase6Data(prisma: PrismaClient): Promise<void> {
   await prisma.paymentEvent.deleteMany();
+  await prisma.paymentDisputeAction.deleteMany();
   await prisma.entitlementGrant.deleteMany();
   await prisma.subscriptionEvent.deleteMany();
   await prisma.purchase.deleteMany();

@@ -1,18 +1,54 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Inject,
   Injectable,
   Logger,
+  NotFoundException,
 } from "@nestjs/common";
 import { XRAY_PRO_ENTITLEMENTS } from "@opero/shared";
-import type { VerifiedCharge } from "@opero/payments";
+import {
+  isKorapayChargebackEvent,
+  type KorapayChargebackEvent,
+  type VerifiedCharge,
+} from "@opero/payments";
 import type { PrismaClient } from "@opero/database";
 import { AuditService } from "../audit/audit.service";
 import { PRISMA_CLIENT } from "../database/database.constants";
+import type { AuthenticatedUser } from "../types/express";
 
 const SUBSCRIPTION_GRACE_DAYS = 3;
 const MONTH_MS = 30 * 24 * 60 * 60 * 1000;
+
+/** Statuses that must never regain entitlements via charge.success / verify. */
+const ACCESS_TERMINAL_STATUSES = new Set([
+  "REFUNDED",
+  "PARTIALLY_REFUNDED",
+  "DISPUTED",
+  "CHARGEBACK",
+  "CANCELLED",
+]);
+
+/**
+ * Monotonic dispute severity — out-of-order webhooks must not soften a harder state.
+ * SUCCEEDED < DISPUTED < REFUNDED/PARTIAL < CHARGEBACK
+ */
+function disputeSeverity(status: string): number {
+  switch (status) {
+    case "SUCCEEDED":
+      return 1;
+    case "DISPUTED":
+      return 2;
+    case "REFUNDED":
+    case "PARTIALLY_REFUNDED":
+      return 3;
+    case "CHARGEBACK":
+      return 4;
+    default:
+      return 0;
+  }
+}
 
 @Injectable()
 export class FulfillmentService {
@@ -79,6 +115,16 @@ export class FulfillmentService {
         data: { status: "FAILED" },
       });
       return { fulfilled: false, paymentId: payment.id, status: "FAILED" as const };
+    }
+
+    // Never restore entitlements after refund/dispute/chargeback via a late verify.
+    if (ACCESS_TERMINAL_STATUSES.has(payment.status)) {
+      return {
+        fulfilled: false,
+        paymentId: payment.id,
+        status: "ACCESS_REVOKED" as const,
+        paymentStatus: payment.status,
+      };
     }
 
     if (payment.status === "SUCCEEDED" && payment.fulfilledAt) {
@@ -348,11 +394,14 @@ export class FulfillmentService {
     reference: string;
     requestId?: string | null;
   }) {
-    const payment = await this.prisma.payment.findUnique({
-      where: { reference: input.reference },
-      include: { checkoutIntent: true, purchase: true },
-    });
+    const payment = await this.findPaymentByReference(input.reference);
     if (!payment) throw new BadRequestException("Unknown payment reference");
+
+    // Chargeback is a harder terminal state — do not soften to REFUNDED.
+    if (payment.status === "CHARGEBACK") {
+      await this.revokePurchaseEntitlements(payment.id, payment.organizationId, "payment_chargeback");
+      return { applied: false, reason: "ALREADY_CHARGEBACK" as const, paymentId: payment.id };
+    }
 
     await this.prisma.$transaction(async (tx) => {
       await tx.payment.update({
@@ -386,6 +435,338 @@ export class FulfillmentService {
       organizationId: payment.organizationId,
       requestId: input.requestId,
       metadata: { reference: payment.reference },
+    });
+    return { applied: true, paymentId: payment.id };
+  }
+
+  /**
+   * Apply a documented Korapay chargeback webhook.
+   * Events: chargeback.pending|declined|lost|partial|auto_accepted
+   * There is no documented chargeback.won webhook — merchant-favor restore is manual.
+   */
+  async applyChargebackEvent(input: {
+    eventType: string;
+    reference: string;
+    requestId?: string | null;
+    providerChargebackRef?: string | null;
+  }) {
+    if (!isKorapayChargebackEvent(input.eventType)) {
+      return { applied: false, reason: "UNKNOWN_CHARGEBACK_EVENT" as const };
+    }
+    const payment = await this.findPaymentByReference(input.reference);
+    if (!payment) {
+      return { applied: false, reason: "PAYMENT_NOT_FOUND" as const };
+    }
+
+    const event = input.eventType as KorapayChargebackEvent;
+    const target =
+      event === "chargeback.pending" || event === "chargeback.declined"
+        ? ("DISPUTED" as const)
+        : ("CHARGEBACK" as const);
+    const revokeReason =
+      event === "chargeback.pending"
+        ? "chargeback_pending"
+        : event === "chargeback.declined"
+          ? "chargeback_declined_contested"
+          : event === "chargeback.lost"
+            ? "chargeback_lost"
+            : event === "chargeback.partial"
+              ? "chargeback_partial"
+              : "chargeback_auto_accepted";
+
+    if (disputeSeverity(payment.status) > disputeSeverity(target)) {
+      // e.g. late pending after CHARGEBACK — keep harder state; ensure grants stay revoked.
+      await this.revokePurchaseEntitlements(payment.id, payment.organizationId, revokeReason);
+      return {
+        applied: false,
+        reason: "OUT_OF_ORDER_IGNORED" as const,
+        paymentId: payment.id,
+        status: payment.status,
+      };
+    }
+
+    if (payment.status === target) {
+      await this.revokePurchaseEntitlements(payment.id, payment.organizationId, revokeReason);
+      return {
+        applied: false,
+        reason: "IDEMPOTENT" as const,
+        paymentId: payment.id,
+        status: payment.status,
+      };
+    }
+
+    await this.suspendOrRevokeAccess({
+      payment,
+      toStatus: target,
+      purchaseStatus: target === "DISPUTED" ? "DISPUTED" : "REVOKED",
+      revokeReason,
+      requestId: input.requestId,
+      auditAction:
+        target === "DISPUTED" ? "billing.payment_disputed" : "billing.payment_chargeback",
+      metadata: {
+        eventType: event,
+        providerChargebackRef: input.providerChargebackRef ?? null,
+      },
+    });
+
+    return { applied: true, paymentId: payment.id, status: target };
+  }
+
+  /**
+   * Authenticated manual dispute workflow for gaps in provider webhooks
+   * (notably merchant-favor resolution — no documented chargeback.won event).
+   * Requires billing:manage (OWNER/ADMIN). Not a settlement bypass.
+   */
+  async applyManualDisputeAction(input: {
+    organizationId: string;
+    reference: string;
+    actor: AuthenticatedUser;
+    action: "open" | "confirm_chargeback" | "resolve_merchant_favor";
+    reason: string;
+    evidenceNote?: string | null;
+    providerChargebackRef?: string | null;
+    requestId?: string | null;
+  }) {
+    const payment = await this.prisma.payment.findFirst({
+      where: {
+        organizationId: input.organizationId,
+        OR: [{ reference: input.reference }, { providerReference: input.reference }],
+      },
+      include: { checkoutIntent: true, purchase: true },
+    });
+    if (!payment) {
+      throw new NotFoundException({
+        message: "Payment not found for organization",
+        code: "PAYMENT_NOT_FOUND",
+      });
+    }
+    if (payment.organizationId !== input.organizationId) {
+      throw new ForbiddenException({
+        message: "Payment does not belong to this organization",
+        code: "CROSS_TENANT_PAYMENT",
+      });
+    }
+
+    const fromStatus = payment.status;
+    let toStatus = fromStatus;
+    let revokeReason: string | null = null;
+    let restore = false;
+
+    if (input.action === "open") {
+      if (!["SUCCEEDED", "DISPUTED"].includes(payment.status)) {
+        throw new ConflictException({
+          message: "Only succeeded (or already disputed) payments can open a dispute",
+          code: "INVALID_DISPUTE_TRANSITION",
+        });
+      }
+      toStatus = "DISPUTED";
+      revokeReason = "manual_dispute_opened";
+    } else if (input.action === "confirm_chargeback") {
+      if (!["SUCCEEDED", "DISPUTED", "CHARGEBACK"].includes(payment.status)) {
+        throw new ConflictException({
+          message: "Chargeback confirm requires a succeeded or disputed payment",
+          code: "INVALID_DISPUTE_TRANSITION",
+        });
+      }
+      toStatus = "CHARGEBACK";
+      revokeReason = "manual_chargeback_confirmed";
+    } else if (input.action === "resolve_merchant_favor") {
+      if (payment.status !== "DISPUTED") {
+        throw new ConflictException({
+          message: "Merchant-favor resolve is only allowed from DISPUTED (not CHARGEBACK/REFUNDED)",
+          code: "INVALID_DISPUTE_TRANSITION",
+        });
+      }
+      toStatus = "SUCCEEDED";
+      restore = true;
+    }
+
+    if (toStatus !== fromStatus || restore || revokeReason) {
+      if (restore) {
+        await this.prisma.$transaction(async (tx) => {
+          await tx.payment.update({
+            where: { id: payment.id },
+            data: { status: "SUCCEEDED" },
+          });
+          if (payment.purchase) {
+            await tx.purchase.update({
+              where: { id: payment.purchase.id },
+              data: { status: "FULFILLED", refundedAt: null },
+            });
+          }
+          await tx.entitlementGrant.updateMany({
+            where: {
+              organizationId: payment.organizationId,
+              sourceType: "PURCHASE",
+              sourceId: payment.id,
+            },
+            data: {
+              revokedAt: null,
+              revokeReason: null,
+              validFrom: new Date(),
+            },
+          });
+          await tx.paymentDisputeAction.create({
+            data: {
+              paymentId: payment.id,
+              organizationId: payment.organizationId,
+              actorUserId: input.actor.id,
+              action: input.action,
+              reason: input.reason,
+              evidenceNote: input.evidenceNote ?? null,
+              providerChargebackRef: input.providerChargebackRef ?? null,
+              fromStatus,
+              toStatus,
+              requestId: input.requestId ?? null,
+            },
+          });
+        });
+      } else if (revokeReason) {
+        await this.suspendOrRevokeAccess({
+          payment,
+          toStatus: toStatus as "DISPUTED" | "CHARGEBACK",
+          purchaseStatus: toStatus === "DISPUTED" ? "DISPUTED" : "REVOKED",
+          revokeReason,
+          requestId: input.requestId,
+          auditAction:
+            toStatus === "DISPUTED" ? "billing.payment_disputed" : "billing.payment_chargeback",
+          metadata: {
+            manual: true,
+            action: input.action,
+            providerChargebackRef: input.providerChargebackRef ?? null,
+          },
+        });
+        await this.prisma.paymentDisputeAction.create({
+          data: {
+            paymentId: payment.id,
+            organizationId: payment.organizationId,
+            actorUserId: input.actor.id,
+            action: input.action,
+            reason: input.reason,
+            evidenceNote: input.evidenceNote ?? null,
+            providerChargebackRef: input.providerChargebackRef ?? null,
+            fromStatus,
+            toStatus,
+            requestId: input.requestId ?? null,
+          },
+        });
+      }
+    }
+
+    await this.audit.record({
+      action: "billing.payment_dispute_manual",
+      entityType: "payment",
+      entityId: payment.id,
+      organizationId: payment.organizationId,
+      actorUserId: input.actor.id,
+      requestId: input.requestId,
+      metadata: {
+        action: input.action,
+        reason: input.reason,
+        evidenceNote: input.evidenceNote ?? null,
+        providerChargebackRef: input.providerChargebackRef ?? null,
+        fromStatus,
+        toStatus,
+        limitation:
+          "Previously downloaded PDF files cannot be remotely recalled; only subsequent downloads are blocked.",
+      },
+    });
+
+    return {
+      paymentId: payment.id,
+      reference: payment.reference,
+      fromStatus,
+      toStatus,
+      action: input.action,
+    };
+  }
+
+  private async suspendOrRevokeAccess(input: {
+    payment: {
+      id: string;
+      organizationId: string;
+      reference: string;
+      purchase: { id: string } | null;
+    };
+    toStatus: "DISPUTED" | "CHARGEBACK";
+    purchaseStatus: "DISPUTED" | "REVOKED";
+    revokeReason: string;
+    requestId?: string | null;
+    auditAction: string;
+    metadata?: Record<string, unknown>;
+  }) {
+    await this.prisma.$transaction(async (tx) => {
+      await tx.payment.update({
+        where: { id: input.payment.id },
+        data: {
+          status: input.toStatus,
+          ...(input.toStatus === "CHARGEBACK" ? { refundedAt: new Date() } : {}),
+        },
+      });
+      if (input.payment.purchase) {
+        await tx.purchase.update({
+          where: { id: input.payment.purchase.id },
+          data: {
+            status: input.purchaseStatus,
+            ...(input.toStatus === "CHARGEBACK" ? { refundedAt: new Date() } : {}),
+          },
+        });
+      }
+      await tx.entitlementGrant.updateMany({
+        where: {
+          organizationId: input.payment.organizationId,
+          sourceType: "PURCHASE",
+          sourceId: input.payment.id,
+          revokedAt: null,
+        },
+        data: {
+          revokedAt: new Date(),
+          revokeReason: input.revokeReason,
+        },
+      });
+    });
+
+    await this.audit.record({
+      action: input.auditAction,
+      entityType: "payment",
+      entityId: input.payment.id,
+      organizationId: input.payment.organizationId,
+      requestId: input.requestId,
+      metadata: {
+        reference: input.payment.reference,
+        toStatus: input.toStatus,
+        revokeReason: input.revokeReason,
+        limitation:
+          "Previously downloaded PDF files cannot be remotely recalled; only subsequent downloads are blocked.",
+        ...input.metadata,
+      },
+    });
+  }
+
+  private async revokePurchaseEntitlements(
+    paymentId: string,
+    organizationId: string,
+    revokeReason: string,
+  ) {
+    await this.prisma.entitlementGrant.updateMany({
+      where: {
+        organizationId,
+        sourceType: "PURCHASE",
+        sourceId: paymentId,
+        revokedAt: null,
+      },
+      data: { revokedAt: new Date(), revokeReason },
+    });
+  }
+
+  /** Match merchant reference or provider reference (chargeback payloads vary). */
+  private async findPaymentByReference(reference: string) {
+    if (!reference) return null;
+    return this.prisma.payment.findFirst({
+      where: {
+        OR: [{ reference }, { providerReference: reference }],
+      },
+      include: { checkoutIntent: true, purchase: true },
     });
   }
 

@@ -8,7 +8,11 @@ import {
   Req,
 } from "@nestjs/common";
 import type { PrismaClient } from "@opero/database";
-import type { PaymentProvider } from "@opero/payments";
+import {
+  extractKorapayChargebackReference,
+  isKorapayChargebackEvent,
+  type PaymentProvider,
+} from "@opero/payments";
 import type { Request } from "express";
 import { PRISMA_CLIENT } from "../database/database.constants";
 import { FulfillmentService } from "./fulfillment.service";
@@ -46,7 +50,11 @@ export class BillingWebhooksController {
     }
 
     const payment = parsed.reference
-      ? await this.prisma.payment.findUnique({ where: { reference: parsed.reference } })
+      ? await this.prisma.payment.findFirst({
+          where: {
+            OR: [{ reference: parsed.reference }, { providerReference: parsed.reference }],
+          },
+        })
       : null;
 
     // Invalid signatures must not consume the durable dedupe key of a real event.
@@ -79,6 +87,11 @@ export class BillingWebhooksController {
     }
 
     if (!payment) {
+      if (isKorapayChargebackEvent(parsed.eventType) || parsed.eventType.startsWith("refund.")) {
+        this.logger.warn(
+          `Webhook ${parsed.eventType} unmatched payment reference=${parsed.reference || "empty"}`,
+        );
+      }
       return { received: true, valid: true, matched: false };
     }
 
@@ -107,14 +120,29 @@ export class BillingWebhooksController {
       }
     } else if (parsed.eventType === "refund.success") {
       try {
-        // `parsed.reference` is the original payment reference for refund events.
         await this.fulfillment.applyRefund({
-          reference: parsed.reference || payment.reference,
+          reference: payment.reference,
           requestId: req.requestId,
         });
       } catch (error) {
         this.logger.warn(`Webhook refund handling deferred: ${String(error)}`);
       }
+    } else if (parsed.eventType === "refund.failed") {
+      this.logger.warn(`Refund failed webhook for ${payment.reference} (no entitlement change)`);
+    } else if (isKorapayChargebackEvent(parsed.eventType)) {
+      try {
+        const payload = body as { data?: unknown };
+        await this.fulfillment.applyChargebackEvent({
+          eventType: parsed.eventType,
+          reference: payment.reference,
+          providerChargebackRef: extractKorapayChargebackReference(payload.data),
+          requestId: req.requestId,
+        });
+      } catch (error) {
+        this.logger.warn(`Webhook chargeback handling deferred: ${String(error)}`);
+      }
+    } else {
+      this.logger.warn(`Unhandled Korapay webhook eventType=${parsed.eventType}`);
     }
 
     return { received: true, valid: true };

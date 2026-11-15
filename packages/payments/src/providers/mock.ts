@@ -1,5 +1,6 @@
 import { createHmac } from "node:crypto";
 import { majorToMinorUnits, minorToMajorUnits } from "../money/amount.js";
+import { extractKorapayWebhookPaymentReference } from "../webhook-references.js";
 import type {
   InitializeCheckoutInput,
   InitializeCheckoutResult,
@@ -112,27 +113,25 @@ export class MockKorapayProvider implements PaymentProvider {
   parseWebhookEvent(input: WebhookVerificationInput): ParsedWebhookEvent {
     const body = input.body as {
       event?: string;
-      data?: {
-        reference?: string;
-        payment_reference?: string;
-        status?: string;
-        amount?: number | string;
-        currency?: string;
-      };
+      data?: Record<string, unknown>;
     };
     const eventType = body.event ?? "unknown";
-    const isRefund = eventType.startsWith("refund.");
-    const reference = isRefund
-      ? (body.data?.payment_reference ?? body.data?.reference ?? "")
-      : (body.data?.reference ?? body.data?.payment_reference ?? "");
-    const currency = body.data?.currency ? String(body.data.currency).toUpperCase() : "NGN";
+    const data = body.data ?? {};
+    const reference = extractKorapayWebhookPaymentReference(eventType, data);
+    const currency = data.currency != null ? String(data.currency).toUpperCase() : "NGN";
+    const amountMajor =
+      data.chargeback_amount != null
+        ? Number(data.chargeback_amount)
+        : data.amount != null
+          ? Number(data.amount)
+          : null;
     const amountMinor =
-      body.data?.amount != null
-        ? majorToMinorUnits(Number(body.data.amount), currency)
+      amountMajor != null && Number.isFinite(amountMajor)
+        ? majorToMinorUnits(amountMajor, currency)
         : null;
-    const statusRaw = (body.data?.status ?? "").toLowerCase();
+    const statusRaw = String(data.status ?? "").toLowerCase();
     const dedupeRef =
-      body.data?.reference ?? body.data?.payment_reference ?? (reference || "unknown");
+      (typeof data.reference === "string" && data.reference) || reference || "unknown";
     return {
       provider: "mock",
       eventType,

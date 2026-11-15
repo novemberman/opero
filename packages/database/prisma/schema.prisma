@@ -312,6 +312,7 @@ model Organization {
   reportAccessEvents         ReportAccessEvent[]
   checkoutIntents            CheckoutIntent[]
   payments                   Payment[]
+  paymentDisputeActions      PaymentDisputeAction[]
   purchases                  Purchase[]
   entitlementGrants          EntitlementGrant[]
   subscriptions              Subscription[]
@@ -352,6 +353,7 @@ model User {
   statementsConfirmed          FinancialStatement[]          @relation("StatementConfirmer")
   checkoutIntentsCreated       CheckoutIntent[]              @relation("CheckoutIntentActor")
   purchasesCreated             Purchase[]                    @relation("PurchaseActor")
+  paymentDisputeActions        PaymentDisputeAction[]        @relation("PaymentDisputeActor")
   subscriptionsCreated         Subscription[]                @relation("SubscriptionActor")
   enterpriseQuotesRequested    EnterpriseQuoteRequest[]      @relation("EnterpriseQuoteActor")
 
@@ -1199,6 +1201,10 @@ enum PaymentStatus {
   REFUNDED
   PARTIALLY_REFUNDED
   CANCELLED
+  /// Chargeback/dispute opened — purchase entitlements suspended.
+  DISPUTED
+  /// Chargeback lost / auto-accepted / confirmed reverse — entitlements revoked.
+  CHARGEBACK
 }
 
 enum PurchaseStatus {
@@ -1206,6 +1212,8 @@ enum PurchaseStatus {
   FULFILLED
   REFUNDED
   REVOKED
+  /// Access suspended while a dispute/chargeback is open.
+  DISPUTED
 }
 
 enum SubscriptionStatus {
@@ -1384,11 +1392,37 @@ model Payment {
   organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   checkoutIntent CheckoutIntent  @relation(fields: [checkoutIntentId], references: [id], onDelete: Restrict)
   events         PaymentEvent[]
+  disputeActions PaymentDisputeAction[]
   purchase       Purchase?
   subscription   Subscription?   @relation("SubscriptionOriginPayment")
 
   @@index([organizationId, status])
+  @@index([providerReference])
   @@map("payments")
+}
+
+/// Manual finance/admin dispute actions. Not a settlement or checkout bypass.
+model PaymentDisputeAction {
+  id                     String   @id @default(uuid()) @db.Uuid
+  paymentId              String   @map("payment_id") @db.Uuid
+  organizationId         String   @map("organization_id") @db.Uuid
+  actorUserId            String   @map("actor_user_id") @db.Uuid
+  action                 String
+  reason                 String
+  evidenceNote           String?  @map("evidence_note")
+  providerChargebackRef  String?  @map("provider_chargeback_ref")
+  fromStatus             String   @map("from_status")
+  toStatus               String   @map("to_status")
+  requestId              String?  @map("request_id")
+  createdAt              DateTime @default(now()) @map("created_at")
+
+  payment      Payment      @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  actor        User         @relation("PaymentDisputeActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@index([paymentId, createdAt])
+  @@index([organizationId, createdAt])
+  @@map("payment_dispute_actions")
 }
 
 model PaymentEvent {

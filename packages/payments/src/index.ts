@@ -19,6 +19,13 @@ export type {
 export { KorapayProvider, type KorapayConfig } from "./providers/korapay.js";
 export { MockKorapayProvider, type MockChargeState } from "./providers/mock.js";
 export {
+  extractKorapayChargebackReference,
+  extractKorapayWebhookPaymentReference,
+  isKorapayChargebackEvent,
+  KORAPAY_CHARGEBACK_EVENTS,
+  type KorapayChargebackEvent,
+} from "./webhook-references.js";
+export {
   KORAPAY_WEBHOOK_PATH,
   buildKorapayNotificationUrl,
   korapayAmountMajor,
