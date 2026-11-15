@@ -9,13 +9,11 @@ import {
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  ExtractionLineCard,
-  type ExtractionLine,
-} from "../../../../../components/extraction-line-card";
+import { ExtractionReviewBoard } from "../../../../../components/extraction-review-board";
+import type { ExtractionLine } from "../../../../../components/extraction-line-card";
 import { ProcessingTimeline } from "../../../../../components/processing-timeline";
 import { StatementMetadataPanel } from "../../../../../components/statement-metadata";
-import { Alert, Badge, EmptyState, buttonClassName } from "../../../../../components/ui";
+import { Alert, Badge, buttonClassName } from "../../../../../components/ui";
 import { apiFetch } from "../../../../../lib/api";
 
 type Extraction = {
@@ -132,29 +130,14 @@ export default function DocumentDetailPage() {
   }
 
   const statements = extractions.flatMap((extraction) => extraction.statements);
-  const lines = statements.flatMap((statement) => statement.lineItems);
+  const lines = useMemo(
+    () =>
+      extractions.flatMap((extraction) =>
+        extraction.statements.flatMap((statement) => statement.lineItems),
+      ),
+    [extractions],
+  );
   const warnings = extractions.flatMap((e) => (Array.isArray(e.warnings) ? e.warnings : []));
-
-  const priorityLines = useMemo(() => {
-    return [...lines].sort((a, b) => {
-      const score = (line: ExtractionLine) => {
-        let s = 0;
-        if (line.unitScaleRequiresReview) s += 40;
-        if (line.reviewStatus === "PENDING") s += 20;
-        if (line.quality === "LOW" || line.quality === "MANUAL") s += 15;
-        if (line.concept === "UNMAPPED") s += 12;
-        if (line.quantityClass && line.quantityClass !== "MONETARY") s += 5;
-        return s;
-      };
-      return score(b) - score(a);
-    });
-  }, [lines]);
-
-  const pendingCount = lines.filter((line) => line.reviewStatus === "PENDING").length;
-  const confirmedCount = lines.filter((line) =>
-    ["CONFIRMED", "CORRECTED"].includes(line.reviewStatus),
-  ).length;
-  const reviewComplete = lines.length > 0 && pendingCount === 0;
 
   const elapsedLabel = `Elapsed ${Math.max(0, Math.round((now - startedAt) / 1000))}s`;
   const processingStatus = String(status?.processingStatus ?? "");
@@ -261,64 +244,7 @@ export default function DocumentDetailPage() {
         </section>
       ) : null}
 
-      <section aria-labelledby="extracted-figures">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <h2 id="extracted-figures" className="text-lg font-semibold text-navy">
-              Extracted figures
-            </h2>
-            <p className="mt-1 text-sm text-text-secondary">
-              Prioritized by uncertainty. Raw values and statement units are always preserved.
-              Monetary amounts are shown as confirmed, provisional or undetermined based on mapping,
-              scale confirmation and review status — never from extraction confidence alone.
-              Non-monetary quantities never appear as NGN amounts.
-            </p>
-          </div>
-          {lines.length > 0 ? (
-            <p className="text-sm text-text-secondary">
-              {confirmedCount} confirmed · {pendingCount} pending
-              {reviewComplete ? " · review complete" : ""}
-            </p>
-          ) : null}
-        </div>
-
-        {lines.length > 0 && pendingCount > 0 ? (
-          <div className="mt-4">
-            <Alert tone="warning" title="Human confirmation required">
-              {pendingCount} figure{pendingCount === 1 ? "" : "s"} still pending. Confirm, correct
-              or reject each item. Diagnostics should wait until material lines are reviewed.
-            </Alert>
-          </div>
-        ) : null}
-
-        {lines.length > 0 && reviewComplete ? (
-          <div className="mt-4">
-            <Alert tone="success" title="Review complete for extracted lines">
-              All current line items are confirmed, corrected or rejected.
-            </Alert>
-          </div>
-        ) : null}
-
-        <ul className="mt-4 space-y-4">
-          {priorityLines.map((line) => (
-            <ExtractionLineCard
-              key={line.id}
-              line={line}
-              canWrite={canWrite}
-              onReview={onReview}
-            />
-          ))}
-        </ul>
-
-        {lines.length === 0 ? (
-          <div className="mt-4">
-            <EmptyState
-              title="No extracted figures yet"
-              description="Processing may still be running. The timeline above updates as stages complete."
-            />
-          </div>
-        ) : null}
-      </section>
+      <ExtractionReviewBoard lines={lines} canWrite={canWrite} onReview={onReview} />
     </div>
   );
 }

@@ -8,6 +8,7 @@ import {
 import Link from "next/link";
 import { useState } from "react";
 import { DocumentUploadForm } from "../../../components/document-upload-form";
+import { ExtractionReviewBoard } from "../../../components/extraction-review-board";
 import {
   ExtractionLineCard,
   type ExtractionLine,
@@ -79,11 +80,31 @@ const fixtureLines: ExtractionLine[] = [
     scaleConfidence: "HIGH",
     unitScaleRequiresReview: false,
     quality: "HIGH",
-    reviewStatus: "CONFIRMED",
+    reviewStatus: "PENDING",
     evidence: {
       evidenceKey: "abcd1234evidence",
       pageNumber: 2,
       snippet: "Revenue of 144,000",
+    },
+  },
+  {
+    id: "1b",
+    concept: "GROSS_PROFIT",
+    labelRaw: "Gross profit",
+    rawValue: "84,000",
+    normalizedValue: "84000",
+    actualMonetaryValue: "84000000",
+    currency: "NGN",
+    quantityClass: "MONETARY",
+    unitScale: "THOUSANDS",
+    scaleConfidence: "HIGH",
+    unitScaleRequiresReview: false,
+    quality: "HIGH",
+    reviewStatus: "CONFIRMED",
+    evidence: {
+      evidenceKey: "grossprofitEvidence",
+      pageNumber: 2,
+      snippet: "Gross profit 84,000",
     },
   },
   {
@@ -109,9 +130,9 @@ const fixtureLines: ExtractionLine[] = [
   {
     id: "3",
     concept: "UNMAPPED",
-    labelRaw: "Gross margin",
-    rawValue: "58.3%",
-    normalizedValue: "58.3",
+    labelRaw: "Gross profit margin",
+    rawValue: "58.33%",
+    normalizedValue: "58.33",
     actualMonetaryValue: null,
     currency: null,
     quantityClass: "PERCENTAGE",
@@ -123,12 +144,52 @@ const fixtureLines: ExtractionLine[] = [
     evidence: {
       evidenceKey: "ijkl9012evidence",
       pageNumber: 2,
-      snippet: "Gross margin 58.3%",
+      snippet: "Gross profit margin 58.33%",
+    },
+  },
+  {
+    id: "3b",
+    concept: "UNMAPPED",
+    labelRaw: "Year ended 31 December 2024",
+    rawValue: "2024",
+    normalizedValue: "2024",
+    actualMonetaryValue: null,
+    currency: null,
+    quantityClass: "DATE",
+    unitScale: "ACTUAL",
+    scaleConfidence: "HIGH",
+    unitScaleRequiresReview: false,
+    quality: "LOW",
+    reviewStatus: "PENDING",
+    evidence: {
+      evidenceKey: "dateHeadingEvidence",
+      pageNumber: 1,
+      snippet: "Year ended 31 December 2024",
+    },
+  },
+  {
+    id: "3c",
+    concept: "UNMAPPED",
+    labelRaw: "net profit margin",
+    rawValue: "12.50%",
+    normalizedValue: "12.50",
+    actualMonetaryValue: null,
+    currency: null,
+    quantityClass: "PERCENTAGE",
+    unitScale: "ACTUAL",
+    scaleConfidence: "HIGH",
+    unitScaleRequiresReview: false,
+    quality: "LOW",
+    reviewStatus: "PENDING",
+    evidence: {
+      evidenceKey: "netMarginEvidence",
+      pageNumber: 2,
+      snippet: "net profit margin 12.50%",
     },
   },
   {
     id: "4",
-    concept: "COST_OF_SALES",
+    concept: "COST_OF_GOODS_SOLD",
     labelRaw: "Cost of sales",
     rawValue: "—",
     normalizedValue: null,
@@ -146,6 +207,26 @@ const fixtureLines: ExtractionLine[] = [
       snippet: "Cost of sales (illegible)",
     },
   },
+  {
+    id: "5",
+    concept: "UNMAPPED",
+    labelRaw: "Header noise",
+    rawValue: "0",
+    normalizedValue: "0",
+    actualMonetaryValue: null,
+    currency: null,
+    quantityClass: "OTHER",
+    unitScale: "ACTUAL",
+    scaleConfidence: "HIGH",
+    unitScaleRequiresReview: false,
+    quality: "LOW",
+    reviewStatus: "REJECTED",
+    evidence: {
+      evidenceKey: "rejectedEvidence",
+      pageNumber: 1,
+      snippet: "Header noise",
+    },
+  },
 ];
 
 export default function DocumentsDesignSpecimen() {
@@ -161,9 +242,10 @@ export default function DocumentsDesignSpecimen() {
               { label: "Documents" },
             ]}
           />
-          <h1 className="text-3xl text-navy">Phase 9D documents specimens</h1>
+          <h1 className="text-3xl text-navy">Documents & extraction review specimens</h1>
           <p className="max-w-2xl text-sm text-text-secondary">
-            Labelled fixtures for visual review. Live routes use the same components with real APIs.
+            Labelled fixtures for visual review, including Stage A extraction review intelligence.
+            Live routes use the same components with real APIs.
           </p>
           <Link href="/design-system" className="text-sm font-medium text-navy no-underline hover:underline">
             ← Design system
@@ -289,20 +371,16 @@ export default function DocumentsDesignSpecimen() {
         </section>
 
         <section className="space-y-3" data-testid="fixture-extraction-review">
-          <h2 className="text-xl text-navy">Extraction review</h2>
-          <Alert tone="warning" title="Human confirmation required">
-            Confirmed, provisional, undetermined and non-monetary lines — fixture sample.
+          <h2 className="text-xl text-navy">Extraction review intelligence</h2>
+          <Alert tone="info" title="Fixture preview">
+            Defaults to pending monetary figures. Open Contextual / non-diagnostic for DATE and
+            percentage rows — filtering does not resolve document REVIEW_REQUIRED.
           </Alert>
-          <ul className="space-y-4">
-            {fixtureLines.map((line) => (
-              <ExtractionLineCard
-                key={line.id}
-                line={line}
-                canWrite={false}
-                onReview={async () => undefined}
-              />
-            ))}
-          </ul>
+          <ExtractionReviewBoard
+            lines={fixtureLines}
+            canWrite={false}
+            onReview={async () => undefined}
+          />
         </section>
 
         <section className="space-y-3" data-testid="fixture-scale-warning">
