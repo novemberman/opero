@@ -32,10 +32,15 @@ export type ExtractionLine = {
 };
 
 function toneForReview(status: string): "warning" | "success" | "error" | "neutral" {
-  if (status === "PENDING") return "warning";
-  if (status === "CONFIRMED" || status === "CORRECTED") return "success";
+  if (status === "PENDING" || status === "CORRECTED") return "warning";
+  if (status === "CONFIRMED") return "success";
   if (status === "REJECTED") return "error";
   return "neutral";
+}
+
+function reviewStatusLabel(status: string): string {
+  if (status === "CORRECTED") return "CORRECTED · Needs re-confirm";
+  return status;
 }
 
 function amountTone(
@@ -59,6 +64,7 @@ export function ExtractionLineCard({
   const presentation = resolveMonetaryPresentation(line);
   const needsAttention =
     line.reviewStatus === "PENDING" ||
+    line.reviewStatus === "CORRECTED" ||
     Boolean(line.unitScaleRequiresReview) ||
     line.quality === "LOW" ||
     line.quality === "MANUAL" ||
@@ -87,7 +93,9 @@ export function ExtractionLineCard({
               {formatFinancialConceptLabel(line.concept)}
             </Badge>
             {line.quantityClass ? <Badge tone="neutral">{line.quantityClass}</Badge> : null}
-            <Badge tone={toneForReview(line.reviewStatus)}>{line.reviewStatus}</Badge>
+            <Badge tone={toneForReview(line.reviewStatus)}>
+              {reviewStatusLabel(line.reviewStatus)}
+            </Badge>
             <Badge tone={line.quality === "HIGH" ? "success" : "warning"}>{line.quality}</Badge>
             <Badge tone={amountTone(presentation.kind)}>
               {presentation.kind === "confirmed"
@@ -201,18 +209,18 @@ export function ExtractionLineCard({
         >
           <Select name="action" label="Action" defaultValue="CONFIRM">
             <option value="CONFIRM">Confirm</option>
-            <option value="CORRECT">Correct value</option>
+            <option value="CORRECT">Correct &amp; confirm</option>
             <option value="REJECT">Reject</option>
           </Select>
           <Input
             name="newValue"
             label="Corrected statement units"
-            placeholder="Only for Correct"
+            placeholder="Required for Correct & confirm"
           />
           <Input name="reason" label="Reason" placeholder="Optional note" />
           <div className="flex items-end">
             <Button type="submit" size="sm">
-              Save review
+              Submit review
             </Button>
           </div>
         </form>

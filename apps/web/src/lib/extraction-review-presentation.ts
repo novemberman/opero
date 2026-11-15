@@ -82,8 +82,14 @@ export function isPendingReview(status: string): boolean {
   return status === "PENDING";
 }
 
+/** Human-CONFIRMED only — legacy CORRECTED is not treated as confirmed (P0-A). */
 export function isConfirmedReview(status: string): boolean {
-  return status === "CONFIRMED" || status === "CORRECTED";
+  return status === "CONFIRMED";
+}
+
+/** Pre-P0-A correction status that still needs explicit re-confirmation. */
+export function isLegacyCorrectedReview(status: string): boolean {
+  return status === "CORRECTED";
 }
 
 export function isRejectedReview(status: string): boolean {
@@ -171,7 +177,9 @@ export function summarizeExtractionReview(
 
   for (const line of lines) {
     const monetary = isMonetaryQuantityClass(line.quantityClass);
-    if (isPendingReview(line.reviewStatus)) pendingAll += 1;
+    if (isPendingReview(line.reviewStatus) || isLegacyCorrectedReview(line.reviewStatus)) {
+      pendingAll += 1;
+    }
     if (isConfirmedReview(line.reviewStatus)) confirmed += 1;
     if (isRejectedReview(line.reviewStatus)) rejected += 1;
 
@@ -183,7 +191,9 @@ export function summarizeExtractionReview(
     if (isMappedConcept(line.concept)) mappedMonetary += 1;
     else unmappedMonetary += 1;
 
-    if (isPendingReview(line.reviewStatus)) pendingMonetary += 1;
+    if (isPendingReview(line.reviewStatus) || isLegacyCorrectedReview(line.reviewStatus)) {
+      pendingMonetary += 1;
+    }
     if (line.unitScaleRequiresReview) scaleConfirmationRequired += 1;
     if (hasSoftScaleConfidence(line.scaleConfidence)) scaleConfidenceAttention += 1;
   }
@@ -210,7 +220,10 @@ export function lineMatchesExtractionReviewFilter(
 
   switch (filter) {
     case "needs_financial_review":
-      return monetary && isPendingReview(line.reviewStatus);
+      return (
+        monetary &&
+        (isPendingReview(line.reviewStatus) || isLegacyCorrectedReview(line.reviewStatus))
+      );
     case "scale_issues":
       return monetary && Boolean(line.unitScaleRequiresReview);
     case "unmapped_monetary":
@@ -242,7 +255,8 @@ export function filterExtractionReviewLines<T extends ExtractionReviewLine>(
  */
 export function extractionReviewPriorityScore(line: ExtractionReviewLine): number {
   const monetary = isMonetaryQuantityClass(line.quantityClass);
-  const pending = isPendingReview(line.reviewStatus);
+  const pending =
+    isPendingReview(line.reviewStatus) || isLegacyCorrectedReview(line.reviewStatus);
   const mapped = isMappedConcept(line.concept);
   let score = 0;
 
@@ -252,7 +266,7 @@ export function extractionReviewPriorityScore(line: ExtractionReviewLine): numbe
   }
 
   score += 1000;
-  // Mapped pending confirmation first; then unmapped / ambiguous monetary.
+  // Mapped pending / legacy CORRECTED confirmation first; then unmapped / ambiguous monetary.
   if (pending && mapped) score += 400;
   else if (pending && !mapped) score += 200;
   else if (pending) score += 150;

@@ -107,8 +107,19 @@ export default function DocumentDetailPage() {
     if (!canWrite) return;
     const form = new FormData(event.currentTarget);
     const action = String(form.get("action") ?? "CONFIRM");
-    const newValue = String(form.get("newValue") ?? "");
+    const newValue = String(form.get("newValue") ?? "").trim();
     const reason = String(form.get("reason") ?? "");
+    // Draft corrected amounts must not be confirmed via Confirm — require Correct & confirm.
+    if (action === "CONFIRM" && newValue) {
+      setError(
+        "A corrected value is entered. Choose “Correct & confirm” to submit the new amount, or clear the field to Confirm the existing value.",
+      );
+      return;
+    }
+    if (action === "CORRECT" && !newValue) {
+      setError("Correct & confirm requires a corrected statement-units value.");
+      return;
+    }
     const { status: httpStatus, body } = await apiFetch<{ message?: string }>(
       `/organizations/${orgId}/documents/${documentId}/review`,
       {
@@ -125,7 +136,7 @@ export default function DocumentDetailPage() {
       setError(body.message ?? "Review failed");
       return;
     }
-    setMessage("Review saved — original raw evidence preserved");
+    setMessage("Review submitted — original raw evidence preserved");
     await load();
   }
 

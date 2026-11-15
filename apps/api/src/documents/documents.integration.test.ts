@@ -351,6 +351,18 @@ describe("document ingestion integration", () => {
       .set("x-csrf-token", auth.csrfToken)
       .send({
         lineItemId: revenue!.id,
+        action: "CONFIRM",
+        newValue: "9999.00",
+        reason: "Must not silently confirm while a correction is supplied",
+      })
+      .expect(400);
+
+    await request(app.getHttpServer())
+      .post(`/api/v1/organizations/${organizationId}/documents/${documentId}/review`)
+      .set("Cookie", auth.cookies)
+      .set("x-csrf-token", auth.csrfToken)
+      .send({
+        lineItemId: revenue!.id,
         action: "CORRECT",
         newValue: "2500.00",
         reason: "Normalize scale",

@@ -19,6 +19,11 @@ import {
   ObjectAlreadyExistsError,
   type ObjectStoragePort,
 } from "@opero/object-storage";
+import {
+  assessSnapshotPayloadIntegrity,
+  UNCONFIRMED_SNAPSHOT_DISCLOSURE,
+  type SnapshotIntegrityAssessment,
+} from "@opero/diagnostics";
 import { DEFAULT_REPORT_TITLE, renderReportPdf } from "@opero/reports";
 import type { Queue } from "bullmq";
 import { createHash } from "node:crypto";
@@ -110,6 +115,35 @@ export class ReportsService {
       this.config.get("S3_REPORTS_BUCKET", { infer: true }) ??
       this.config.get("S3_DOCUMENTS_BUCKET", { infer: true })
     );
+  }
+
+  /** Read-time only — never rewrites frozen diagnostic snapshots. */
+  private async diagnosticIntegrity(
+    organizationId: string,
+    diagnosticRunId: string,
+  ): Promise<SnapshotIntegrityAssessment> {
+    const snapshot = await this.prisma.diagnosticInputSnapshot.findFirst({
+      where: { organizationId, diagnosticRunId },
+      select: { payload: true },
+    });
+    return assessSnapshotPayloadIntegrity(snapshot?.payload);
+  }
+
+  private publicationForPresentation(
+    publication: ReportPublication | null,
+    integrity: SnapshotIntegrityAssessment,
+  ): ReportPublication | null {
+    if (!publication) return null;
+    if (integrity.authoritative) return publication;
+    const extras = [
+      ...(publication.additionalDisclosures ?? []),
+      UNCONFIRMED_SNAPSHOT_DISCLOSURE,
+    ];
+    return {
+      ...publication,
+      verifiedPublication: false,
+      additionalDisclosures: extras,
+    };
   }
 
   async create(input: {
@@ -334,8 +368,12 @@ export class ReportsService {
     }
 
     const { currentVersion, ...summary } = report;
+    const integrity = await this.diagnosticIntegrity(organizationId, report.diagnosticRunId);
     const fullPreview = currentVersion
-      ? buildReportModel(payloadOf(currentVersion), publicationOf(currentVersion))
+      ? buildReportModel(
+          payloadOf(currentVersion),
+          this.publicationForPresentation(publicationOf(currentVersion), integrity),
+        )
       : null;
     // Internal draft/review stays fully visible to members. Published paid
     // content requires a commercial entitlement (purchase or active OS plan).
@@ -348,6 +386,7 @@ export class ReportsService {
       report: summary,
       access: entitled ? "FULL" : "FREE_PREVIEW",
       preview: entitled || !fullPreview ? fullPreview : redactPaidReportPreview(fullPreview),
+      integrity,
     };
   }
 
@@ -365,7 +404,16 @@ export class ReportsService {
       where: { id: versionId, reportId, organizationId },
     });
     if (!version) throw new NotFoundException("Report version not found");
-    const fullPreview = buildReportModel(payloadOf(version), publicationOf(version));
+    const parent = await this.prisma.xRayReport.findFirst({
+      where: { id: reportId, organizationId },
+      select: { diagnosticRunId: true },
+    });
+    if (!parent) throw new NotFoundException("Report not found");
+    const integrity = await this.diagnosticIntegrity(organizationId, parent.diagnosticRunId);
+    const fullPreview = buildReportModel(
+      payloadOf(version),
+      this.publicationForPresentation(publicationOf(version), integrity),
+    );
     const published = version.status === "PUBLISHED" || version.status === "SUPERSEDED";
     const entitled =
       !published ||
@@ -381,6 +429,7 @@ export class ReportsService {
           },
       access: entitled ? "FULL" : "FREE_PREVIEW",
       preview: entitled ? fullPreview : redactPaidReportPreview(fullPreview),
+      integrity,
     };
   }
 
@@ -586,12 +635,17 @@ export class ReportsService {
     const groundingValidation = assertNoCriticalGrounding(payload, "publish");
 
     // Without a produced score the report is published limitations-forward only.
-    const verifiedPublication = canBeVerified(payload);
+    // Contaminated historical snapshots also cannot be verified publications.
+    const integrity = await this.diagnosticIntegrity(input.organizationId, run.id);
+    const verifiedPublication = canBeVerified(payload) && integrity.authoritative;
     const publishedAt = new Date();
-    const extraDisclosures = additionalDisclosures(payload, {
-      status: result.status,
-      issues: result.issues.map(({ code, severity, title }) => ({ code, severity, title })),
-    });
+    const extraDisclosures = [
+      ...additionalDisclosures(payload, {
+        status: result.status,
+        issues: result.issues.map(({ code, severity, title }) => ({ code, severity, title })),
+      }),
+      ...(integrity.authoritative ? [] : [UNCONFIRMED_SNAPSHOT_DISCLOSURE]),
+    ];
     const model = buildReportModel(payload, {
       verifiedPublication,
       generatedAt: publishedAt.toISOString(),

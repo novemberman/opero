@@ -7,6 +7,7 @@ import {
 } from "@nestjs/common";
 import { InjectQueue } from "@nestjs/bullmq";
 import {
+  assessSnapshotPayloadIntegrity,
   CALC_ENGINE_VERSION,
   RULE_SET_VERSION,
   SCORE_METHODOLOGY_VERSION,
@@ -152,13 +153,25 @@ export class DiagnosticsService {
     const run = await this.prisma.diagnosticRun.findFirst({
       where: { id: runId, organizationId },
       include: {
-        snapshot: { select: { contentHash: true, documentIds: true, extractionIds: true } },
+        snapshot: { select: { contentHash: true, documentIds: true, extractionIds: true, payload: true } },
         quality: true,
         score: { include: { components: true } },
       },
     });
     if (!run) throw new NotFoundException("Diagnostic run not found");
-    return run;
+    const integrity = assessSnapshotPayloadIntegrity(run.snapshot?.payload);
+    const { snapshot, ...rest } = run;
+    return {
+      ...rest,
+      snapshot: snapshot
+        ? {
+            contentHash: snapshot.contentHash,
+            documentIds: snapshot.documentIds,
+            extractionIds: snapshot.extractionIds,
+          }
+        : null,
+      integrity,
+    };
   }
 
   async getMetrics(organizationId: string, runId: string) {
@@ -185,7 +198,12 @@ export class DiagnosticsService {
       include: { components: true },
     });
     if (!score) throw new NotFoundException("Score not found");
-    return score;
+    const snapshot = await this.prisma.diagnosticInputSnapshot.findFirst({
+      where: { organizationId, diagnosticRunId: runId },
+      select: { payload: true },
+    });
+    const integrity = assessSnapshotPayloadIntegrity(snapshot?.payload);
+    return { ...score, integrity };
   }
 
   async getFindings(organizationId: string, runId: string) {

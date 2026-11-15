@@ -455,6 +455,12 @@ export class DocumentsService {
     if (input.action === "CORRECT" && !input.newValue) {
       throw new BadRequestException("newValue is required for corrections");
     }
+    // A filled correction field must use Correct & confirm — never silently confirm the old value.
+    if (input.action === "CONFIRM" && input.newValue?.trim()) {
+      throw new BadRequestException(
+        "A corrected value requires the Correct & confirm action; Confirm would ignore the new amount",
+      );
+    }
 
     const updated = await this.prisma.$transaction(async (tx) => {
       await tx.extractionReview.create({

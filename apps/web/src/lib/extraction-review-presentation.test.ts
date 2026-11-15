@@ -93,6 +93,13 @@ const fixture: ExtractionReviewLine[] = [
     quantityClass: "MONETARY",
   }),
   line({
+    id: "legacy-corrected",
+    labelRaw: "Legacy corrected revenue",
+    concept: "REVENUE",
+    reviewStatus: "CORRECTED",
+    quantityClass: "MONETARY",
+  }),
+  line({
     id: "junk",
     labelRaw: "Rejected noise",
     concept: "UNMAPPED",
@@ -119,17 +126,17 @@ describe("extraction-review-presentation", () => {
 
   it("summarizes pending/mapped/unmapped monetary, scale, contextual, confirmed and rejected", () => {
     const summary = summarizeExtractionReview(fixture);
-    expect(summary.total).toBe(10);
-    expect(summary.pendingMonetary).toBe(4); // rev, other, med-scale, legacy
-    expect(summary.mappedMonetary).toBe(4); // rev, med-scale, cogs, legacy
+    expect(summary.total).toBe(11);
+    expect(summary.pendingMonetary).toBe(5); // rev, other, med-scale, legacy, legacy-corrected
+    expect(summary.mappedMonetary).toBe(5); // rev, med-scale, cogs, legacy, legacy-corrected
     expect(summary.unmappedMonetary).toBe(2); // other, junk
     expect(summary.scaleConfirmationRequired).toBe(1);
     // Soft confidence attention stays separate from mandatory scale confirmation.
     expect(summary.scaleConfidenceAttention).toBe(2); // other AMBIGUOUS + med-scale MEDIUM
     expect(summary.contextualNonMonetary).toBe(4); // margin, fy, ratio, note
-    expect(summary.confirmed).toBe(1);
+    expect(summary.confirmed).toBe(1); // CONFIRMED only — CORRECTED is not confirmed
     expect(summary.rejected).toBe(1);
-    expect(summary.pendingAll).toBe(8);
+    expect(summary.pendingAll).toBe(9);
   });
 
   it("keeps soft scale confidence distinct from mandatory scale review", () => {
@@ -143,11 +150,19 @@ describe("extraction-review-presentation", () => {
     ).toBe(true);
   });
 
-  it("defaults the financial review filter to pending monetary only", () => {
+  it("defaults the financial review filter to pending monetary and legacy CORRECTED", () => {
     expect(DEFAULT_EXTRACTION_REVIEW_FILTER).toBe("needs_financial_review");
     const filtered = filterExtractionReviewLines(fixture, "needs_financial_review");
-    expect(filtered.map((l) => l.id).sort()).toEqual(["legacy", "med-scale", "other", "rev"]);
-    expect(filtered.every((l) => l.reviewStatus === "PENDING")).toBe(true);
+    expect(filtered.map((l) => l.id).sort()).toEqual([
+      "legacy",
+      "legacy-corrected",
+      "med-scale",
+      "other",
+      "rev",
+    ]);
+    expect(
+      filtered.every((l) => l.reviewStatus === "PENDING" || l.reviewStatus === "CORRECTED"),
+    ).toBe(true);
     expect(filtered.every((l) => isMonetaryQuantityClass(l.quantityClass))).toBe(true);
   });
 
@@ -173,7 +188,7 @@ describe("extraction-review-presentation", () => {
         .map((l) => l.quantityClass)
         .sort(),
     ).toEqual(["DATE", "NOTE_NUMBER", "PERCENTAGE", "RATIO"]);
-    expect(filterExtractionReviewLines(fixture, "all")).toHaveLength(10);
+    expect(filterExtractionReviewLines(fixture, "all")).toHaveLength(11);
   });
 
   it("prioritizes mapped pending monetary before unmapped monetary; contextual last", () => {

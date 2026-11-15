@@ -25,6 +25,11 @@ export {
   type EligibilityDecision,
   type EligibilityLine,
 } from "./eligibility.js";
+export {
+  assessSnapshotPayloadIntegrity,
+  UNCONFIRMED_SNAPSHOT_DISCLOSURE,
+  type SnapshotIntegrityAssessment,
+} from "./snapshot-integrity.js";
 export { assessReadiness } from "./readiness/assess.js";
 export type {
   ReadinessChecklistItem,
