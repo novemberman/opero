@@ -4,7 +4,20 @@ import { membershipRoleSchema, roleHasPermission, type MembershipRole } from "@o
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useState } from "react";
+import { HealthScorePanel } from "../../../../components/diagnostics/health-score-panel";
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  CardHeader,
+  Checkbox,
+  EmptyState,
+  Skeleton,
+  buttonClassName,
+} from "../../../../components/ui";
 import { apiFetch } from "../../../../lib/api";
+import { resolveHealthScorePresentation } from "../../../../lib/health-score-presentation";
 
 type RunRow = {
   id: string;
@@ -23,6 +36,13 @@ type DocRow = {
   processingStatus: string;
 };
 
+function runStatusTone(status: string): "success" | "warning" | "error" | "info" | "neutral" {
+  if (status === "SUCCEEDED") return "success";
+  if (status === "FAILED") return "error";
+  if (status === "QUEUED" || status === "RUNNING") return "info";
+  return "neutral";
+}
+
 export default function DiagnosticsPage() {
   const params = useParams<{ orgId: string }>();
   const router = useRouter();
@@ -32,11 +52,13 @@ export default function DiagnosticsPage() {
   const [selected, setSelected] = useState<string[]>([]);
   const [role, setRole] = useState<MembershipRole | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
   const canWrite = role ? roleHasPermission(role, "xray:write") : false;
 
   const load = useCallback(async () => {
+    setLoading(true);
     const [runsRes, docsRes, orgsRes] = await Promise.all([
       apiFetch<{ runs?: RunRow[]; message?: string }>(`/organizations/${orgId}/diagnostics`),
       apiFetch<{ documents?: DocRow[]; message?: string }>(`/organizations/${orgId}/documents`),
@@ -47,6 +69,7 @@ export default function DiagnosticsPage() {
     ]);
     if (runsRes.status >= 400) {
       setError(runsRes.body.message ?? "Unable to load diagnostics");
+      setLoading(false);
       return;
     }
     const membership = orgsRes.body.organizations?.find((row) => row.organization.id === orgId);
@@ -59,10 +82,10 @@ export default function DiagnosticsPage() {
       ),
     );
     setError(null);
+    setLoading(false);
   }, [orgId]);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- mount fetch
     void load();
   }, [load]);
 
@@ -97,98 +120,167 @@ export default function DiagnosticsPage() {
     }
   }
 
-  return (
-    <>
-      <div className="mx-auto max-w-6xl py-10">
-        <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <p className="text-sm uppercase tracking-[0.16em] text-pine">Opero X-Ray</p>
-            <h1 className="mt-2 text-3xl text-ink">Diagnostics</h1>
-            <p className="mt-2 max-w-2xl text-muted">
-              Deterministic KPIs, data-quality measures, and a provisional Business Health Score from
-              reviewed financial evidence. Missing data reduces coverage — it is not treated as zero.
-            </p>
-          </div>
-          <Link className="text-pine underline" href={`/organizations/${orgId}`}>
-            Back to organization
-          </Link>
-        </div>
+  const latestSucceeded = runs.find((run) => run.status === "SUCCEEDED") ?? null;
+  const latestPresentation = latestSucceeded
+    ? resolveHealthScorePresentation({
+        runStatus: latestSucceeded.status,
+        score: latestSucceeded.score,
+      })
+    : null;
 
-        {canWrite ? (
-          <form onSubmit={onStart} className="mb-10 border border-line p-4">
-            <h2 className="text-lg text-ink">Start a diagnostic run</h2>
-            <p className="mt-1 text-sm text-muted">
-              Select clean-scanned documents. Results stay reproducible via an immutable input
-              snapshot.
-            </p>
-            <ul className="mt-4 max-h-48 space-y-2 overflow-auto">
+  return (
+    <div className="mx-auto max-w-6xl space-y-8" data-testid="diagnostics-overview">
+      <header className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="text-sm font-semibold uppercase tracking-[0.14em] text-emerald">
+            Opero X-Ray
+          </p>
+          <h1 className="mt-2 text-3xl text-navy">Diagnostics</h1>
+          <p className="mt-2 max-w-2xl text-sm text-text-secondary">
+            Deterministic KPIs, data-quality measures and a provisional Business Health Score from
+            reviewed financial evidence. Missing data reduces coverage — it is never treated as
+            zero.
+          </p>
+        </div>
+      </header>
+
+      {error ? (
+        <Alert tone="error" title="Unable to load diagnostics">
+          <div className="space-y-3">
+            <p>{error}</p>
+            <Button type="button" size="sm" variant="secondary" onClick={() => void load()}>
+              Retry
+            </Button>
+          </div>
+        </Alert>
+      ) : null}
+
+      {loading ? (
+        <div className="space-y-3" data-testid="diagnostics-loading">
+          <Skeleton className="h-40 w-full" />
+          <Skeleton className="h-24 w-full" />
+        </div>
+      ) : null}
+
+      {!loading && latestSucceeded ? (
+        <HealthScorePanel
+          runStatus={latestSucceeded.status}
+          score={latestSucceeded.score}
+          className="!p-5"
+        />
+      ) : null}
+
+      {!loading && !latestSucceeded && latestPresentation == null ? (
+        <EmptyState
+          title="No completed diagnostics yet"
+          description="Run diagnostics on clean-scanned documents to see Business Health Score eligibility and ratio analysis."
+          action={
+            <Link
+              href={`/organizations/${orgId}/documents`}
+              className={buttonClassName({ variant: "secondary", size: "sm" })}
+            >
+              Open documents
+            </Link>
+          }
+        />
+      ) : null}
+
+      {canWrite ? (
+        <Card>
+          <CardHeader
+            title="Start a diagnostic run"
+            description="Select clean-scanned documents. Results stay reproducible via an immutable input snapshot."
+          />
+          <form onSubmit={onStart} className="mt-4">
+            <ul className="max-h-48 space-y-2 overflow-auto">
               {documents.map((doc) => (
                 <li key={doc.id}>
-                  <label className="flex items-center gap-2 text-sm text-ink">
-                    <input
-                      type="checkbox"
-                      checked={selected.includes(doc.id)}
-                      onChange={() => toggleDoc(doc.id)}
-                    />
-                    {doc.originalFilename}
-                  </label>
+                  <Checkbox
+                    label={doc.originalFilename}
+                    checked={selected.includes(doc.id)}
+                    onChange={() => toggleDoc(doc.id)}
+                  />
                 </li>
               ))}
               {documents.length === 0 ? (
-                <li className="text-sm text-muted">
+                <li className="text-sm text-text-secondary">
                   No eligible documents.{" "}
-                  <Link className="underline" href={`/organizations/${orgId}/documents`}>
+                  <Link className="text-emerald underline" href={`/organizations/${orgId}/documents`}>
                     Upload documents
                   </Link>{" "}
                   first.
                 </li>
               ) : null}
             </ul>
-            <button
-              className="mt-4 rounded-full bg-pine px-5 py-2 text-paper disabled:opacity-50"
+            <Button
+              className="mt-4"
               type="submit"
+              loading={submitting}
               disabled={submitting || selected.length === 0}
             >
               {submitting ? "Starting…" : "Run diagnostics"}
-            </button>
+            </Button>
           </form>
-        ) : (
-          <p className="mb-10 text-sm text-muted">
-            View-only access: starting diagnostics requires Analyst or higher.
-          </p>
-        )}
+        </Card>
+      ) : (
+        <Alert tone="info" title="View-only access">
+          Starting diagnostics requires Analyst or higher.
+        </Alert>
+      )}
 
-        {error ? <p className="mb-4 text-sm text-copper">{error}</p> : null}
+      <section aria-labelledby="runs-heading" className="space-y-4">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <h2 id="runs-heading" className="text-lg font-semibold text-navy">
+            Diagnostic runs
+          </h2>
+          <p className="text-sm text-text-secondary">{runs.length} run{runs.length === 1 ? "" : "s"}</p>
+        </div>
 
-        <ul className="divide-y divide-line border border-line">
-          {runs.map((run) => (
-            <li key={run.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
-              <div>
-                <Link
-                  className="font-medium text-ink underline"
-                  href={`/organizations/${orgId}/diagnostics/${run.id}`}
-                >
-                  Run {run.id.slice(0, 8)}…
-                </Link>
-                <p className="text-sm text-muted">
-                  {run.status}
-                  {run.currency ? ` · ${run.currency}` : ""}
-                  {run.periodLabel ? ` · ${run.periodLabel}` : ""}
-                  {run.score
-                    ? run.score.status === "SCORED"
-                      ? ` · score ${run.score.overallScore}`
-                      : " · INSUFFICIENT_DATA"
-                    : ""}
-                </p>
-              </div>
-              <time className="text-sm text-muted">{new Date(run.createdAt).toLocaleString()}</time>
-            </li>
-          ))}
-          {runs.length === 0 ? (
-            <li className="px-4 py-6 text-muted">No diagnostic runs yet.</li>
-          ) : null}
+        {!loading && runs.length === 0 ? (
+          <EmptyState
+            title="No diagnostic runs"
+            description="Completed runs appear here with eligibility status and period context."
+          />
+        ) : null}
+
+        <ul className="space-y-3">
+          {runs.map((run) => {
+            const scorePresentation = resolveHealthScorePresentation({
+              runStatus: run.status,
+              score: run.score,
+            });
+            return (
+              <li
+                key={run.id}
+                className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-surface px-4 py-3 shadow-sm"
+              >
+                <div className="min-w-0">
+                  <Link
+                    className="font-medium text-navy no-underline hover:text-emerald"
+                    href={`/organizations/${orgId}/diagnostics/${run.id}`}
+                  >
+                    Run {run.id.slice(0, 8)}…
+                  </Link>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <Badge tone={runStatusTone(run.status)}>{run.status}</Badge>
+                    <Badge tone={scorePresentation.badgeTone}>{scorePresentation.badgeLabel}</Badge>
+                    {run.currency ? <Badge tone="neutral">{run.currency}</Badge> : null}
+                    {run.periodLabel ? <Badge tone="neutral">{run.periodLabel}</Badge> : null}
+                    {scorePresentation.kind === "scored" && scorePresentation.scoreText ? (
+                      <span className="font-data text-sm text-emerald">
+                        Score {scorePresentation.scoreText}
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+                <time className="font-data text-xs text-text-secondary">
+                  {new Date(run.createdAt).toLocaleString()}
+                </time>
+              </li>
+            );
+          })}
         </ul>
-      </div>
-    </>
+      </section>
+    </div>
   );
 }

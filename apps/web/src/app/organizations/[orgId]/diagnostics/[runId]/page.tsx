@@ -3,7 +3,24 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
+import { FindingCard, type FindingInput } from "../../../../../components/diagnostics/finding-card";
+import { HealthScorePanel } from "../../../../../components/diagnostics/health-score-panel";
+import { MetricDimensionSections } from "../../../../../components/diagnostics/metric-dimension-section";
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  CardHeader,
+  EmptyState,
+  Skeleton,
+  buttonClassName,
+} from "../../../../../components/ui";
 import { apiFetch } from "../../../../../lib/api";
+import {
+  distinctComputedPeriods,
+  type MetricInput,
+} from "../../../../../lib/diagnostic-metric-presentation";
 
 type RunDetail = {
   id: string;
@@ -34,67 +51,45 @@ type RunDetail = {
       included: boolean;
       score: number | null;
       exclusionReason: string | null;
+      metricCodes?: string[];
     }>;
   } | null;
-};
-
-type Metric = {
-  code: string;
-  label: string;
-  dimension: string;
-  status: string;
-  value: string | null;
-  unit: string | null;
-};
-
-type Finding = {
-  id: string;
-  ruleId: string;
-  category: string;
-  severity: string;
-  title: string;
-  explanation: string;
-  implication: string;
-  suggestedAction: string;
-  evidence: Array<{
-    snapshotKey: string;
-    documentId: string | null;
-    label: string | null;
-  }>;
 };
 
 export default function DiagnosticRunPage() {
   const params = useParams<{ orgId: string; runId: string }>();
   const { orgId, runId } = params;
   const [run, setRun] = useState<RunDetail | null>(null);
-  const [metrics, setMetrics] = useState<Metric[]>([]);
-  const [findings, setFindings] = useState<Finding[]>([]);
+  const [metrics, setMetrics] = useState<MetricInput[]>([]);
+  const [findings, setFindings] = useState<FindingInput[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     const [runRes, metricsRes, findingsRes] = await Promise.all([
       apiFetch<{ run?: RunDetail; message?: string }>(
         `/organizations/${orgId}/diagnostics/${runId}`,
       ),
-      apiFetch<{ metrics?: Metric[]; message?: string }>(
+      apiFetch<{ metrics?: MetricInput[]; message?: string }>(
         `/organizations/${orgId}/diagnostics/${runId}/metrics`,
       ),
-      apiFetch<{ findings?: Finding[]; message?: string }>(
+      apiFetch<{ findings?: FindingInput[]; message?: string }>(
         `/organizations/${orgId}/diagnostics/${runId}/findings`,
       ),
     ]);
     if (runRes.status >= 400) {
       setError(runRes.body.message ?? "Unable to load diagnostic run");
+      setLoading(false);
       return;
     }
     setRun(runRes.body.run ?? null);
     setMetrics(metricsRes.body.metrics ?? []);
     setFindings(findingsRes.body.findings ?? []);
     setError(null);
+    setLoading(false);
   }, [orgId, runId]);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- mount/poll
     void load();
     const timer = setInterval(() => {
       void load();
@@ -102,190 +97,186 @@ export default function DiagnosticRunPage() {
     return () => clearInterval(timer);
   }, [load]);
 
-  const computed = metrics.filter((m) => m.status === "COMPUTED");
-  const missing = metrics.filter((m) => m.status !== "COMPUTED");
+  const periods = distinctComputedPeriods(metrics);
+  const pending = run?.status === "QUEUED" || run?.status === "RUNNING";
 
   return (
-    <>
-      <div className="mx-auto max-w-6xl py-10">
-        <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <p className="text-sm uppercase tracking-[0.16em] text-pine">Opero X-Ray</p>
-            <h1 className="mt-2 text-3xl text-ink">Diagnostic run</h1>
-            <p className="mt-2 text-muted">
-              Status {run?.status ?? "…"}
-              {run?.currency ? ` · ${run.currency}` : ""}
-              {run?.periodLabel ? ` · ${run.periodLabel}` : ""}
-            </p>
+    <div className="mx-auto max-w-6xl space-y-8" data-testid="diagnostic-run-detail">
+      <header className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="text-sm font-semibold uppercase tracking-[0.14em] text-emerald">
+            Opero X-Ray
+          </p>
+          <h1 className="mt-2 text-3xl text-navy">Diagnostic run</h1>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {run ? <Badge tone={run.status === "SUCCEEDED" ? "success" : pending ? "info" : "neutral"}>{run.status}</Badge> : null}
+            {run?.currency ? <Badge tone="neutral">{run.currency}</Badge> : null}
+            {run?.periodLabel ? <Badge tone="neutral">{run.periodLabel}</Badge> : null}
           </div>
-          <Link className="text-pine underline" href={`/organizations/${orgId}/diagnostics`}>
-            All diagnostics
-          </Link>
         </div>
+        <Link
+          className={buttonClassName({ variant: "ghost", size: "sm" })}
+          href={`/organizations/${orgId}/diagnostics`}
+        >
+          All diagnostics
+        </Link>
+      </header>
 
-        {error ? <p className="mb-4 text-sm text-copper">{error}</p> : null}
-        {run?.failureMessage ? (
-          <p className="mb-4 text-sm text-copper">{run.failureMessage}</p>
-        ) : null}
+      {error ? (
+        <Alert tone="error" title="Unable to load diagnostic">
+          <div className="space-y-3">
+            <p>{error}</p>
+            <Button type="button" size="sm" variant="secondary" onClick={() => void load()}>
+              Retry
+            </Button>
+          </div>
+        </Alert>
+      ) : null}
 
-        <section className="mb-10 border border-line p-5">
-          <h2 className="text-xl text-ink">Business Health Score</h2>
-          {run?.score?.status === "SCORED" ? (
-            <p className="mt-3 text-5xl text-pine">{run.score.overallScore}</p>
-          ) : run?.status === "SUCCEEDED" ? (
-            <p className="mt-3 text-2xl text-copper">INSUFFICIENT_DATA</p>
+      {run?.failureMessage ? (
+        <Alert tone="error" title="Run failure">
+          {run.failureMessage}
+        </Alert>
+      ) : null}
+
+      {loading && !run ? (
+        <div className="space-y-3" data-testid="diagnostic-detail-loading">
+          <Skeleton className="h-48 w-full" />
+          <Skeleton className="h-32 w-full" />
+        </div>
+      ) : null}
+
+      {pending ? (
+        <Alert tone="info" title="Diagnostic in progress">
+          Metrics, findings and score eligibility update as the run completes. This page refreshes
+          automatically.
+        </Alert>
+      ) : null}
+
+      {run ? (
+        <HealthScorePanel runStatus={run.status} score={run.score} quality={run.quality} />
+      ) : null}
+
+      {run?.status === "SUCCEEDED" ? (
+        <Card>
+          <CardHeader
+            title="Next steps"
+            description="Continue with readiness, evidence reconciliation, AI interpretation or reporting for this run."
+          />
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Link
+              href={`/organizations/${orgId}/readiness?run=${runId}`}
+              className={buttonClassName({ variant: "secondary", size: "sm" })}
+            >
+              Check readiness
+            </Link>
+            <Link
+              href={`/organizations/${orgId}/reconciliations?run=${runId}`}
+              className={buttonClassName({ variant: "secondary", size: "sm" })}
+            >
+              Review evidence conflicts
+            </Link>
+            <Link
+              href={`/organizations/${orgId}/ai?run=${runId}`}
+              className={buttonClassName({ variant: "secondary", size: "sm" })}
+            >
+              AI interpretation
+            </Link>
+            <Link
+              href={`/organizations/${orgId}/reports?run=${runId}`}
+              className={buttonClassName({ variant: "secondary", size: "sm" })}
+            >
+              Create a report
+            </Link>
+          </div>
+        </Card>
+      ) : null}
+
+      <section aria-labelledby="metrics-heading" className="space-y-4">
+        <div>
+          <h2 id="metrics-heading" className="text-xl font-semibold text-navy">
+            Financial analysis
+          </h2>
+          <p className="mt-1 text-sm text-text-secondary">
+            Profitability, liquidity, leverage, efficiency and cash-flow measures from the
+            diagnostic engine. Comparative periods appear only when distinct period labels exist in
+            the returned metrics.
+          </p>
+          {periods.length > 1 ? (
+            <p className="mt-2 text-sm text-emerald">
+              Periods present in computed metrics: {periods.join(" · ")}
+            </p>
           ) : (
-            <p className="mt-3 text-muted">Score available when the run completes.</p>
+            <p className="mt-2 text-sm text-text-secondary">
+              Comparative trend charts are withheld — only{" "}
+              {periods[0] ? `period “${periods[0]}”` : "a single period (or none)"} is present in
+              the computed metric payload.
+            </p>
           )}
-          {run?.score?.components ? (
-            <ul className="mt-4 space-y-1 text-sm text-muted">
-              {run.score.components.map((c) => (
-                <li key={c.dimension}>
-                  {c.dimension} (w{c.weight}):{" "}
-                  {c.included ? c.score : `excluded — ${c.exclusionReason}`}
-                </li>
-              ))}
-            </ul>
-          ) : null}
-          {run?.quality ? (
-            <p className="mt-4 text-sm text-muted">
-              Completeness {run.quality.completeness} · Consistency {run.quality.consistency} ·
-              Reliability {run.quality.evidenceReliability} · Coverage{" "}
-              {run.quality.diagnosticCoverage}
-            </p>
-          ) : null}
-        </section>
+        </div>
+        <MetricDimensionSections metrics={metrics} />
+      </section>
 
-        {run?.status === "SUCCEEDED" ? (
-          <section className="mb-10 border border-line p-4">
-            <h2 className="text-lg text-ink">Next steps for this run</h2>
-            <p className="mt-2 flex flex-wrap gap-x-5 gap-y-2 text-sm">
-              <Link className="underline" href={`/organizations/${orgId}/readiness?run=${runId}`}>
-                Check readiness
-              </Link>
-              <Link
-                className="underline"
-                href={`/organizations/${orgId}/reconciliations?run=${runId}`}
-              >
-                Review evidence conflicts
-              </Link>
-              <Link className="underline" href={`/organizations/${orgId}/ai?run=${runId}`}>
-                AI interpretation
-              </Link>
-              <Link className="underline" href={`/organizations/${orgId}/reports?run=${runId}`}>
-                Create a report
-              </Link>
-            </p>
-          </section>
+      <section aria-labelledby="findings-heading" className="space-y-4">
+        <div>
+          <h2 id="findings-heading" className="text-xl font-semibold text-navy">
+            Findings
+          </h2>
+          <p className="mt-1 text-sm text-text-secondary">
+            Deterministic observations with source evidence links. Expand evidence for snapshot
+            traceability.
+          </p>
+        </div>
+        {findings.length === 0 ? (
+          <EmptyState
+            title="No findings for this run"
+            description="Findings appear when rule evaluations produce observations or risks."
+          />
+        ) : (
+          <ul className="space-y-3">
+            {findings.map((finding) => (
+              <FindingCard key={finding.id} finding={finding} orgId={orgId} />
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <Card>
+        <CardHeader
+          title="Methodology & limitations"
+          description="Engine versions and score limitations from the run payload."
+        />
+        <p className="mt-3 text-sm text-text-secondary">
+          Engine {run?.calculationEngineVersion ?? "…"} · Rules {run?.ruleSetVersion ?? "…"} · Score{" "}
+          {run?.scoreMethodologyVersion ?? "…"}
+        </p>
+        <p className="mt-2 text-sm text-text-secondary">
+          Thresholds are provisional heuristics, not industry benchmarks. This is not a credit
+          rating, audit opinion, or prediction of business survival. No implicit FX. Missing values
+          are never treated as zero.
+        </p>
+        {run?.score?.limitations?.length ? (
+          <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-text-secondary">
+            {run.score.limitations.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
         ) : null}
-
-        <section className="mb-10">
-          <h2 className="text-xl text-ink">Key metrics</h2>
-          <ul className="mt-3 divide-y divide-line border border-line">
-            {computed.map((m) => (
-              <li key={m.code} className="flex justify-between gap-3 px-4 py-2 text-sm">
-                <span className="text-ink">
-                  {m.label} <span className="text-muted">({m.dimension})</span>
-                </span>
-                <span className="text-ink">
-                  {m.value}
-                  {m.unit === "ratio" ? "" : m.unit ? ` ${m.unit}` : ""}
-                </span>
-              </li>
+        {run?.snapshot?.documentIds?.length ? (
+          <p className="mt-4 text-sm text-text-secondary">
+            Source documents:{" "}
+            {run.snapshot.documentIds.map((id) => (
+              <Link
+                key={id}
+                className="mr-2 text-emerald underline"
+                href={`/organizations/${orgId}/documents/${id}`}
+              >
+                {id.slice(0, 8)}…
+              </Link>
             ))}
-            {computed.length === 0 ? (
-              <li className="px-4 py-4 text-muted">No computed metrics yet.</li>
-            ) : null}
-          </ul>
-        </section>
-
-        <section className="mb-10">
-          <h2 className="text-xl text-ink">Findings</h2>
-          <ul className="mt-3 space-y-3">
-            {findings.map((f) => (
-              <li key={f.id} className="border border-line p-4">
-                <p className="text-sm uppercase tracking-wide text-muted">
-                  {f.category} · {f.severity} · {f.ruleId}
-                </p>
-                <h3 className="mt-1 text-lg text-ink">{f.title}</h3>
-                <p className="mt-2 text-sm text-muted">{f.explanation}</p>
-                <p className="mt-2 text-sm text-ink">{f.implication}</p>
-                <p className="mt-2 text-sm text-pine">{f.suggestedAction}</p>
-                {f.evidence.length ? (
-                  <ul className="mt-3 space-y-1 text-sm">
-                    {f.evidence.map((e) => (
-                      <li key={e.snapshotKey}>
-                        {e.documentId ? (
-                          <Link
-                            className="underline"
-                            href={`/organizations/${orgId}/documents/${e.documentId}`}
-                          >
-                            {e.label ?? "Evidence"}
-                          </Link>
-                        ) : (
-                          (e.label ?? e.snapshotKey)
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                ) : null}
-              </li>
-            ))}
-            {findings.length === 0 ? (
-              <li className="text-muted">No findings for this run.</li>
-            ) : null}
-          </ul>
-        </section>
-
-        <section className="mb-10">
-          <h2 className="text-xl text-ink">Missing or uncomputed</h2>
-          <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-muted">
-            {missing.slice(0, 20).map((m) => (
-              <li key={m.code}>
-                {m.label}: {m.status}
-              </li>
-            ))}
-            {(run?.quality?.details?.missingDimensions ?? []).map((d) => (
-              <li key={d}>Missing dimension: {d}</li>
-            ))}
-          </ul>
-        </section>
-
-        <section className="border border-line p-4 text-sm text-muted">
-          <h2 className="text-base text-ink">Methodology & limitations</h2>
-          <p className="mt-2">
-            Engine {run?.calculationEngineVersion ?? "…"} · Rules {run?.ruleSetVersion ?? "…"} ·
-            Score {run?.scoreMethodologyVersion ?? "…"}
           </p>
-          <p className="mt-2">
-            Thresholds are provisional heuristics, not industry benchmarks. This is not a credit
-            rating, audit opinion, or prediction of business survival. No implicit FX. Missing
-            values are never treated as zero. See repository{" "}
-            <code>docs/DIAGNOSTIC_METHODOLOGY.md</code>.
-          </p>
-          {run?.score?.limitations?.length ? (
-            <ul className="mt-2 list-disc pl-5">
-              {run.score.limitations.map((l) => (
-                <li key={l}>{l}</li>
-              ))}
-            </ul>
-          ) : null}
-          {run?.snapshot?.documentIds?.length ? (
-            <p className="mt-3">
-              Source documents:{" "}
-              {run.snapshot.documentIds.map((id) => (
-                <Link
-                  key={id}
-                  className="mr-2 underline"
-                  href={`/organizations/${orgId}/documents/${id}`}
-                >
-                  {id.slice(0, 8)}…
-                </Link>
-              ))}
-            </p>
-          ) : null}
-        </section>
-      </div>
-    </>
+        ) : null}
+      </Card>
+    </div>
   );
 }

@@ -100,8 +100,16 @@ Review specimen: `/design-system` (9A preview only; not a public marketing surfa
 - Explicit human confirmation summary (pending vs confirmed)
 - Specimens: `/design-system/documents` · evidence: `docs/phase-9d/`
 
+## 9E — Diagnostics, readiness & AI interpretation
+
+- Diagnostics overview + run detail: Business Health Score eligibility panel, dimension score bars, ratio cards with units/periods/evidence, findings with expandable source evidence
+- Score never calculated in the browser — SCORED / INSUFFICIENT_DATA / pending / unavailable only
+- Readiness decision-support workspace with actionable blocker links to documents / reconciliations
+- AI interpretation: provider availability, simulated labelling, grounding panel, human-review edits
+- Charts: CSS category/metric bars from backend values only; no fictional time series
+- Specimens: `/design-system/diagnostics` · evidence: `docs/phase-9e/`
+
 ### Later increments
 
-- **9E** Diagnostics / AI
 - **9F** Reports / billing / settings
 - **9G** Responsive / a11y / visual regression

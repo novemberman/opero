@@ -71,6 +71,9 @@ function Specimen() {
           <a href="/design-system/documents" className="text-emerald no-underline hover:underline">
             Documents (9D)
           </a>
+          <a href="/design-system/diagnostics" className="text-emerald no-underline hover:underline">
+            Diagnostics (9E)
+          </a>
         </p>
       </header>
 
