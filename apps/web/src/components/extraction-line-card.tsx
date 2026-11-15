@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent } from "react";
+import { formatFinancialConceptLabel } from "../lib/extraction-review-presentation";
 import { resolveMonetaryPresentation } from "../lib/monetary-presentation";
 import { cn } from "../lib/cn";
 import { Alert, Badge, Button, Input, Select } from "./ui";
@@ -78,8 +79,12 @@ export function ExtractionLineCard({
         <div className="min-w-0">
           <p className="text-lg font-semibold text-navy">{line.labelRaw}</p>
           <div className="mt-2 flex flex-wrap gap-2">
-            <Badge tone={line.concept === "UNMAPPED" ? "warning" : "emerald"}>
-              {line.concept}
+            <Badge
+              tone={line.concept === "UNMAPPED" ? "warning" : "emerald"}
+              title={line.concept}
+              data-concept={line.concept}
+            >
+              {formatFinancialConceptLabel(line.concept)}
             </Badge>
             {line.quantityClass ? <Badge tone="neutral">{line.quantityClass}</Badge> : null}
             <Badge tone={toneForReview(line.reviewStatus)}>{line.reviewStatus}</Badge>

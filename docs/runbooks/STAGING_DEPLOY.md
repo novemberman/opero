@@ -8,7 +8,7 @@
 4. Set variables from `.env.staging.example` (real secrets via Railway dashboard only).
 5. Set `APP_ENV=staging`, `NODE_ENV=production`, `TRUST_PROXY=true`, `DOCUMENT_STORAGE_DRIVER=s3`.
 6. On `opero-web`, set `API_PROXY_TARGET` to the API origin (public or private). Leave browser on same-origin `/api/v1` (default). Set API `CORS_ORIGINS` / `APP_ORIGIN` to the **web** HTTPS origin. Do **not** set `COOKIE_DOMAIN` on Railway default domains.
-7. Run one-off migrate: `pnpm migrate:deploy` (or API pre-deploy command).
-8. Deploy `opero-api`, then `opero-worker`, then `opero-web`.
-9. Smoke: API `/api/v1/health` + `/api/v1/ready`, web `/health`, page source `__OPERO_PUBLIC_ENV__` shows `"apiBaseUrl":"/api/v1"`, register/login, **create organization**, sign out, document upload (mock or test payments only).
+7. Run one-off migrate: `pnpm migrate:deploy` (or API pre-deploy command). For additive `FinancialConcept` releases, confirm `prisma migrate status` is up to date **before** starting the worker.
+8. Deploy `opero-api` first (pre-deploy migrates), wait until healthy/ready, then `opero-worker`, then `opero-web`. Do not let Railway deploy the worker on the new commit until the API pre-deploy migration has completed.
+9. Smoke: API `/api/v1/health` + `/api/v1/ready`, web `/health`, page source `__OPERO_PUBLIC_ENV__` shows `"apiBaseUrl":"/api/v1"`, register/login, **create organization**, sign out, document upload (mock or test payments only). Use a **synthetic** document for extraction taxonomy checks — do not reprocess production/staging FY statements unless explicitly authorized.
 10. Configure Korapay **test** webhook URL to `https://<api>/api/v1/billing/webhooks/korapay`.

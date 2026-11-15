@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_EXTRACTION_REVIEW_FILTER,
+  FINANCIAL_CONCEPT_DISPLAY_LABELS,
   filterExtractionReviewLines,
+  formatFinancialConceptLabel,
   hasSoftScaleConfidence,
   isContextualQuantityClass,
+  isMappedConcept,
   isMonetaryQuantityClass,
   lineMatchesExtractionReviewFilter,
   selectExtractionReviewLines,
@@ -206,5 +209,39 @@ describe("extraction-review-presentation", () => {
     const filtered = filterExtractionReviewLines(fixture, "needs_financial_review");
     expect(filtered.some((l) => l.reviewStatus === "CONFIRMED")).toBe(false);
     expect(filtered.some((l) => l.reviewStatus === "REJECTED")).toBe(false);
+  });
+
+  it("provides readable labels for B2.2 Increment A concepts without renaming enums", () => {
+    const incrementA: Array<[string, string]> = [
+      ["PROFIT_BEFORE_TAX", "Profit before tax"],
+      ["INCOME_TAX_EXPENSE", "Income tax expense"],
+      ["OPENING_CASH_AND_EQUIVALENTS", "Opening cash and equivalents"],
+      ["INVESTING_CASH_FLOW", "Investing cash flow"],
+      ["FINANCING_CASH_FLOW", "Financing cash flow"],
+      ["NET_CHANGE_IN_CASH", "Net change in cash"],
+    ];
+    for (const [concept, label] of incrementA) {
+      expect(FINANCIAL_CONCEPT_DISPLAY_LABELS[concept]).toBe(label);
+      expect(formatFinancialConceptLabel(concept)).toBe(label);
+      // Enum identity stays on the record; presentation never rewrites it.
+      expect(concept).not.toBe(label);
+    }
+    expect(formatFinancialConceptLabel("NET_PROFIT")).toBe("Net profit");
+    expect(formatFinancialConceptLabel("UNKNOWN_FUTURE_CONCEPT")).toBe("UNKNOWN_FUTURE_CONCEPT");
+  });
+
+  it("treats Increment A mapped concepts as mapped pending monetary in the review queue", () => {
+    const pbt = line({
+      id: "pbt",
+      labelRaw: "Profit before tax",
+      concept: "PROFIT_BEFORE_TAX",
+      reviewStatus: "PENDING",
+      quantityClass: "MONETARY",
+    });
+    expect(isMappedConcept(pbt.concept)).toBe(true);
+    expect(lineMatchesExtractionReviewFilter(pbt, "needs_financial_review")).toBe(true);
+    expect(lineMatchesExtractionReviewFilter(pbt, "unmapped_monetary")).toBe(false);
+    expect(pbt.reviewStatus).toBe("PENDING");
+    expect(pbt.concept).toBe("PROFIT_BEFORE_TAX");
   });
 });

@@ -37,7 +37,7 @@
         "PAYMENT_PROVIDER",
         "APP_VERSION"
       ],
-      "notes": "Private network to Postgres/Redis/S3. Korapay notification_url = https://<api-domain>/api/v1/billing/webhooks/korapay"
+      "notes": "Private network to Postgres/Redis/S3. Korapay notification_url = https://<api-domain>/api/v1/billing/webhooks/korapay. Sole migrator: preDeployCommand runs before the new API revision receives traffic. Deploy API before worker whenever migrations add enum values the worker may write."
     },
     {
       "name": "opero-worker",
@@ -53,7 +53,7 @@
         "DOCUMENT_STORAGE_DRIVER",
         "APP_VERSION"
       ],
-      "notes": "No public HTTP. Shares private network with API."
+      "notes": "No public HTTP. Shares private network with API. Do not auto-deploy worker ahead of API when FinancialConcept (or other DB enum) migrations are pending — wait until API pre-deploy migrate succeeds, then deploy worker."
     },
     {
       "name": "PostgreSQL",

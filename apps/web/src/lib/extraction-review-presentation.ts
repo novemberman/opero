@@ -94,6 +94,45 @@ export function isMappedConcept(concept: string): boolean {
   return concept !== "UNMAPPED";
 }
 
+/**
+ * Human-readable labels for FinancialConcept enum values.
+ * Internal enum strings are preserved on records; this is presentation only.
+ */
+export const FINANCIAL_CONCEPT_DISPLAY_LABELS: Record<string, string> = {
+  REVENUE: "Revenue",
+  COST_OF_GOODS_SOLD: "Cost of goods sold",
+  GROSS_PROFIT: "Gross profit",
+  OPERATING_EXPENSES: "Operating expenses",
+  OPERATING_PROFIT: "Operating profit",
+  NET_PROFIT: "Net profit",
+  CASH_AND_EQUIVALENTS: "Cash and equivalents",
+  ACCOUNTS_RECEIVABLE: "Accounts receivable",
+  ACCOUNTS_PAYABLE: "Accounts payable",
+  INVENTORY: "Inventory",
+  CURRENT_ASSETS: "Current assets",
+  CURRENT_LIABILITIES: "Current liabilities",
+  TOTAL_ASSETS: "Total assets",
+  TOTAL_LIABILITIES: "Total liabilities",
+  EQUITY: "Equity",
+  INTEREST_BEARING_DEBT: "Interest-bearing debt",
+  INTEREST_EXPENSE: "Interest expense",
+  OPERATING_CASH_FLOW: "Operating cash flow",
+  CAPITAL_EXPENDITURE: "Capital expenditure",
+  // B2.2 Increment A
+  PROFIT_BEFORE_TAX: "Profit before tax",
+  INCOME_TAX_EXPENSE: "Income tax expense",
+  OPENING_CASH_AND_EQUIVALENTS: "Opening cash and equivalents",
+  INVESTING_CASH_FLOW: "Investing cash flow",
+  FINANCING_CASH_FLOW: "Financing cash flow",
+  NET_CHANGE_IN_CASH: "Net change in cash",
+  UNMAPPED: "Unmapped",
+};
+
+/** Display label for a concept enum; falls back to the raw enum string. */
+export function formatFinancialConceptLabel(concept: string): string {
+  return FINANCIAL_CONCEPT_DISPLAY_LABELS[concept] ?? concept;
+}
+
 export type ExtractionReviewSummary = {
   total: number;
   pendingMonetary: number;
