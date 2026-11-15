@@ -199,6 +199,10 @@ export const reviewLineItemBodySchema = z
         "INVESTING_CASH_FLOW",
         "FINANCING_CASH_FLOW",
         "NET_CHANGE_IN_CASH",
+        "SHARE_CAPITAL",
+        "RETAINED_EARNINGS",
+        "TAX_PAYABLE",
+        "TOTAL_LIABILITIES_AND_EQUITY",
         "UNMAPPED",
       ])
       .optional(),

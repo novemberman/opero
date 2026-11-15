@@ -211,16 +211,20 @@ describe("extraction-review-presentation", () => {
     expect(filtered.some((l) => l.reviewStatus === "REJECTED")).toBe(false);
   });
 
-  it("provides readable labels for B2.2 Increment A concepts without renaming enums", () => {
-    const incrementA: Array<[string, string]> = [
+  it("provides readable labels for B2.2 Increment A and B1 concepts without renaming enums", () => {
+    const labels: Array<[string, string]> = [
       ["PROFIT_BEFORE_TAX", "Profit before tax"],
       ["INCOME_TAX_EXPENSE", "Income tax expense"],
       ["OPENING_CASH_AND_EQUIVALENTS", "Opening cash and equivalents"],
       ["INVESTING_CASH_FLOW", "Investing cash flow"],
       ["FINANCING_CASH_FLOW", "Financing cash flow"],
       ["NET_CHANGE_IN_CASH", "Net change in cash"],
+      ["SHARE_CAPITAL", "Share capital"],
+      ["RETAINED_EARNINGS", "Retained earnings"],
+      ["TAX_PAYABLE", "Tax payable"],
+      ["TOTAL_LIABILITIES_AND_EQUITY", "Total liabilities and equity"],
     ];
-    for (const [concept, label] of incrementA) {
+    for (const [concept, label] of labels) {
       expect(FINANCIAL_CONCEPT_DISPLAY_LABELS[concept]).toBe(label);
       expect(formatFinancialConceptLabel(concept)).toBe(label);
       // Enum identity stays on the record; presentation never rewrites it.

@@ -125,6 +125,11 @@ export const FINANCIAL_CONCEPT_DISPLAY_LABELS: Record<string, string> = {
   INVESTING_CASH_FLOW: "Investing cash flow",
   FINANCING_CASH_FLOW: "Financing cash flow",
   NET_CHANGE_IN_CASH: "Net change in cash",
+  // B2.2 Increment B1
+  SHARE_CAPITAL: "Share capital",
+  RETAINED_EARNINGS: "Retained earnings",
+  TAX_PAYABLE: "Tax payable",
+  TOTAL_LIABILITIES_AND_EQUITY: "Total liabilities and equity",
   UNMAPPED: "Unmapped",
 };
 

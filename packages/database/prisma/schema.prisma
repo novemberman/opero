@@ -133,6 +133,11 @@ enum FinancialConcept {
   INVESTING_CASH_FLOW
   FINANCING_CASH_FLOW
   NET_CHANGE_IN_CASH
+  /// B2.2 Increment B1 — BS/equity/tax liability recognition only; not KPI inputs yet.
+  SHARE_CAPITAL
+  RETAINED_EARNINGS
+  TAX_PAYABLE
+  TOTAL_LIABILITIES_AND_EQUITY
   UNMAPPED
 }
 

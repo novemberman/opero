@@ -141,10 +141,39 @@ describe("B2.2 Increment A — approved concept mappings from B2 evidence", () =
   });
 });
 
+describe("B2.2 Increment B1 — BS/equity/tax liability mappings from B2 evidence", () => {
+  it("maps the four approved concepts from evidence labels", () => {
+    expect(interpret("Current tax payable", "4,000").concept).toBe("TAX_PAYABLE");
+    expect(interpret("Retained earnings", "25,000").concept).toBe("RETAINED_EARNINGS");
+    expect(interpret("Share capital", "45,000").concept).toBe("SHARE_CAPITAL");
+    expect(interpret("Total liabilities and equity", "140,000").concept).toBe(
+      "TOTAL_LIABILITIES_AND_EQUITY",
+    );
+  });
+
+  it("keeps new mappings monetary without collapsing accounting distinctions", () => {
+    const tax = interpret("Current tax payable", "4,000");
+    expect(tax.quantityClass).toBe("MONETARY");
+    expect(tax.rawValue).toBe("4,000");
+    expect(tax.concept).not.toBe("INCOME_TAX_EXPENSE");
+    expect(tax.concept).not.toBe("ACCOUNTS_PAYABLE");
+
+    const sc = interpret("Share capital", "45,000");
+    expect(sc.concept).not.toBe("EQUITY");
+
+    const re = interpret("Retained earnings", "25,000");
+    expect(re.concept).not.toBe("NET_PROFIT");
+
+    const le = interpret("Total liabilities and equity", "140,000");
+    expect(le.concept).not.toBe("TOTAL_ASSETS");
+    // interpretExtractedLine has no reviewStatus — persistence defaults to PENDING.
+  });
+});
+
 describe("B2.1 extraction hygiene — deferred unsupported remain unmapped", () => {
   it("keeps deferred / ambiguous B2 labels unmapped", () => {
-    // Increment A mapped #2,#5,#15,#16,#17,#21 — remaining unsupported stay UNMAPPED.
-    const deferred = [1, 6, 7, 8, 12, 13, 14, 18, 3, 23];
+    // A mapped #2,#5,#15–17,#21; B1 mapped #1,#6,#7,#8 — WC/debt/ambiguous stay UNMAPPED.
+    const deferred = [12, 13, 14, 18, 3, 23];
     for (const n of deferred) {
       const row = B2_UNMAPPED.find((r) => r.n === n)!;
       const interpreted = interpret(row.label, row.raw);
@@ -308,10 +337,11 @@ describe("B2.1 before/after fixture counts", () => {
     ).length;
     const afterContextual = after.filter((l) => l.quantityClass !== "MONETARY").length;
 
-    // Noise (6) + narrative (3) contextual; #9 closing + Increment A (#2,#5,#15–17,#21) map;
-    // #27/#28 demoted. Remaining unmapped monetary: deferred unsupported (8) + ambiguous (2) = 10.
-    expect(afterUnmappedMonetary).toBe(10);
-    expect(afterMappedMonetary).toBeGreaterThanOrEqual(10); // anchors + closing + Increment A
+    // Noise (6) + narrative (3) contextual; #9 closing + Increment A (#2,#5,#15–17,#21)
+    // + Increment B1 (#1,#6,#7,#8) map; #27/#28 demoted.
+    // Remaining unmapped monetary: WC/debt deferred (4) + ambiguous (2) = 6.
+    expect(afterUnmappedMonetary).toBe(6);
+    expect(afterMappedMonetary).toBeGreaterThanOrEqual(14); // anchors + closing + A + B1
     expect(afterContextual).toBeGreaterThanOrEqual(9); // 6 noise + 3 narrative (+ demoted)
 
     // Scale axes remain distinct on the safe alias line.

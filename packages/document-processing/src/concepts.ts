@@ -25,6 +25,11 @@ export const FINANCIAL_CONCEPTS = [
   "INVESTING_CASH_FLOW",
   "FINANCING_CASH_FLOW",
   "NET_CHANGE_IN_CASH",
+  // B2.2 Increment B1 — BS/equity/tax liability recognition only (not KPI inputs yet).
+  "SHARE_CAPITAL",
+  "RETAINED_EARNINGS",
+  "TAX_PAYABLE",
+  "TOTAL_LIABILITIES_AND_EQUITY",
   "UNMAPPED",
 ] as const;
 
@@ -126,8 +131,24 @@ const LABEL_MAP: Array<{ concept: FinancialConceptId; patterns: RegExp[] }> = [
     patterns: [/^total\s+assets$/i],
   },
   {
+    // Must stay ahead of TOTAL_LIABILITIES; never alias to TOTAL_ASSETS / EQUITY alone.
+    concept: "TOTAL_LIABILITIES_AND_EQUITY",
+    patterns: [
+      /^total\s+liabilities\s+and\s+equity$/i,
+      /^total\s+equity\s+and\s+liabilities$/i,
+    ],
+  },
+  {
     concept: "TOTAL_LIABILITIES",
     patterns: [/^total\s+liabilities$/i],
+  },
+  {
+    concept: "SHARE_CAPITAL",
+    patterns: [/^share\s+capital$/i],
+  },
+  {
+    concept: "RETAINED_EARNINGS",
+    patterns: [/^retained\s+earnings$/i],
   },
   {
     concept: "EQUITY",
@@ -136,6 +157,10 @@ const LABEL_MAP: Array<{ concept: FinancialConceptId; patterns: RegExp[] }> = [
       /^equity$/i,
       /^net\s+assets$/i,
     ],
+  },
+  {
+    concept: "TAX_PAYABLE",
+    patterns: [/^current\s+tax\s+payable$/i, /^tax\s+payable$/i],
   },
   {
     concept: "INTEREST_BEARING_DEBT",
@@ -198,17 +223,12 @@ const LABEL_MAP: Array<{ concept: FinancialConceptId; patterns: RegExp[] }> = [
 /**
  * Labels that look financial but are intentionally left UNMAPPED because the
  * diagnostics engine has no dedicated concept yet (preserve distinctions).
- * B2.2 Increment A moved PBT / tax expense / opening cash / ICF / FCF / Δcash
- * into dedicated concepts above.
+ * Increment A/B1 moved PBT/tax expense/CF section totals and BS equity/tax
+ * liability labels into dedicated concepts above.
  */
 const KNOWN_UNMAPPED_DISTINCTIONS = [
   /^non[- ]current\s+assets$/i,
   /^total\s+non[- ]current\s+assets$/i,
-  /^share\s+capital$/i,
-  /^retained\s+earnings$/i,
-  /^current\s+tax\s+payable$/i,
-  /^tax\s+payable$/i,
-  /^total\s+liabilities\s+and\s+equity$/i,
   /^increase\s+in\s+inventory$/i,
   /^increase\s+in\s+trade\s+payables?$/i,
   /^increase\s+in\s+trade\s+receivables?$/i,
