@@ -3,6 +3,8 @@
  * are never treated as monetary statement figures.
  */
 
+import { classifyExtractionNoise } from "./extraction-hygiene.js";
+
 export const QUANTITY_CLASSES = [
   "MONETARY",
   "PERCENTAGE",
@@ -67,6 +69,12 @@ export function classifyQuantity(input: {
     if (/^(19|20)\d{2}$/.test(raw) || DATE_LABEL.test(label) || DATE_LABEL.test(raw)) {
       return { quantityClass: "DATE", reason: "Value or label looks like a date / financial year" };
     }
+  }
+
+  // B2.1 evidence-grounded chrome / note-prose hygiene (before defaulting to MONETARY).
+  const noise = classifyExtractionNoise({ label, rawValue: raw });
+  if (noise) {
+    return { quantityClass: noise.quantityClass, reason: noise.reason };
   }
 
   return { quantityClass: "MONETARY", reason: "Treated as a monetary amount" };

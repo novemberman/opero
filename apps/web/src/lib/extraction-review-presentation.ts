@@ -12,10 +12,25 @@ export type ExtractionReviewLine = {
   quality: string;
   quantityClass?: string | null;
   unitScaleRequiresReview?: boolean | null;
+  /** Informational only — never treated as a mandatory scale-review flag. */
+  scaleConfidence?: string | null;
   evidence?: unknown;
   rawValue?: string;
   normalizedValue?: string | null;
 };
+
+const SOFT_SCALE_CONFIDENCE = new Set(["MEDIUM", "LOW", "UNKNOWN", "AMBIGUOUS"]);
+
+/**
+ * Soft scale-confidence attention is informational.
+ * It must stay distinct from `unitScaleRequiresReview` (mandatory confirmation).
+ */
+export function hasSoftScaleConfidence(
+  scaleConfidence: string | null | undefined,
+): boolean {
+  if (!scaleConfidence) return false;
+  return SOFT_SCALE_CONFIDENCE.has(scaleConfidence.toUpperCase());
+}
 
 export const EXTRACTION_REVIEW_FILTERS = [
   "needs_financial_review",
@@ -85,6 +100,11 @@ export type ExtractionReviewSummary = {
   mappedMonetary: number;
   unmappedMonetary: number;
   scaleConfirmationRequired: number;
+  /**
+   * Monetary lines whose scaleConfidence is MEDIUM/LOW/UNKNOWN/AMBIGUOUS.
+   * Informational only — does not imply unitScaleRequiresReview.
+   */
+  scaleConfidenceAttention: number;
   contextualNonMonetary: number;
   confirmed: number;
   rejected: number;
@@ -99,6 +119,7 @@ export function summarizeExtractionReview(
   let mappedMonetary = 0;
   let unmappedMonetary = 0;
   let scaleConfirmationRequired = 0;
+  let scaleConfidenceAttention = 0;
   let contextualNonMonetary = 0;
   let confirmed = 0;
   let rejected = 0;
@@ -120,6 +141,7 @@ export function summarizeExtractionReview(
 
     if (isPendingReview(line.reviewStatus)) pendingMonetary += 1;
     if (line.unitScaleRequiresReview) scaleConfirmationRequired += 1;
+    if (hasSoftScaleConfidence(line.scaleConfidence)) scaleConfidenceAttention += 1;
   }
 
   return {
@@ -128,6 +150,7 @@ export function summarizeExtractionReview(
     mappedMonetary,
     unmappedMonetary,
     scaleConfirmationRequired,
+    scaleConfidenceAttention,
     contextualNonMonetary,
     confirmed,
     rejected,

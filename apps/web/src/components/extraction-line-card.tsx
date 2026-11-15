@@ -157,6 +157,18 @@ export function ExtractionLineCard({
         </div>
       ) : null}
 
+      {!line.unitScaleRequiresReview &&
+      presentation.kind !== "non_monetary" &&
+      line.scaleConfidence &&
+      ["MEDIUM", "LOW", "UNKNOWN", "AMBIGUOUS"].includes(line.scaleConfidence.toUpperCase()) ? (
+        <div className="mt-3" data-testid="scale-confidence-info">
+          <Alert tone="info" title={`Scale confidence: ${line.scaleConfidence}`}>
+            This confidence level is informational only. It does not require scale confirmation
+            unless the scale-review flag is set. Existing unit-scale review semantics are unchanged.
+          </Alert>
+        </div>
+      ) : null}
+
       {line.concept === "UNMAPPED" && presentation.kind !== "non_monetary" ? (
         <div className="mt-3">
           <Alert tone="warning" title="Unmapped concept">

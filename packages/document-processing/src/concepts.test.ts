@@ -22,5 +22,12 @@ describe("mapLabelToConcept", () => {
     expect(isKnownUnmappedDistinction("Profit before tax")).toBe(true);
     expect(mapLabelToConcept("Profit before tax")).toBe("UNMAPPED");
     expect(isKnownUnmappedDistinction("Retained earnings")).toBe(true);
+    expect(isKnownUnmappedDistinction("Opening cash and cash equivalents")).toBe(true);
+    expect(mapLabelToConcept("Opening cash and cash equivalents")).toBe("UNMAPPED");
+  });
+
+  it("maps closing cash as CASH_AND_EQUIVALENTS without mapping opening cash", () => {
+    expect(mapLabelToConcept("Closing cash and cash equivalents")).toBe("CASH_AND_EQUIVALENTS");
+    expect(mapLabelToConcept("Opening cash and cash equivalents")).toBe("UNMAPPED");
   });
 });

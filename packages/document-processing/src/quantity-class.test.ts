@@ -25,4 +25,19 @@ describe("classifyQuantity", () => {
       "MONETARY",
     );
   });
+
+  it("classifies B2.1 verified PDF chrome and note prose as non-monetary", () => {
+    expect(classifyQuantity({ label: "NGN THOUSANDS Page", rawValue: "1" }).quantityClass).toBe(
+      "OTHER",
+    );
+    expect(
+      classifyQuantity({ label: "Notes to the synthetic statements", rawValue: "1" }).quantityClass,
+    ).toBe("NOTE_NUMBER");
+    expect(classifyQuantity({ label: "equal liabilities of", rawValue: "70,000" }).quantityClass).toBe(
+      "OTHER",
+    );
+    expect(classifyQuantity({ label: "represents NGN", rawValue: "144,000,000" }).quantityClass).toBe(
+      "OTHER",
+    );
+  });
 });

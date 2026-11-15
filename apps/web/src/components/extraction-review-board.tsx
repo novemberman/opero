@@ -115,6 +115,11 @@ export function ExtractionReviewBoard({
               value={summary.scaleConfirmationRequired}
               emphasize="warning"
             />
+            <SummaryStat
+              label="Scale confidence (info)"
+              value={summary.scaleConfidenceAttention}
+              emphasize="neutral"
+            />
             <SummaryStat label="Contextual / non-monetary" value={summary.contextualNonMonetary} />
             <SummaryStat label="Confirmed" value={summary.confirmed} emphasize="emerald" />
             <SummaryStat label="Rejected" value={summary.rejected} />
@@ -122,8 +127,12 @@ export function ExtractionReviewBoard({
           </div>
           <p className="mt-3 text-xs text-text-secondary">
             Counts are derived from extraction fields already returned by the API (
-            <span className="font-data">quantityClass</span>, concept, review status, scale flags).
-            Missing <span className="font-data">quantityClass</span> is treated as monetary. Document{" "}
+            <span className="font-data">quantityClass</span>, concept, review status, scale flags,
+            scale confidence). Missing <span className="font-data">quantityClass</span> is treated
+            as monetary. <span className="font-data">Scale confirmation</span> counts only{" "}
+            <span className="font-data">unitScaleRequiresReview</span>;{" "}
+            <span className="font-data">Scale confidence (info)</span> is informational and does not
+            create a mandatory review flag. Document{" "}
             <span className="font-data">REVIEW_REQUIRED</span> is unchanged by these filters.
           </p>
         </div>

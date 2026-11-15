@@ -73,6 +73,8 @@ const LABEL_MAP: Array<{ concept: FinancialConceptId; patterns: RegExp[] }> = [
       /^cash(\s+and\s+cash\s+equivalents)?$/i,
       /^cash\s+and\s+equivalents$/i,
       /^cash\s+at\s+bank$/i,
+      // B2.1 #9 — period-end CF closing cash equals BS cash. Do NOT map Opening cash.
+      /^closing\s+cash(\s+and\s+cash\s+equivalents)?$/i,
     ],
   },
   {
@@ -161,6 +163,8 @@ const KNOWN_UNMAPPED_DISTINCTIONS = [
   /^total\s+non[- ]current\s+assets$/i,
   /^share\s+capital$/i,
   /^retained\s+earnings$/i,
+  // Opening cash is a CF period-start balance — not interchangeable with BS cash.
+  /^opening\s+cash(\s+and\s+cash\s+equivalents)?$/i,
 ];
 
 /**

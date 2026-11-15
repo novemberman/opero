@@ -284,9 +284,13 @@ export function analyzeDuplicateMappedFigures(
     const explanatory = group.every((g) =>
       /\b(note|refer|see also|as above|per note)\b/i.test(g.labelRaw ?? ""),
     );
+    const proseRestatement = group.some((g) =>
+      /\s+of$/i.test((g.labelRaw ?? "").trim()) ||
+      /^(equal|equals|plus|represents)\b/i.test((g.labelRaw ?? "").trim()),
+    );
 
     let kind: DuplicateKind = "CORROBORATING";
-    if (explanatory) kind = "EXPLANATORY_REPEAT";
+    if (explanatory || (proseRestatement && values.length === 1)) kind = "EXPLANATORY_REPEAT";
     else if (values.length > 1) kind = "CONFLICTING";
     else if (periods.size > 1) kind = "DIFFERENT_PERIOD";
     else if (scopes.size > 1) kind = "DIFFERENT_SCOPE";

@@ -25,6 +25,12 @@ export {
 } from "./limits.js";
 export { assertSameCurrency, neutralizeFormulaLike, parseFinancialNumber } from "./money.js";
 export {
+  classifyExtractionNoise,
+  demoteExplanatoryMappedDuplicates,
+  isExplanatoryProseLabel,
+  type ExtractionNoiseHit,
+} from "./extraction-hygiene.js";
+export {
   analyzeDuplicateMappedFigures,
   detectConsolidationScope,
   detectCurrencies,

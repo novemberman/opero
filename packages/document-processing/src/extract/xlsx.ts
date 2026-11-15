@@ -4,6 +4,7 @@ import { checkFinancialConsistency } from "../consistency.js";
 import { interpretExtractedLine } from "../interpret-line.js";
 import { PARSER_LIMITS } from "../limits.js";
 import { neutralizeFormulaLike } from "../money.js";
+import { demoteExplanatoryMappedDuplicates } from "../extraction-hygiene.js";
 import {
   analyzeDuplicateMappedFigures,
   detectConsolidationScope,
@@ -155,8 +156,12 @@ export async function extractFromXlsx(buffer: Buffer, documentId: string): Promi
     );
   }
 
+  const hygiene = demoteExplanatoryMappedDuplicates(lines);
+  const hygienicLines = hygiene.lines;
+  warnings.push(...hygiene.warnings);
+
   const duplicates = analyzeDuplicateMappedFigures(
-    lines.map((l) => ({
+    hygienicLines.map((l) => ({
       concept: l.concept,
       normalizedValue: l.normalizedValue,
       periodLabel: periodMeta.periodLabel,
@@ -167,7 +172,7 @@ export async function extractFromXlsx(buffer: Buffer, documentId: string): Promi
   warnings.push(...duplicates.warnings);
 
   const consistency = checkFinancialConsistency(
-    lines.map((l) => ({
+    hygienicLines.map((l) => ({
       concept: l.concept,
       normalizedValue: l.normalizedValue,
       unitScale: l.unitScale,
@@ -177,7 +182,7 @@ export async function extractFromXlsx(buffer: Buffer, documentId: string): Promi
     })),
   );
 
-  const monetaryMapped = lines.some(
+  const monetaryMapped = hygienicLines.some(
     (l) => l.quantityClass === "MONETARY" && l.concept !== "UNMAPPED",
   );
 
@@ -185,7 +190,7 @@ export async function extractFromXlsx(buffer: Buffer, documentId: string): Promi
     method: "exceljs-cached-values",
     quality: monetaryMapped && !scaleMeta.requiresReview ? "HIGH" : "LOW",
     warnings,
-    manualRequired: lines.length === 0 || scaleMeta.requiresReview,
+    manualRequired: hygienicLines.length === 0 || scaleMeta.requiresReview,
     consistency,
     duplicates: duplicates.findings,
     statements: [
@@ -200,7 +205,7 @@ export async function extractFromXlsx(buffer: Buffer, documentId: string): Promi
         periodLabel: periodMeta.periodLabel,
         entityName: entityMeta.entityName,
         consolidationScope: consolidationMeta.consolidationScope,
-        lines,
+        lines: hygienicLines,
       },
     ],
   };
