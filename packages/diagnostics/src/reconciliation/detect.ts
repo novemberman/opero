@@ -88,9 +88,9 @@ export function detectEvidenceConflicts(snapshot: DiagnosticSnapshot): EvidenceC
           ? (Math.max(...nums) - Math.min(...nums)) / max
           : 1;
 
-      // Prefer confirmed/corrected — only flag when unresolved (no single preferred value).
+      // Prefer human-CONFIRMED only — CORRECTED alone is not approval (P0-A).
       const preferred = periodLines.filter(
-        (l) => l.reviewStatus === "CONFIRMED" || l.reviewStatus === "CORRECTED",
+        (l) => l.reviewStatus === "CONFIRMED" && l.actualValue != null,
       );
       const preferredValues = new Set(preferred.map((p) => p.actualValue));
       if (preferred.length > 0 && preferredValues.size === 1) {

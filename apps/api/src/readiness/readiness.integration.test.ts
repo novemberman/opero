@@ -93,17 +93,21 @@ describe("readiness integration", () => {
     expect(ready.body.assessment.issues).toEqual([]);
     expect(failedChecks(ready.body.assessment.checklist)).toEqual([]);
 
-    // A pending line-item review takes the document out of READY again.
+    // Material pending monetary reviews block authoritative readiness.
     const prisma = testPrisma();
     await prisma.financialLineItem.updateMany({
       where: { organizationId },
       data: { reviewStatus: "PENDING" },
     });
     const pending = await post(app, owner, assessPath).send(body).expect(201);
-    expect(pending.body.assessment.status).toBe("ACTION_REQUIRED");
+    expect(pending.body.assessment.status).toBe("BLOCKED");
     expect((pending.body.assessment.issues as Issue[]).map((issue) => issue.code)).toEqual([
       "PENDING_REVIEWS",
     ]);
+    expect(pending.body.assessment.blockingReasons).toEqual([
+      "Unconfirmed material monetary figures",
+    ]);
+
 
     // Every assessment is kept; `latest` returns the newest.
     expect(await prisma.diagnosticReadinessAssessment.count({ where: { organizationId } })).toBe(4);

@@ -178,6 +178,7 @@ export function computeScore(metrics: MetricResult[], quality: QualityAssessment
   const limitations = [
     "score.v1 thresholds are provisional heuristics, not industry benchmarks",
     "Missing dimensions are not renormalized to hide coverage gaps",
+    "Only human-confirmed monetary evidence enters scoring; unconfirmed amounts are withheld",
     "Unreviewed evidence lowers reliability and may suppress overall scoring",
     "Contradictory or multi-currency inputs lower consistency and may suppress overall scoring",
     "This score is not a credit rating, audit opinion, or prediction of business survival",

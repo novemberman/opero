@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { d, scaleFactor, toPlain } from "./decimal.js";
+import { eligibilityExclusionWarning, evaluateMonetaryEligibility } from "./eligibility.js";
 import type { DiagnosticSnapshot, SnapshotLineItem, UnitScale } from "./types.js";
 
 export type RawSnapshotLine = {
@@ -41,6 +42,12 @@ function normalizeActual(
   }
 }
 
+/**
+ * Build a diagnostic snapshot. Authoritative monetary `actualValue` is set only
+ * for lines that pass {@link evaluateMonetaryEligibility} (human-CONFIRMED, mapped,
+ * monetary, scale resolved). PENDING / CORRECTED / REJECTED / UNMAPPED / non-monetary
+ * never contribute amounts to KPIs, BHS, AI, or reports.
+ */
 export function buildSnapshot(input: {
   lines: RawSnapshotLine[];
   currency?: string | null;
@@ -49,61 +56,72 @@ export function buildSnapshot(input: {
   periodLabel?: string | null;
 }): DiagnosticSnapshot {
   const warnings: string[] = [];
-  const lines: SnapshotLineItem[] = input.lines
-    .filter((line) => line.reviewStatus !== "REJECTED" && line.concept !== "UNMAPPED")
-    .filter((line) => {
-      const quantityClass = line.quantityClass ?? "MONETARY";
-      if (quantityClass !== "MONETARY") {
-        warnings.push(
-          `Excluded non-monetary line ${line.labelRaw} (${quantityClass}) from diagnostic snapshot`,
-        );
-        return false;
-      }
-      return true;
-    })
-    .map((line) => {
-      const scaleBlocked =
-        Boolean(line.unitScaleRequiresReview) &&
-        line.reviewStatus !== "CONFIRMED" &&
-        line.reviewStatus !== "CORRECTED";
-      const scaled = scaleBlocked
-        ? {
-            actualValue: null as string | null,
-            warning: `Unconfirmed monetary scale for ${line.labelRaw}; absolute value withheld`,
-          }
-        : normalizeActual(line.normalizedValue, line.unitScale);
-      if (scaled.warning) warnings.push(scaled.warning);
-      const snapshotKey = [
-        line.documentId,
-        line.extractionId,
-        line.lineItemId,
-        line.concept,
-        line.normalizedValue ?? "null",
-        line.reviewStatus,
-      ].join(":");
-      return {
-        snapshotKey,
-        lineItemId: line.lineItemId,
-        documentId: line.documentId,
-        extractionId: line.extractionId,
-        statementId: line.statementId,
-        concept: line.concept,
-        labelRaw: line.labelRaw,
-        rawValue: line.rawValue,
-        normalizedValue: line.normalizedValue,
-        actualValue: scaled.actualValue,
-        currency: line.currency,
-        unitScale: line.unitScale,
-        quality: line.quality,
-        reviewStatus: line.reviewStatus,
-        statementType: line.statementType,
-        periodStart: line.periodStart,
-        periodEnd: line.periodEnd,
-        periodLabel: line.periodLabel,
-        evidenceReferenceId: line.evidenceReferenceId,
-        evidenceKey: line.evidenceKey,
-      };
+  const lines: SnapshotLineItem[] = [];
+
+  for (const line of input.lines) {
+    const decision = evaluateMonetaryEligibility({
+      concept: line.concept,
+      quantityClass: line.quantityClass,
+      reviewStatus: line.reviewStatus,
+      unitScale: line.unitScale,
+      unitScaleRequiresReview: line.unitScaleRequiresReview,
+      normalizedValue: line.normalizedValue,
+      labelRaw: line.labelRaw,
     });
+
+    // Drop rejected / unmapped / non-monetary from the snapshot entirely.
+    if (
+      decision.reason === "REJECTED" ||
+      decision.reason === "UNMAPPED" ||
+      decision.reason === "NON_MONETARY"
+    ) {
+      const warning = eligibilityExclusionWarning(line, decision);
+      if (warning) warnings.push(warning);
+      continue;
+    }
+
+    let actualValue: string | null = null;
+    if (decision.eligible) {
+      const scaled = normalizeActual(line.normalizedValue, line.unitScale);
+      actualValue = scaled.actualValue;
+      if (scaled.warning) warnings.push(scaled.warning);
+    } else {
+      const warning = eligibilityExclusionWarning(line, decision);
+      if (warning) warnings.push(warning);
+    }
+
+    const snapshotKey = [
+      line.documentId,
+      line.extractionId,
+      line.lineItemId,
+      line.concept,
+      line.normalizedValue ?? "null",
+      line.reviewStatus,
+    ].join(":");
+
+    lines.push({
+      snapshotKey,
+      lineItemId: line.lineItemId,
+      documentId: line.documentId,
+      extractionId: line.extractionId,
+      statementId: line.statementId,
+      concept: line.concept,
+      labelRaw: line.labelRaw,
+      rawValue: line.rawValue,
+      normalizedValue: line.normalizedValue,
+      actualValue,
+      currency: line.currency,
+      unitScale: line.unitScale,
+      quality: line.quality,
+      reviewStatus: line.reviewStatus,
+      statementType: line.statementType,
+      periodStart: line.periodStart,
+      periodEnd: line.periodEnd,
+      periodLabel: line.periodLabel,
+      evidenceReferenceId: line.evidenceReferenceId,
+      evidenceKey: line.evidenceKey,
+    });
+  }
 
   const currencies = new Set(
     lines.map((l) => l.currency).filter((c): c is string => Boolean(c)),

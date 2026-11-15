@@ -366,7 +366,8 @@ describe("document ingestion integration", () => {
     );
     expect(updated.rawValue).toBe("2,500.00");
     expect(updated.normalizedValue).toBe("2500.00");
-    expect(updated.reviewStatus).toBe("CORRECTED");
+    expect(updated.reviewStatus).toBe("CONFIRMED");
+
   });
 
   it("persists Revenue of 144,000 NGN thousands and exposes scaled actualMonetaryValue", async () => {

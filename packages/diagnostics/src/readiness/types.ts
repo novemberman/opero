@@ -25,7 +25,16 @@ export type ReadinessInputDocument = {
   deletionStatus: string;
   statementCount: number;
   lineItemCount: number;
+  /**
+   * Material mapped monetary figures still needing human CONFIRMED review
+   * (or outstanding mandatory scale confirmation). Blocks READY.
+   */
   pendingReviewCount: number;
+  /**
+   * Contextual / non-authoritative pending rows (UNMAPPED, non-monetary headings,
+   * percentages, dates). Informational only — does not block diagnostics.
+   */
+  contextualPendingCount?: number;
   hasCurrency: boolean;
   hasPeriod: boolean;
   periodType: string;

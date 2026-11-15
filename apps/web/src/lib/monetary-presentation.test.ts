@@ -90,9 +90,22 @@ describe("monetary-presentation", () => {
       currency: "NGN",
       quantityClass: "MONETARY",
       unitScaleRequiresReview: true,
-      reviewStatus: "CORRECTED",
+      reviewStatus: "CONFIRMED",
     });
     expect(result.kind).toBe("confirmed");
     expect(result.isEstablished).toBe(true);
   });
+
+  it("does not treat legacy CORRECTED alone as established", () => {
+    const result = resolveMonetaryPresentation({
+      concept: "REVENUE",
+      actualMonetaryValue: "5000000",
+      currency: "NGN",
+      quantityClass: "MONETARY",
+      unitScaleRequiresReview: false,
+      reviewStatus: "CORRECTED",
+    });
+    expect(result.isEstablished).toBe(false);
+  });
 });
+

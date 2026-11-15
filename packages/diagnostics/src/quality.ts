@@ -22,12 +22,13 @@ const DIMENSIONS: ScoreDimension[] = [
 ];
 
 function reviewWeight(status: string): number {
+  // Only human-CONFIRMED evidence is authoritative; CORRECTED alone is not approval.
   switch (status) {
     case "CONFIRMED":
-    case "CORRECTED":
       return 1;
+    case "CORRECTED":
     case "PENDING":
-      return 0.45;
+      return 0;
     default:
       return 0;
   }

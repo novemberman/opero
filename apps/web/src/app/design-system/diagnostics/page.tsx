@@ -288,10 +288,10 @@ export default function DiagnosticsDesignSpecimen() {
               },
               {
                 id: "reviews_complete",
-                label: "No pending line-item reviews",
+                label: "Material monetary figures confirmed",
                 passed: false,
-                required: false,
-                detail: "3 line item(s) still pending review",
+                required: true,
+                detail: "3 material monetary line(s) still need human confirmation",
               },
               {
                 id: "currency_present",

@@ -64,10 +64,12 @@ export function resolveConcept(
   const latestKey = [...byPeriod.keys()].sort().at(-1)!;
   const periodLines = byPeriod.get(latestKey)!;
 
-  const preferred = periodLines.filter(
-    (l) => l.reviewStatus === "CONFIRMED" || l.reviewStatus === "CORRECTED",
-  );
-  const pool = preferred.length ? preferred : periodLines;
+  // Only CONFIRMED lines carry actualValue after P0-A; prefer them explicitly.
+  const preferred = periodLines.filter((l) => l.reviewStatus === "CONFIRMED" && l.actualValue != null);
+  const pool = preferred.length ? preferred : periodLines.filter((l) => l.actualValue != null);
+  if (!pool.length) {
+    return { amount: null, conflict: false, incompatibleCurrency: false };
+  }
   const values = new Set(pool.map((p) => p.actualValue));
   if (values.size > 1) {
     return { amount: null, conflict: true, incompatibleCurrency: false };
@@ -133,13 +135,16 @@ export function amountsByPeriod(
   for (const [periodKey, group] of groups) {
     const values = new Set(group.map((g) => g.actualValue));
     if (values.size !== 1) continue;
-    const line = group.find((g) => g.reviewStatus === "CONFIRMED" || g.reviewStatus === "CORRECTED") ?? group[0]!;
+    const line =
+      group.find((g) => g.reviewStatus === "CONFIRMED" && g.actualValue != null) ??
+      group.find((g) => g.actualValue != null);
+    if (!line?.actualValue) continue;
     out.push({
       periodKey,
       periodStart: line.periodStart,
       periodEnd: line.periodEnd,
       periodLabel: line.periodLabel,
-      amount: { value: d(line.actualValue!), line },
+      amount: { value: d(line.actualValue), line },
     });
   }
   return out.sort((a, b) => {

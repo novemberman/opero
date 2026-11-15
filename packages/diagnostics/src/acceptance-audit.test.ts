@@ -305,7 +305,7 @@ describe("acceptance audit — ten scoring scenarios", () => {
     expect(["INCOMPATIBLE", "INSUFFICIENT_INPUTS"]).toContain(growth?.status);
   });
 
-  it("10 unreviewed evidence → reliability suppresses overall score", () => {
+  it("10 unreviewed evidence → amounts withheld and score suppressed", () => {
     const snap = buildSnapshot({
       currency: "USD",
       periodStart: "2024-01-01",
@@ -323,10 +323,11 @@ describe("acceptance audit — ten scoring scenarios", () => {
         line("OPERATING_CASH_FLOW", "180", { reviewStatus: "PENDING", quality: "LOW" }),
       ],
     });
+    expect(snap.lines.every((l) => l.actualValue == null)).toBe(true);
     const s = summarize("unreviewed", snap);
-    expect(Number(s.reliability)).toBeLessThan(0.5);
     expect(s.scoreStatus).toBe("INSUFFICIENT_DATA");
   });
+
 
   it("score is deterministic across repeated runs", () => {
     const snap = healthySnapshot();

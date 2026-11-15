@@ -52,13 +52,33 @@ describe("assessReadiness", () => {
     expect(result.issues.some((i) => i.code === "MISSING_CURRENCY")).toBe(true);
   });
 
-  it("marks ACTION_REQUIRED for pending reviews and unconfirmed metadata", () => {
+  it("blocks on material unconfirmed monetary reviews", () => {
     const result = assessReadiness({
-      documents: [doc({ pendingReviewCount: 3, metadataConfirmed: false, periodType: "UNKNOWN" })],
+      documents: [doc({ pendingReviewCount: 3, metadataConfirmed: true })],
+      openCriticalReconciliations: 0,
+      openHighReconciliations: 0,
+    });
+    expect(result.status).toBe("BLOCKED");
+    expect(result.blockingReasons).toContain("Unconfirmed material monetary figures");
+    expect(result.checklist.find((c) => c.id === "reviews_complete")?.required).toBe(true);
+  });
+
+  it("marks ACTION_REQUIRED for unconfirmed metadata without material pending", () => {
+    const result = assessReadiness({
+      documents: [
+        doc({
+          pendingReviewCount: 0,
+          contextualPendingCount: 2,
+          metadataConfirmed: false,
+          periodType: "UNKNOWN",
+        }),
+      ],
       openCriticalReconciliations: 0,
       openHighReconciliations: 1,
     });
     expect(result.status).toBe("ACTION_REQUIRED");
     expect(result.blockingReasons).toEqual([]);
+    expect(result.issues.some((i) => i.code === "CONTEXTUAL_PENDING")).toBe(true);
   });
 });
+

@@ -25,14 +25,14 @@ describe("snapshot", () => {
     expect(a.contentHash).toBe(b.contentHash);
   });
 
-  it("scales thousands into actual units", () => {
+  it("scales thousands into actual units when confirmed", () => {
     const snap = buildSnapshot({
-      lines: [line("REVENUE", "2.5", { unitScale: "THOUSANDS" })],
+      lines: [line("REVENUE", "2.5", { unitScale: "THOUSANDS", reviewStatus: "CONFIRMED" })],
     });
     expect(snap.lines[0]?.actualValue).toBe("2500");
   });
 
-  it("scales Netshift FY2024 Revenue 144,000 thousands to NGN 144,000,000 once", () => {
+  it("withholds Netshift-style PENDING Revenue even when thousands scale is known", () => {
     const snap = buildSnapshot({
       currency: "NGN",
       lines: [
@@ -49,6 +49,25 @@ describe("snapshot", () => {
       ],
     });
     expect(snap.lines[0]?.normalizedValue).toBe("144000");
+    expect(snap.lines[0]?.actualValue).toBeNull();
+  });
+
+  it("scales confirmed Netshift FY2024 Revenue 144,000 thousands to NGN 144,000,000", () => {
+    const snap = buildSnapshot({
+      currency: "NGN",
+      lines: [
+        {
+          ...line("REVENUE", "144000", {
+            unitScale: "THOUSANDS",
+            reviewStatus: "CONFIRMED",
+          }),
+          labelRaw: "Revenue of",
+          rawValue: "144,000",
+          quantityClass: "MONETARY",
+          unitScaleRequiresReview: false,
+        },
+      ],
+    });
     expect(snap.lines[0]?.actualValue).toBe("144000000");
   });
 
@@ -59,7 +78,7 @@ describe("snapshot", () => {
     const blocked = buildSnapshot({
       lines: [
         {
-          ...line("REVENUE", "180", { unitScale: "THOUSANDS", reviewStatus: "PENDING" }),
+          ...line("REVENUE", "180", { unitScale: "THOUSANDS", reviewStatus: "CONFIRMED" }),
           unitScaleRequiresReview: true,
           quantityClass: "MONETARY",
         },
@@ -74,7 +93,7 @@ describe("snapshot", () => {
     const snap = buildSnapshot({
       lines: [
         {
-          ...line("GROSS_PROFIT", "60", { unitScale: "ACTUAL" }),
+          ...line("GROSS_PROFIT", "60", { unitScale: "ACTUAL", reviewStatus: "CONFIRMED" }),
           quantityClass: "PERCENTAGE",
         },
       ],

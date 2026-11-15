@@ -71,20 +71,33 @@ export function assessReadiness(input: ReadinessInput): ReadinessResult {
     required: true,
   });
 
-  const pendingReviews = docs.reduce((n, d) => n + d.pendingReviewCount, 0);
+  const materialPending = docs.reduce((n, d) => n + d.pendingReviewCount, 0);
+  const contextualPending = docs.reduce((n, d) => n + (d.contextualPendingCount ?? 0), 0);
   checklist.push({
     id: "reviews_complete",
-    label: "No pending line-item reviews",
-    passed: pendingReviews === 0,
-    required: false,
-    detail: pendingReviews > 0 ? `${pendingReviews} line item(s) still pending review` : undefined,
+    label: "Material monetary figures confirmed",
+    passed: materialPending === 0,
+    required: true,
+    detail:
+      materialPending > 0
+        ? `${materialPending} material monetary line(s) still need human confirmation`
+        : undefined,
   });
-  if (pendingReviews > 0) {
+  if (materialPending > 0) {
     issues.push({
       code: "PENDING_REVIEWS",
-      severity: "MEDIUM",
-      title: "Pending extraction reviews",
-      detail: `${pendingReviews} line item(s) have not been confirmed or corrected`,
+      severity: "CRITICAL",
+      title: "Unconfirmed material monetary figures",
+      detail: `${materialPending} mapped monetary line(s) are not human-confirmed; authoritative diagnostics and scores cannot use them`,
+      blocking: true,
+    });
+  }
+  if (contextualPending > 0) {
+    issues.push({
+      code: "CONTEXTUAL_PENDING",
+      severity: "INFO",
+      title: "Contextual extraction rows still pending",
+      detail: `${contextualPending} non-monetary or unmapped row(s) remain pending; they do not block diagnostics`,
       blocking: false,
     });
   }

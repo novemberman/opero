@@ -474,12 +474,12 @@ export class DocumentsService {
       return tx.financialLineItem.update({
         where: { id: lineItem.id },
         data: {
+          // P0-A: CORRECT is an explicit human approval of the new value → CONFIRMED.
+          // Legacy CORRECTED rows remain ineligible until re-confirmed.
           reviewStatus:
-            input.action === "CONFIRM"
+            input.action === "CONFIRM" || input.action === "CORRECT"
               ? "CONFIRMED"
-              : input.action === "CORRECT"
-                ? "CORRECTED"
-                : "REJECTED",
+              : "REJECTED",
           normalizedValue:
             input.action === "CORRECT" ? input.newValue! : lineItem.normalizedValue,
           concept: (input.newConcept as never) ?? lineItem.concept,

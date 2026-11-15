@@ -92,9 +92,11 @@ export class StatementsService {
     if (confirm) {
       data.confirmedAt = new Date();
       data.confirmedByUserId = input.actor.id;
+      data.reviewStatus = "CONFIRMED";
     } else if (!willBeConfirmed) {
       data.confirmedAt = null;
       data.confirmedByUserId = null;
+      data.reviewStatus = "PENDING";
     }
 
     const previousValues: Record<string, unknown> = { confirmed: wasConfirmed };

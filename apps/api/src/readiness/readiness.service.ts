@@ -2,6 +2,8 @@ import { BadRequestException, Inject, Injectable, NotFoundException } from "@nes
 import type { Prisma, PrismaClient } from "@opero/database";
 import {
   assessReadiness,
+  isMaterialMonetaryReviewItem,
+  materialMonetaryNeedsConfirmation,
   type ReadinessInputDocument,
   type ReadinessResult,
 } from "@opero/diagnostics";
@@ -61,7 +63,16 @@ export class ReadinessService {
                 periodType: true,
                 consolidationScope: true,
                 confirmedAt: true,
-                lineItems: { select: { currency: true, reviewStatus: true } },
+                lineItems: {
+                  select: {
+                    currency: true,
+                    reviewStatus: true,
+                    concept: true,
+                    quantityClass: true,
+                    unitScale: true,
+                    unitScaleRequiresReview: true,
+                  },
+                },
               },
             },
           },
@@ -103,7 +114,26 @@ export class ReadinessService {
           deletionStatus: document.deletionStatus,
           statementCount: statements.length,
           lineItemCount: lineItems.length,
-          pendingReviewCount: lineItems.filter((item) => item.reviewStatus === "PENDING").length,
+          pendingReviewCount: lineItems.filter((item) =>
+            materialMonetaryNeedsConfirmation({
+              concept: item.concept,
+              quantityClass: item.quantityClass,
+              reviewStatus: item.reviewStatus,
+              unitScale: item.unitScale,
+              unitScaleRequiresReview: item.unitScaleRequiresReview,
+            }),
+          ).length,
+          contextualPendingCount: lineItems.filter(
+            (item) =>
+              item.reviewStatus === "PENDING" &&
+              !isMaterialMonetaryReviewItem({
+                concept: item.concept,
+                quantityClass: item.quantityClass,
+                reviewStatus: item.reviewStatus,
+                unitScale: item.unitScale,
+                unitScaleRequiresReview: item.unitScaleRequiresReview,
+              }),
+          ).length,
           hasCurrency:
             statements.length > 0 &&
             statements.every(

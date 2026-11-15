@@ -38,7 +38,8 @@ function isMonetaryQuantity(quantityClass: string | null | undefined): boolean {
 }
 
 function hasReviewConfirmation(reviewStatus: string): boolean {
-  return reviewStatus === "CONFIRMED" || reviewStatus === "CORRECTED";
+  // P0-A: only CONFIRMED is authoritative; CORRECTED alone is not approval.
+  return reviewStatus === "CONFIRMED";
 }
 
 function hasCandidateAmount(value: string | null | undefined): boolean {

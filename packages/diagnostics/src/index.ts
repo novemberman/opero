@@ -15,6 +15,16 @@ export {
   SCORE_MIN_DIMENSIONS,
   SCORE_MIN_RELIABILITY,
 } from "./versions.js";
+export {
+  evaluateMonetaryEligibility,
+  isHumanConfirmedReview,
+  isMappedMonetaryConcept,
+  isMaterialMonetaryReviewItem,
+  materialMonetaryNeedsConfirmation,
+  quantityClassOf,
+  type EligibilityDecision,
+  type EligibilityLine,
+} from "./eligibility.js";
 export { assessReadiness } from "./readiness/assess.js";
 export type {
   ReadinessChecklistItem,
