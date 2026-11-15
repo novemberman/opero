@@ -38,7 +38,9 @@ export function Alert({
         <span className="sr-only">{labels[tone]}: </span>
         {title ?? labels[tone]}
       </p>
-      {children ? <div className="mt-1 text-text-secondary [&_a]:text-emerald [&_a]:underline">{children}</div> : null}
+      {children ? (
+        <div className="mt-1 text-text-secondary [&_a]:text-navy [&_a]:underline">{children}</div>
+      ) : null}
     </div>
   );
 }

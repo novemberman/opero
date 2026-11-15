@@ -132,9 +132,7 @@ export default function DocumentsPage() {
     <div className="mx-auto max-w-6xl space-y-8" data-testid="documents-library">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="text-sm font-semibold uppercase tracking-[0.14em] text-emerald">
-            Opero X-Ray
-          </p>
+          <p className="brand-kicker">Opero X-Ray</p>
           <h1 className="mt-2 text-3xl text-navy">Documents</h1>
           <p className="mt-2 max-w-2xl text-sm text-text-secondary">
             Upload statements, track scanning and extraction, then confirm figures before
@@ -274,7 +272,7 @@ export default function DocumentsPage() {
                       <TD>
                         <Link
                           href={`/organizations/${orgId}/documents/${doc.id}`}
-                          className="font-medium text-navy no-underline hover:text-emerald"
+                          className="font-medium text-navy no-underline hover:underline"
                         >
                           {doc.originalFilename}
                         </Link>
@@ -297,7 +295,7 @@ export default function DocumentsPage() {
                       <TD>
                         <Link
                           href={`/organizations/${orgId}/documents/${doc.id}`}
-                          className="text-sm font-medium text-emerald no-underline hover:underline"
+                          className="text-sm font-medium text-navy no-underline hover:text-emerald"
                         >
                           {doc.processingStatus === "REVIEW_REQUIRED" ? "Review" : "Open"}
                         </Link>
@@ -330,7 +328,7 @@ export default function DocumentsPage() {
                   </div>
                   <Link
                     href={`/organizations/${orgId}/documents/${doc.id}`}
-                    className="mt-3 inline-flex text-sm font-medium text-emerald no-underline hover:underline"
+                    className="mt-3 inline-flex text-sm font-medium text-navy no-underline hover:text-emerald"
                   >
                     {doc.processingStatus === "REVIEW_REQUIRED" ? "Review figures" : "Open document"}
                   </Link>

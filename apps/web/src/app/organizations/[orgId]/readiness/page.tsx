@@ -177,7 +177,7 @@ function ReadinessContent() {
   return (
     <div className="mx-auto max-w-6xl space-y-8" data-testid="readiness-workspace">
       <header>
-        <p className="text-sm font-semibold uppercase tracking-[0.14em] text-emerald">
+        <p className="brand-kicker">
           Opero X-Ray
         </p>
         <h1 className="mt-2 text-3xl text-navy">Readiness assessment</h1>

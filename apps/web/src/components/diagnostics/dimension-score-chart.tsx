@@ -38,7 +38,7 @@ export function DimensionScoreChart({
             <div className="h-2 w-full overflow-hidden rounded-full bg-border">
               {value != null ? (
                 <div
-                  className="h-full rounded-full bg-emerald transition-[width] duration-500 motion-reduce:transition-none"
+                  className="h-full rounded-full bg-navy transition-[width] duration-500 motion-reduce:transition-none"
                   style={{ width: `${value}%` }}
                 />
               ) : (

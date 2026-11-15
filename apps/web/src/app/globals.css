@@ -1,9 +1,18 @@
 @import "tailwindcss";
 
 /*
-  Opero Phase 9A design tokens.
-  Legacy aliases (paper, ink, pine, copper, line, muted) map onto the new
-  brand palette so existing screens adopt the identity without a rewrite.
+  Opero Phase 9 design tokens — approved brand palette.
+
+  Semantic roles (do not invert casually):
+  - Navy (#101D32): primary brand + application structure (shell, headers, titles)
+  - Emerald (#087F6D): actions, progress, focus, positive interaction states
+  - Champagne gold (#D6A85B): restrained premium highlights / executive kickers
+  - Cloud white / workspace (#F7F9FC): page canvas; white surfaces for content
+  - Slate (#64748B): secondary text + neutral metadata
+  - Ice blue (#EAF2F8): calm information surfaces (not brand chrome)
+
+  Financial semantics stay separate: warning/error/success status colours are
+  not replaced by gold or emerald. Emerald must not imply “favorable” metrics.
 */
 
 @theme {
@@ -17,6 +26,7 @@
   --color-workspace: #f7f9fc;
   --color-slate: #64748b;
   --color-info-surface: #eaf2f8;
+  --color-ice: #eaf2f8;
 
   /* Surfaces & elevation */
   --color-surface: #ffffff;
@@ -204,6 +214,37 @@ h3 {
   background: var(--color-info-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
+}
+
+/* Premium / product kicker — navy type + gold rule (accessible on cloud white). */
+.brand-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-size: 0.875rem;
+  font-weight: 650;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-navy);
+}
+
+.brand-kicker::before {
+  content: "";
+  display: inline-block;
+  width: 0.85rem;
+  height: 0.2rem;
+  border-radius: 999px;
+  background: var(--color-gold);
+  flex-shrink: 0;
+}
+
+/* On navy heroes — gold type without the rule fighting inverse text. */
+.brand-kicker-inverse {
+  font-size: 0.875rem;
+  font-weight: 650;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--color-gold);
 }
 
 .skip-link {

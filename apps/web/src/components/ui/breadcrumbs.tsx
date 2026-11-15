@@ -23,7 +23,7 @@ export function Breadcrumbs({
             <li key={index} className="inline-flex items-center gap-1.5">
               {index > 0 ? <span aria-hidden className="text-border-strong">/</span> : null}
               {item.href && !last ? (
-                <Link href={item.href} className="font-medium text-text no-underline hover:text-emerald">
+                <Link href={item.href} className="font-medium text-navy no-underline hover:underline">
                   {item.label}
                 </Link>
               ) : (

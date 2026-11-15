@@ -48,16 +48,20 @@ No shared Button / Input / Card / Dialog primitives — pages inlined Tailwind u
 
 ### Brand colours
 
-| Role | Hex | Token |
-|------|-----|--------|
-| Primary navy | `#101D32` | `--color-navy` / `ink` |
-| Primary emerald | `#087F6D` | `--color-emerald` / `pine` |
-| Premium gold | `#D6A85B` | `--color-gold` / `copper` |
-| Workspace | `#F7F9FC` | `--color-workspace` / `paper` |
-| Secondary slate | `#64748B` | `--color-slate` / `muted` |
-| Information surface | `#EAF2F8` | `--color-info-surface` |
+| Role | Hex | Token | Semantic use |
+|------|-----|--------|--------------|
+| Deep navy | `#101D32` | `--color-navy` | Brand + application structure (shell, titles) |
+| Emerald | `#087F6D` | `--color-emerald` | Actions, progress, focus — not “favourable” metrics |
+| Champagne gold | `#D6A85B` | `--color-gold` | Restrained premium highlights / selected executive cues |
+| Cloud white / workspace | `#F7F9FC` | `--color-workspace` | Page canvas |
+| Slate | `#64748B` | `--color-slate` | Secondary text + metadata |
+| Ice blue | `#EAF2F8` | `--color-info-surface` / `--color-ice` | Calm information surfaces |
 
-Legacy utility names (`bg-pine`, `text-ink`, …) alias the new palette so existing screens pick up identity without a big-bang rewrite.
+Kickers use `.brand-kicker` (navy + gold rule) or `.brand-kicker-inverse` on navy panels.
+
+Status colours (`success` / `warning` / `error`) stay separate — gold never replaces warning.
+
+Legacy utility names (`bg-pine`, `text-ink`, …) alias the brand palette.
 
 ### Typography
 

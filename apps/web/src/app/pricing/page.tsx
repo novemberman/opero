@@ -49,7 +49,7 @@ export default function PricingPage() {
       <main id="main" className="bg-workspace">
         <section className="border-b border-border bg-navy text-text-inverse">
           <div className="mx-auto max-w-6xl px-5 py-14 sm:px-8 sm:py-16">
-            <p className="text-sm font-semibold uppercase tracking-[0.16em] text-emerald">Pricing</p>
+            <p className="brand-kicker">Pricing</p>
             <h1 className="mt-3 max-w-2xl font-display text-4xl sm:text-5xl">Opero plans</h1>
             <p className="mt-4 max-w-xl text-base leading-relaxed text-white/70">
               Nigerian launch pricing for X-Ray and Opero OS. Amounts are shown in NGN. Purchases

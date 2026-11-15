@@ -50,7 +50,7 @@ export function FindingCard({
       <h3 className="mt-3 text-lg font-semibold text-navy">{finding.title}</h3>
       <p className="mt-2 text-sm text-text-secondary">{finding.explanation}</p>
       <p className="mt-2 text-sm text-navy">{finding.implication}</p>
-      <p className="mt-2 text-sm font-medium text-emerald">{finding.suggestedAction}</p>
+      <p className="mt-2 text-sm font-medium text-navy">{finding.suggestedAction}</p>
 
       <details className="mt-4 text-sm" data-testid="finding-evidence">
         <summary className="cursor-pointer font-semibold text-navy">

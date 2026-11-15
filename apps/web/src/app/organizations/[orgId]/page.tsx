@@ -235,9 +235,7 @@ export default function OrganizationDashboardPage() {
     <div className="space-y-8" data-testid="organization-dashboard">
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
-          <p className="text-sm font-semibold uppercase tracking-[0.14em] text-emerald">
-            Workspace overview
-          </p>
+          <p className="brand-kicker">Workspace overview</p>
           <h1 className="mt-2 text-3xl text-navy sm:text-4xl">{org?.name ?? "Organization"}</h1>
           <p className="mt-2 text-sm text-text-secondary">
             {org?.slug ? `${org.slug} · ` : ""}
@@ -310,7 +308,7 @@ export default function OrganizationDashboardPage() {
               Business Health Score
             </p>
             {latestScore != null ? (
-              <p className="mt-2 font-data text-3xl font-semibold text-emerald">{latestScore}</p>
+              <p className="mt-2 font-data text-3xl font-semibold text-navy">{latestScore}</p>
             ) : (
               <p className="mt-2 text-sm text-text-secondary">
                 {scoreWithheld

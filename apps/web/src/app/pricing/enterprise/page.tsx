@@ -44,7 +44,7 @@ export default function EnterpriseQuotePage() {
       <PublicHeader />
       <main id="main" className="bg-workspace">
         <section className="mx-auto max-w-xl px-5 py-12 sm:px-8 sm:py-16">
-          <p className="text-sm font-semibold uppercase tracking-[0.16em] text-emerald">Enterprise</p>
+          <p className="brand-kicker">Enterprise</p>
           <h1 className="mt-3 font-display text-4xl text-navy">Request a quotation</h1>
           <p className="mt-3 text-sm leading-relaxed text-text-secondary">
             Custom quotation for larger teams. This form does not charge a card and does not start a

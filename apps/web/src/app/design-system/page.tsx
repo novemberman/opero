@@ -58,53 +58,81 @@ function Specimen() {
     <div className="mx-auto max-w-5xl space-y-10 px-5 py-10 sm:px-8">
       <header className="space-y-3">
         <Breadcrumbs items={[{ label: "Opero", href: "/" }, { label: "Design system" }]} />
-        <p className="text-sm font-semibold uppercase tracking-[0.16em] text-emerald">Phase 9A</p>
+        <p className="brand-kicker">Phase 9 visual identity</p>
         <h1 className="font-display text-4xl text-navy sm:text-5xl">Opero design foundation</h1>
         <p className="max-w-2xl text-text-secondary">
-          Token, typography and component specimen for owner review. Product surfaces adopt these
-          primitives in increments 9B–9F.
+          Semantic colour roles in real components — navy for structure, emerald for actions,
+          gold for restrained premium highlights, slate for metadata. Not a teal-first UI.
         </p>
         <p className="flex flex-wrap gap-4 text-sm font-medium">
-          <a href="/design-system/workspace" className="text-emerald no-underline hover:underline">
+          <a href="/design-system/workspace" className="text-navy no-underline hover:underline">
             Workspace (9C)
           </a>
-          <a href="/design-system/documents" className="text-emerald no-underline hover:underline">
+          <a href="/design-system/documents" className="text-navy no-underline hover:underline">
             Documents (9D)
           </a>
-          <a href="/design-system/diagnostics" className="text-emerald no-underline hover:underline">
+          <a href="/design-system/diagnostics" className="text-navy no-underline hover:underline">
             Diagnostics (9E)
           </a>
         </p>
       </header>
 
-      <section className="space-y-4" aria-labelledby="colour-heading">
-        <h2 id="colour-heading">Colour</h2>
+      <section className="space-y-4" aria-labelledby="colour-heading" data-testid="colour-roles">
+        <h2 id="colour-heading">Colour roles</h2>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {[
-            ["Navy", "bg-navy", "#101D32"],
-            ["Emerald", "bg-emerald", "#087F6D"],
-            ["Gold", "bg-gold", "#D6A85B"],
-            ["Workspace", "bg-workspace border border-border", "#F7F9FC"],
-            ["Info surface", "bg-info-surface", "#EAF2F8"],
-            ["Slate", "bg-slate", "#64748B"],
-          ].map(([label, cls, hex]) => (
+            ["Navy", "bg-navy", "#101D32", "Brand + structure"],
+            ["Emerald", "bg-emerald", "#087F6D", "Actions + progress"],
+            ["Gold", "bg-gold", "#D6A85B", "Premium highlights"],
+            ["Workspace", "bg-workspace border border-border", "#F7F9FC", "Page canvas"],
+            ["Ice / info", "bg-info-surface", "#EAF2F8", "Calm surfaces"],
+            ["Slate", "bg-slate", "#64748B", "Secondary text"],
+          ].map(([label, cls, hex, role]) => (
             <div key={label} className="overflow-hidden rounded-xl border border-border bg-surface shadow-sm">
               <div className={`h-16 ${cls}`} />
               <div className="px-3 py-2 text-sm">
-                <p className="font-semibold text-text">{label}</p>
+                <p className="font-semibold text-navy">{label}</p>
                 <p className="font-data text-text-secondary">{hex}</p>
+                <p className="mt-1 text-xs text-slate">{role}</p>
               </div>
             </div>
           ))}
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Badge tone="success">Success</Badge>
-          <Badge tone="warning">Warning</Badge>
-          <Badge tone="error">Error</Badge>
-          <Badge tone="info">Info</Badge>
-          <Badge tone="emerald">Emerald</Badge>
-          <Badge tone="gold">Gold</Badge>
+
+        <div className="grid gap-4 lg:grid-cols-2" data-testid="colour-in-components">
+          <Card className="space-y-3 !bg-navy !text-text-inverse">
+            <p className="brand-kicker-inverse">Navy structure</p>
+            <p className="text-lg font-semibold text-white">Workspace chrome & executive headers</p>
+            <p className="text-sm text-white/65">
+              Navigation, brand panels and board-facing titles sit on navy — not emerald.
+            </p>
+            <Badge tone="gold">Selected</Badge>
+          </Card>
+          <Card className="space-y-4">
+            <p className="brand-kicker">Emerald actions</p>
+            <p className="text-sm text-text-secondary">
+              Primary buttons, upload progress and focus rings. Not used to imply favourable
+              financial performance.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button>Primary action</Button>
+              <Button variant="secondary">Secondary</Button>
+              <Button variant="gold">Gold highlight</Button>
+            </div>
+            <ProgressBar value={62} label="Upload progress 62%" />
+          </Card>
         </div>
+
+        <div className="flex flex-wrap gap-2">
+          <Badge tone="success">Status success</Badge>
+          <Badge tone="warning">Status warning</Badge>
+          <Badge tone="error">Status error</Badge>
+          <Badge tone="info">Status info</Badge>
+          <Badge tone="gold">Premium gold</Badge>
+        </div>
+        <p className="text-xs text-slate">
+          Warning and success remain semantic status colours — gold never replaces warning amber.
+        </p>
       </section>
 
       <section className="space-y-4" aria-labelledby="type-heading">

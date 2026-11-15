@@ -26,7 +26,7 @@ export function AuthShell({
             className="pointer-events-none absolute inset-0"
             style={{
               background:
-                "radial-gradient(ellipse at 15% 0%, rgba(8,127,109,0.32), transparent 50%), linear-gradient(165deg, #101d32 0%, #0c1626 100%)",
+                "radial-gradient(ellipse at 12% 0%, rgba(214,168,91,0.18), transparent 48%), radial-gradient(ellipse at 90% 30%, rgba(234,242,248,0.08), transparent 42%), linear-gradient(165deg, #101d32 0%, #0c1626 100%)",
             }}
             aria-hidden
           />
@@ -35,6 +35,7 @@ export function AuthShell({
               <OperoLogo inverse markClassName="size-9" />
             </Link>
             <div>
+              <p className="brand-kicker-inverse mb-3">Opero X-Ray</p>
               <p className="max-w-sm font-display text-3xl leading-snug text-balance xl:text-[2.35rem]">
                 Clarity you can take to the board.
               </p>

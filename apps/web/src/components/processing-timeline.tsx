@@ -38,7 +38,7 @@ export function ProcessingTimeline({
     >
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="text-sm font-semibold uppercase tracking-[0.14em] text-emerald">Processing</p>
+          <p className="brand-kicker">Processing</p>
           <h2 className="mt-1 text-xl text-navy">{currentLabel}</h2>
           {progress.nextRecommendedAction ? (
             <p className="mt-1 text-sm text-text-secondary">{progress.nextRecommendedAction}</p>

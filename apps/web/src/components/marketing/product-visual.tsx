@@ -34,7 +34,7 @@ export function ProductVisual({ className }: { className?: string }) {
             <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald">
+                  <p className="brand-kicker-inverse text-[11px] tracking-[0.12em]">
                     Business health
                   </p>
                   <p className="mt-2 font-data text-4xl font-semibold tracking-tight text-white">72</p>
@@ -47,7 +47,7 @@ export function ProductVisual({ className }: { className?: string }) {
                     cy="32"
                     r="26"
                     fill="none"
-                    stroke="#087F6D"
+                    stroke="#D6A85B"
                     strokeWidth="6"
                     strokeLinecap="round"
                     strokeDasharray={`${2 * Math.PI * 26 * 0.72} ${2 * Math.PI * 26}`}
@@ -65,7 +65,7 @@ export function ProductVisual({ className }: { className?: string }) {
                 {bars.map((bar) => (
                   <div key={bar.label} className="flex flex-1 flex-col items-center gap-1.5">
                     <div
-                      className="w-full rounded-t-md bg-emerald/90"
+                      className="w-full rounded-t-md bg-ice/85"
                       style={{ height: bar.h }}
                       title={bar.label}
                     />
@@ -79,7 +79,7 @@ export function ProductVisual({ className }: { className?: string }) {
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-2">
               {[
-                ["Gross margin", "58%", "emerald"],
+                ["Gross margin", "58%", "white"],
                 ["Current ratio", "1.8×", "white"],
                 ["Cash / assets", "19%", "white"],
                 ["Leverage", "0.4×", "gold"],
@@ -89,7 +89,7 @@ export function ProductVisual({ className }: { className?: string }) {
                   <p
                     className={cn(
                       "mt-1 font-data text-lg font-semibold",
-                      tone === "emerald" ? "text-emerald" : tone === "gold" ? "text-gold" : "text-white",
+                      tone === "gold" ? "text-gold" : "text-white",
                     )}
                   >
                     {value}
@@ -118,7 +118,7 @@ export function ProductVisual({ className }: { className?: string }) {
                         raw {raw} · {scale}
                       </p>
                     </div>
-                    <p className="self-center text-right text-[11px] font-semibold text-emerald">{actual}</p>
+                    <p className="self-center text-right text-[11px] font-semibold text-white/90">{actual}</p>
                   </div>
                 ))}
               </div>

@@ -42,7 +42,7 @@ export function HealthScorePanel({
             <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-text-secondary">
               Overall score
             </p>
-            <p className="mt-1 font-data text-5xl font-semibold text-emerald sm:text-6xl">
+            <p className="mt-1 font-data text-5xl font-semibold text-navy sm:text-6xl">
               {presentation.scoreText}
             </p>
           </div>

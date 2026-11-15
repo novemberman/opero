@@ -165,7 +165,7 @@ export default function DocumentsDesignSpecimen() {
           <p className="max-w-2xl text-sm text-text-secondary">
             Labelled fixtures for visual review. Live routes use the same components with real APIs.
           </p>
-          <Link href="/design-system" className="text-sm font-medium text-emerald">
+          <Link href="/design-system" className="text-sm font-medium text-navy no-underline hover:underline">
             ← Design system
           </Link>
         </header>

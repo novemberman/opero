@@ -93,7 +93,7 @@ export default function AiInterpretationPage() {
     <div className="mx-auto max-w-6xl space-y-8" data-testid="ai-interpretation-detail">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="text-sm font-semibold uppercase tracking-[0.14em] text-emerald">
+          <p className="brand-kicker">
             Opero X-Ray
           </p>
           <h1 className="mt-2 text-3xl text-navy">AI interpretation draft</h1>

@@ -61,10 +61,10 @@ function SidebarBody({
   const router = useRouter();
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col bg-navy text-text-inverse">
       <div
         className={cn(
-          "flex items-center gap-2 border-b border-border px-3 py-4",
+          "flex items-center gap-2 border-b border-white/10 px-3 py-4",
           collapsed && "justify-center px-2",
         )}
       >
@@ -74,25 +74,29 @@ function SidebarBody({
           aria-label="Opero overview"
           onClick={onNavigate}
         >
-          {collapsed ? <OperoMark className="size-8" /> : <OperoLogo markClassName="size-8" />}
+          {collapsed ? (
+            <OperoMark className="size-8" inverse />
+          ) : (
+            <OperoLogo markClassName="size-8" inverse />
+          )}
         </Link>
       </div>
 
-      <div className={cn("border-b border-border px-3 py-3", collapsed && "px-2")}>
+      <div className={cn("border-b border-white/10 px-3 py-3", collapsed && "px-2")}>
         {collapsed ? (
           <p
-            className="truncate text-center text-[10px] font-semibold uppercase tracking-wide text-text-secondary"
+            className="truncate text-center text-[10px] font-semibold uppercase tracking-wide text-white/55"
             title={orgName}
           >
             {orgName.slice(0, 1)}
           </p>
         ) : (
           <>
-            <label className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-text-secondary">
+            <label className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-gold">
               Workspace
             </label>
             <select
-              className="mt-1.5 min-h-10 w-full rounded-lg border border-border bg-surface px-2 text-sm font-medium text-navy"
+              className="mt-1.5 min-h-10 w-full rounded-lg border border-white/15 bg-navy-hover px-2 text-sm font-medium text-text-inverse"
               aria-label="Switch organization"
               value={orgId}
               onChange={(event) => {
@@ -110,7 +114,7 @@ function SidebarBody({
               ))}
             </select>
             {orgSlug ? (
-              <p className="mt-1 truncate font-data text-[11px] text-text-secondary">{orgSlug}</p>
+              <p className="mt-1 truncate font-data text-[11px] text-white/50">{orgSlug}</p>
             ) : null}
           </>
         )}
@@ -124,8 +128,8 @@ function SidebarBody({
             "focus-visible:outline focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-focus",
             collapsed ? "justify-center px-2" : "px-3",
             active
-              ? "bg-info-surface text-emerald"
-              : "text-text-secondary hover:bg-hover hover:text-navy",
+              ? "bg-white/10 text-white shadow-[inset_3px_0_0_0_var(--color-gold)]"
+              : "text-white/60 hover:bg-white/5 hover:text-white",
           );
           const link = (
             <Link
@@ -152,11 +156,11 @@ function SidebarBody({
       </nav>
 
       {showCollapseControl ? (
-        <div className="border-t border-border p-2">
+        <div className="border-t border-white/10 p-2">
           <button
             type="button"
             className={cn(
-              "flex min-h-10 w-full items-center rounded-lg text-sm font-medium text-text-secondary hover:bg-hover hover:text-navy",
+              "flex min-h-10 w-full items-center rounded-lg text-sm font-medium text-white/55 hover:bg-white/5 hover:text-white",
               collapsed ? "justify-center px-2" : "px-3",
             )}
             onClick={onToggleCollapse}
@@ -295,12 +299,12 @@ export function WorkspaceShell({
   if (loading) {
     return (
       <div className="flex min-h-dvh bg-workspace">
-        <aside className="hidden w-64 border-r border-border bg-surface md:block">
+        <aside className="hidden w-64 border-r border-navy-hover bg-navy md:block">
           <div className="space-y-3 p-4">
-            <Skeleton className="h-8 w-32" />
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-8 w-full" />
-            <Skeleton className="h-8 w-full" />
+            <Skeleton className="h-8 w-32 !bg-white/15" />
+            <Skeleton className="h-10 w-full !bg-white/10" />
+            <Skeleton className="h-8 w-full !bg-white/10" />
+            <Skeleton className="h-8 w-full !bg-white/10" />
           </div>
         </aside>
         <div className="flex-1 p-6">
@@ -340,7 +344,7 @@ export function WorkspaceShell({
 
       <aside
         className={cn(
-          "sticky top-0 hidden h-dvh shrink-0 border-r border-border bg-surface md:block",
+          "sticky top-0 hidden h-dvh shrink-0 border-r border-navy-hover bg-navy md:block",
           collapsed ? "w-[4.25rem]" : "w-64",
         )}
         data-collapsed={collapsed ? "true" : "false"}
@@ -373,9 +377,14 @@ export function WorkspaceShell({
             aria-label="Close navigation"
             onClick={() => setMobileOpen(false)}
           />
-          <aside className="relative z-10 flex h-full w-[min(100%,18rem)] flex-col bg-surface shadow-lg">
-            <div className="flex items-center justify-end border-b border-border px-2 py-2">
-              <Button variant="ghost" size="sm" onClick={() => setMobileOpen(false)}>
+          <aside className="relative z-10 flex h-full w-[min(100%,18rem)] flex-col bg-navy text-text-inverse shadow-lg">
+            <div className="flex items-center justify-end border-b border-white/10 px-2 py-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-white hover:bg-white/10 hover:text-white"
+                onClick={() => setMobileOpen(false)}
+              >
                 Close
               </Button>
             </div>
@@ -410,6 +419,7 @@ export function WorkspaceShell({
               Menu
             </Button>
             <div className="min-w-0">
+              <p className="brand-kicker mb-0.5 text-[11px] tracking-[0.12em]">Opero X-Ray</p>
               <Breadcrumbs items={crumbs} />
               {role ? (
                 <p className="mt-0.5 truncate text-[11px] text-text-secondary">Role · {role}</p>

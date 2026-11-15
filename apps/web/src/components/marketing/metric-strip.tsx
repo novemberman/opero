@@ -15,7 +15,7 @@ export function MetricStrip() {
             key={item.label}
             className={`px-5 py-6 sm:px-6 ${index > 0 ? "border-t border-border sm:border-t-0 sm:border-l" : ""}`}
           >
-            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald">{item.label}</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate">{item.label}</p>
             <p className="mt-2 font-data text-lg font-semibold text-navy sm:text-xl">{item.value}</p>
             <p className="mt-1 text-xs text-text-secondary">{item.note}</p>
           </div>

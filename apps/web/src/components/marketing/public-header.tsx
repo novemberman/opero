@@ -38,7 +38,9 @@ export function PublicHeader({ compact = false }: { compact?: boolean }) {
                   href={link.href}
                   className={cn(
                     "rounded-full px-3 py-1.5 text-sm font-medium no-underline transition-colors",
-                    active ? "bg-info-surface text-emerald" : "text-text-secondary hover:text-navy",
+                    active
+                      ? "bg-info-surface text-navy"
+                      : "text-text-secondary hover:text-navy",
                   )}
                 >
                   {link.label}

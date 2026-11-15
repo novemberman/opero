@@ -165,12 +165,13 @@ export default function DocumentDetailPage() {
     <div className="mx-auto max-w-6xl space-y-8" data-testid="document-detail">
       <header className="space-y-3">
         <Link
-          className="text-sm font-medium text-emerald no-underline hover:underline"
+          className="text-sm font-medium text-navy no-underline hover:text-emerald"
           href={`/organizations/${orgId}/documents`}
         >
           ← All documents
         </Link>
-        <h1 className="text-3xl text-navy">Document processing</h1>
+        <p className="brand-kicker">Opero X-Ray</p>
+        <h1 className="mt-2 text-3xl text-navy">Document processing</h1>
         <p className="max-w-2xl text-sm text-text-secondary">
           Extracted figures retain source evidence. Corrections update statement units while
           preserving the original raw value. Processing continues if you leave this page.

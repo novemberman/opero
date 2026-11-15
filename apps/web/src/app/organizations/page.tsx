@@ -46,7 +46,7 @@ export default function OrganizationsPage() {
       <main id="main" className="mx-auto max-w-5xl px-5 py-12 sm:px-8">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.14em] text-emerald">
+            <p className="brand-kicker">
               Workspaces
             </p>
             <h1 className="mt-2 text-3xl text-navy sm:text-4xl">Your organizations</h1>

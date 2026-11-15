@@ -42,7 +42,7 @@ function CapabilityGlyph({ kind }: { kind: (typeof capabilities)[number]["visual
       <div className="font-data space-y-1.5 text-[11px]" aria-hidden>
         <div className="flex justify-between rounded-md bg-info-surface px-2 py-1.5 text-navy">
           <span>Revenue</span>
-          <span className="text-emerald">mapped</span>
+          <span className="text-navy">mapped</span>
         </div>
         <div className="flex justify-between rounded-md bg-workspace px-2 py-1.5 text-text-secondary">
           <span>Margin %</span>
@@ -61,7 +61,7 @@ function CapabilityGlyph({ kind }: { kind: (typeof capabilities)[number]["visual
             cy="28"
             r="22"
             fill="none"
-            stroke="#087F6D"
+            stroke="#D6A85B"
             strokeWidth="5"
             strokeLinecap="round"
             strokeDasharray={`${2 * Math.PI * 22 * 0.7} ${2 * Math.PI * 22}`}
@@ -81,7 +81,7 @@ function CapabilityGlyph({ kind }: { kind: (typeof capabilities)[number]["visual
         <p className="rounded-md border border-border bg-workspace px-2 py-1.5 text-text-secondary">
           Calculation · deterministic
         </p>
-        <p className="rounded-md border border-emerald/25 bg-emerald/5 px-2 py-1.5 text-emerald">
+        <p className="rounded-md border border-border bg-ice px-2 py-1.5 text-navy">
           Interpretation · labelled AI
         </p>
       </div>
@@ -114,7 +114,7 @@ export default function HomePage() {
             className="pointer-events-none absolute inset-0"
             style={{
               background:
-                "radial-gradient(ellipse at 12% 0%, rgba(8,127,109,0.28), transparent 48%), linear-gradient(180deg, #101d32 0%, #0c1626 100%)",
+                "radial-gradient(ellipse at 8% 0%, rgba(214,168,91,0.16), transparent 42%), radial-gradient(ellipse at 92% 18%, rgba(234,242,248,0.1), transparent 46%), linear-gradient(180deg, #101d32 0%, #0c1626 100%)",
             }}
             aria-hidden
           />
@@ -122,9 +122,7 @@ export default function HomePage() {
             <div>
               <div className="flex items-center gap-3">
                 <OperoMark className="size-10" inverse />
-                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-emerald">
-                  Opero X-Ray
-                </p>
+                <p className="brand-kicker-inverse">Opero X-Ray</p>
               </div>
               <h1 className="mt-6 max-w-lg font-display text-[2.5rem] leading-[1.08] text-balance text-white sm:text-5xl lg:text-[3.35rem]">
                 See the truth in your numbers.
@@ -162,7 +160,7 @@ export default function HomePage() {
         >
           <div className="grid gap-10 lg:grid-cols-[1fr_1fr] lg:items-end">
             <div>
-              <p className="text-sm font-semibold uppercase tracking-[0.16em] text-emerald">Product</p>
+              <p className="brand-kicker">Product</p>
               <h2 id="xray-heading" className="mt-3 text-3xl text-navy sm:text-4xl">
                 Built for decisions you must defend.
               </h2>
@@ -192,9 +190,7 @@ export default function HomePage() {
           aria-labelledby="how-heading"
         >
           <div className="mx-auto max-w-6xl px-5 py-14 sm:px-8 sm:py-16">
-            <p className="text-sm font-semibold uppercase tracking-[0.16em] text-emerald">
-              How it works
-            </p>
+            <p className="brand-kicker">How it works</p>
             <h2 id="how-heading" className="mt-3 text-3xl text-navy sm:text-4xl">
               Four steps. Human confirmation kept.
             </h2>
@@ -218,9 +214,7 @@ export default function HomePage() {
           className="mx-auto max-w-6xl px-5 py-14 sm:px-8 sm:py-16"
           aria-labelledby="capabilities-heading"
         >
-          <p className="text-sm font-semibold uppercase tracking-[0.16em] text-emerald">
-            Capabilities
-          </p>
+          <p className="brand-kicker">Capabilities</p>
           <h2 id="capabilities-heading" className="mt-3 max-w-xl text-3xl text-navy sm:text-4xl">
             Serious review, without the noise.
           </h2>
@@ -247,7 +241,7 @@ export default function HomePage() {
         >
           <div className="mx-auto flex max-w-6xl flex-col gap-6 px-5 py-14 sm:px-8 sm:py-16 lg:flex-row lg:items-center lg:justify-between">
             <div className="max-w-xl">
-              <p className="text-sm font-semibold uppercase tracking-[0.16em] text-emerald">Pricing</p>
+              <p className="brand-kicker">Pricing</p>
               <h2 id="pricing-heading" className="mt-3 text-3xl text-navy sm:text-4xl">
                 Transparent NGN launch plans
               </h2>

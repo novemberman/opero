@@ -33,21 +33,25 @@ function FixtureSidebar({ collapsed }: { collapsed: boolean }) {
   return (
     <aside
       className={cn(
-        "flex h-[640px] flex-col border border-border bg-surface",
+        "flex h-[640px] flex-col border border-navy-hover bg-navy text-text-inverse",
         collapsed ? "w-[4.25rem]" : "w-64",
       )}
       data-testid={collapsed ? "fixture-sidebar-collapsed" : "fixture-sidebar-expanded"}
     >
-      <div className={cn("border-b border-border px-3 py-4", collapsed && "flex justify-center")}>
-        {collapsed ? <OperoMark className="size-8" /> : <OperoLogo markClassName="size-8" />}
+      <div className={cn("border-b border-white/10 px-3 py-4", collapsed && "flex justify-center")}>
+        {collapsed ? (
+          <OperoMark className="size-8" inverse />
+        ) : (
+          <OperoLogo markClassName="size-8" inverse />
+        )}
       </div>
       {!collapsed ? (
-        <div className="border-b border-border px-3 py-3">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-text-secondary">
+        <div className="border-b border-white/10 px-3 py-3">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-gold">
             Workspace
           </p>
-          <p className="mt-1 text-sm font-semibold text-navy">Netshift Digital Ltd</p>
-          <p className="font-data text-[11px] text-text-secondary">netshift-demo</p>
+          <p className="mt-1 text-sm font-semibold text-white">Netshift Digital Ltd</p>
+          <p className="font-data text-[11px] text-white/50">netshift-demo</p>
         </div>
       ) : null}
       <nav className="flex-1 space-y-0.5 overflow-y-auto px-2 py-3">
@@ -57,7 +61,9 @@ function FixtureSidebar({ collapsed }: { collapsed: boolean }) {
               className={cn(
                 "flex min-h-10 items-center gap-2.5 rounded-lg text-sm font-medium",
                 collapsed ? "justify-center px-2" : "px-3",
-                index === 0 ? "bg-info-surface text-emerald" : "text-text-secondary",
+                index === 0
+                  ? "bg-white/10 text-white shadow-[inset_3px_0_0_0_var(--color-gold)]"
+                  : "text-white/60",
               )}
               aria-label={item.label}
             >
@@ -99,7 +105,7 @@ function FixtureDashboard({ empty }: { empty?: boolean }) {
         Sample workspace data for visual review — not live tenant data.
       </Alert>
       <div>
-        <p className="text-sm font-semibold uppercase tracking-[0.14em] text-emerald">
+        <p className="brand-kicker">
           Workspace overview
         </p>
         <h1 className="mt-2 text-3xl text-navy">Netshift Digital Ltd</h1>
@@ -124,7 +130,7 @@ function FixtureDashboard({ empty }: { empty?: boolean }) {
           <p className="font-semibold text-navy">Action centre</p>
           <ul className="mt-3 space-y-2 text-sm text-text-secondary">
             <li className="flex items-center justify-between gap-2 rounded-xl border border-border px-3 py-2">
-              Review extracted figures <Badge tone="emerald">Next</Badge>
+              Review extracted figures <Badge tone="gold">Next</Badge>
             </li>
             <li className="rounded-xl border border-border px-3 py-2">Run available diagnostics</li>
           </ul>
