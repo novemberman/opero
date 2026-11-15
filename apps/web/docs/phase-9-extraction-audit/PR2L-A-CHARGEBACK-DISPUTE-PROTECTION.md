@@ -2,6 +2,7 @@
 
 **Date:** 2026-11-15  
 **Status:** Implemented locally (not pushed / not deployed)  
+**Release audit:** `PR2L-A-RELEASE-SECURITY-AUDIT.md` — **PASS WITH OWNER GATES**  
 **Closes readiness gap B1** from `PR2L-KORAPAY-LIVE-PAYMENT-READINESS.md`
 
 ---
@@ -89,11 +90,10 @@ Apply with `pnpm migrate:deploy` / `prisma migrate deploy` on each environment b
 | Suite | Result |
 |-------|--------|
 | `@opero/payments` unit (incl. webhook-references + chargeback parse) | **22 passed** |
-| `apps/api` `billing.integration.test.ts` (12 tests, incl. chargeback + manual) | **12 passed** |
-| `@opero/payments` / `@opero/database` typecheck | **pass** |
+| `apps/api` `billing.integration.test.ts` (13 tests, incl. chargeback + manual) | **13 passed** |
+| Security + report download suites | **24 passed** |
 | `apps/api` `tsc --noEmit` | **pass** |
-| `docker compose config` | **pass** |
-| `Dockerfile.api` build (`opero-api:pr2la-test`) | **pass** |
+| `Dockerfile.api` build (`opero-api:pr2la-audit`) | **pass** |
 
 ---
 

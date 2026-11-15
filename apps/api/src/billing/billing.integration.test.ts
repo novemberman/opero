@@ -805,4 +805,95 @@ describe("Phase 7A billing (mock Korapay)", () => {
     });
     expect(actions.length).toBeGreaterThanOrEqual(3);
   });
+
+  it("denies viewer dispute actions and blocks merchant-favor after refund", async () => {
+    const ctx = await draftReport("cb-auth");
+    const checkout = await post(
+      app,
+      ctx.owner,
+      `/organizations/${ctx.organizationId}/billing/checkout/xray-pro`,
+    )
+      .send({ reportId: ctx.reportId, idempotencyKey: `auth-${randomUUID()}` })
+      .expect(201);
+    const reference = checkout.body.checkout.reference as string;
+    payments.settle(reference, "success");
+    await post(app, ctx.owner, `/organizations/${ctx.organizationId}/billing/payments/verify`)
+      .send({ reference })
+      .expect(200);
+
+    await post(
+      app,
+      ctx.viewer,
+      `/organizations/${ctx.organizationId}/billing/payments/${reference}/disputes`,
+    )
+      .send({ action: "open", reason: "viewer should not open disputes" })
+      .expect(403);
+
+    // Refund then attempt merchant-favor restore — must fail.
+    const refund = payments.signWebhook({
+      event: "refund.success",
+      data: {
+        reference: `RFD-${randomUUID().slice(0, 8)}`,
+        payment_reference: reference,
+        amount: 15000,
+        currency: "NGN",
+        status: "success",
+      },
+    });
+    await request(app.getHttpServer())
+      .post("/api/v1/billing/webhooks/korapay")
+      .set(refund.headers)
+      .send(refund.body)
+      .expect(200);
+    expect((await prisma.payment.findUniqueOrThrow({ where: { reference } })).status).toBe(
+      "REFUNDED",
+    );
+    await get(app, ctx.viewer, `${ctx.path}/pdf`).expect(403);
+
+    await post(
+      app,
+      ctx.owner,
+      `/organizations/${ctx.organizationId}/billing/payments/${reference}/disputes`,
+    )
+      .send({ action: "resolve_merchant_favor", reason: "must not restore after refund" })
+      .expect(409);
+    await get(app, ctx.viewer, `${ctx.path}/pdf`).expect(403);
+
+    // Concurrent chargeback.lost webhooks remain CHARGEBACK and idempotent.
+    const ctx2 = await draftReport("cb-race");
+    const checkout2 = await post(
+      app,
+      ctx2.owner,
+      `/organizations/${ctx2.organizationId}/billing/checkout/xray-pro`,
+    )
+      .send({ reportId: ctx2.reportId, idempotencyKey: `race-cb-${randomUUID()}` })
+      .expect(201);
+    const ref2 = checkout2.body.checkout.reference as string;
+    payments.settle(ref2, "success");
+    await post(app, ctx2.owner, `/organizations/${ctx2.organizationId}/billing/payments/verify`)
+      .send({ reference: ref2 })
+      .expect(200);
+
+    const mkLost = () =>
+      payments.signWebhook({
+        event: "chargeback.lost",
+        data: {
+          status: "lost",
+          reference: `KPY-CHG-race-${randomUUID().slice(0, 8)}`,
+          currency: "NGN",
+          chargeback_amount: 15000,
+          payment: { status: "success", reference: ref2 },
+        },
+      });
+    const a = mkLost();
+    const b = mkLost();
+    await Promise.all([
+      request(app.getHttpServer()).post("/api/v1/billing/webhooks/korapay").set(a.headers).send(a.body),
+      request(app.getHttpServer()).post("/api/v1/billing/webhooks/korapay").set(b.headers).send(b.body),
+    ]);
+    expect((await prisma.payment.findUniqueOrThrow({ where: { reference: ref2 } })).status).toBe(
+      "CHARGEBACK",
+    );
+    await get(app, ctx2.viewer, `${ctx2.path}/pdf`).expect(403);
+  });
 });

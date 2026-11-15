@@ -50,6 +50,12 @@ function disputeSeverity(status: string): number {
   }
 }
 
+/** Predecessor statuses that may transition into `target` (same severity = idempotent refresh). */
+function allowedDisputePredecessors(target: "DISPUTED" | "CHARGEBACK"): string[] {
+  if (target === "DISPUTED") return ["SUCCEEDED", "DISPUTED"];
+  return ["SUCCEEDED", "DISPUTED", "REFUNDED", "PARTIALLY_REFUNDED", "CHARGEBACK"];
+}
+
 @Injectable()
 export class FulfillmentService {
   private readonly logger = new Logger(FulfillmentService.name);
@@ -131,25 +137,56 @@ export class FulfillmentService {
       return { fulfilled: false, paymentId: payment.id, status: "ALREADY_FULFILLED" as const };
     }
 
-    // Claim exclusive fulfillment lock — concurrent verifiers lose.
+    // Claim exclusive fulfillment lock — only from non-terminal statuses so a
+    // concurrent refund/dispute/chargeback cannot be overwritten by late verify.
     const lock = `fulfill:${payment.id}`;
+    const fulfillableStatuses = ["PENDING", "FAILED", "SUCCEEDED"] as const;
     const claimed = await this.prisma.payment.updateMany({
-      where: { id: payment.id, fulfillmentLock: null },
+      where: {
+        id: payment.id,
+        fulfillmentLock: null,
+        status: { in: [...fulfillableStatuses] },
+      },
       data: { fulfillmentLock: lock },
     });
     if (claimed.count === 0) {
+      const latest = await this.prisma.payment.findUniqueOrThrow({ where: { id: payment.id } });
+      if (ACCESS_TERMINAL_STATUSES.has(latest.status)) {
+        return {
+          fulfilled: false,
+          paymentId: payment.id,
+          status: "ACCESS_REVOKED" as const,
+          paymentStatus: latest.status,
+        };
+      }
       // Brief wait for the winner to finish so concurrent verifies converge
       // on ALREADY_FULFILLED instead of thrashing FULFILLMENT_IN_PROGRESS.
       for (let attempt = 0; attempt < 8; attempt += 1) {
         await new Promise((resolve) => setTimeout(resolve, 25));
-        const latest = await this.prisma.payment.findUniqueOrThrow({ where: { id: payment.id } });
-        if (latest.fulfilledAt) {
+        const again = await this.prisma.payment.findUniqueOrThrow({ where: { id: payment.id } });
+        if (ACCESS_TERMINAL_STATUSES.has(again.status)) {
+          return {
+            fulfilled: false,
+            paymentId: payment.id,
+            status: "ACCESS_REVOKED" as const,
+            paymentStatus: again.status,
+          };
+        }
+        if (again.fulfilledAt) {
           return { fulfilled: false, paymentId: payment.id, status: "ALREADY_FULFILLED" as const };
         }
-        if (!latest.fulfillmentLock) break;
+        if (!again.fulfillmentLock) break;
       }
-      const latest = await this.prisma.payment.findUniqueOrThrow({ where: { id: payment.id } });
-      if (latest.fulfilledAt) {
+      const final = await this.prisma.payment.findUniqueOrThrow({ where: { id: payment.id } });
+      if (ACCESS_TERMINAL_STATUSES.has(final.status)) {
+        return {
+          fulfilled: false,
+          paymentId: payment.id,
+          status: "ACCESS_REVOKED" as const,
+          paymentStatus: final.status,
+        };
+      }
+      if (final.fulfilledAt) {
         return { fulfilled: false, paymentId: payment.id, status: "ALREADY_FULFILLED" as const };
       }
       throw new ConflictException({
@@ -160,9 +197,13 @@ export class FulfillmentService {
 
     try {
       const result = await this.prisma.$transaction(async (tx) => {
-        const intent = payment.checkoutIntent;
-        await tx.payment.update({
-          where: { id: payment.id },
+        // CAS: refuse to mark SUCCEEDED / grant if a harder status won the race.
+        const settled = await tx.payment.updateMany({
+          where: {
+            id: payment.id,
+            status: { in: [...fulfillableStatuses] },
+            fulfillmentLock: lock,
+          },
           data: {
             status: "SUCCEEDED",
             paidAt: new Date(),
@@ -172,6 +213,15 @@ export class FulfillmentService {
             rawVerifySnapshot: input.verified.raw as object,
           },
         });
+        if (settled.count === 0) {
+          const latest = await tx.payment.findUniqueOrThrow({ where: { id: payment.id } });
+          return {
+            kind: "blocked" as const,
+            status: latest.status,
+          };
+        }
+
+        const intent = payment.checkoutIntent;
         await tx.checkoutIntent.update({
           where: { id: intent.id },
           data: { status: "SUCCEEDED" },
@@ -359,6 +409,24 @@ export class FulfillmentService {
         throw new BadRequestException(`Unsupported checkout purpose ${intent.purpose}`);
       });
 
+      if (result.kind === "blocked") {
+        // Release lock; terminal status (refund/dispute/chargeback) owns the row.
+        await this.prisma.payment
+          .update({
+            where: { id: payment.id },
+            data: { fulfillmentLock: null },
+          })
+          .catch((releaseError) => {
+            this.logger.warn(`Failed to release fulfillment lock after block: ${String(releaseError)}`);
+          });
+        return {
+          fulfilled: false,
+          paymentId: payment.id,
+          status: "ACCESS_REVOKED" as const,
+          paymentStatus: result.status,
+        };
+      }
+
       await this.audit.record({
         action: "billing.payment_fulfilled",
         entityType: "payment",
@@ -403,11 +471,26 @@ export class FulfillmentService {
       return { applied: false, reason: "ALREADY_CHARGEBACK" as const, paymentId: payment.id };
     }
 
-    await this.prisma.$transaction(async (tx) => {
-      await tx.payment.update({
-        where: { id: payment.id },
+    const applied = await this.prisma.$transaction(async (tx) => {
+      const claimed = await tx.payment.updateMany({
+        where: {
+          id: payment.id,
+          status: { in: ["PENDING", "SUCCEEDED", "FAILED", "DISPUTED", "REFUNDED", "PARTIALLY_REFUNDED"] },
+        },
         data: { status: "REFUNDED", refundedAt: new Date() },
       });
+      if (claimed.count === 0) {
+        await tx.entitlementGrant.updateMany({
+          where: {
+            organizationId: payment.organizationId,
+            sourceType: "PURCHASE",
+            sourceId: payment.id,
+            revokedAt: null,
+          },
+          data: { revokedAt: new Date(), revokeReason: "payment_chargeback" },
+        });
+        return false;
+      }
       if (payment.purchase) {
         await tx.purchase.update({
           where: { id: payment.purchase.id },
@@ -426,7 +509,12 @@ export class FulfillmentService {
           revokeReason: "payment_refunded",
         },
       });
+      return true;
     });
+
+    if (!applied) {
+      return { applied: false, reason: "ALREADY_CHARGEBACK" as const, paymentId: payment.id };
+    }
 
     await this.audit.record({
       action: "billing.payment_refunded",
@@ -458,6 +546,16 @@ export class FulfillmentService {
       return { applied: false, reason: "PAYMENT_NOT_FOUND" as const };
     }
 
+    // Chargebacks apply only to settled (or already disputed/reversed) payments.
+    if (disputeSeverity(payment.status) === 0) {
+      return {
+        applied: false,
+        reason: "PAYMENT_NOT_SETTLED" as const,
+        paymentId: payment.id,
+        status: payment.status,
+      };
+    }
+
     const event = input.eventType as KorapayChargebackEvent;
     const target =
       event === "chargeback.pending" || event === "chargeback.declined"
@@ -485,17 +583,7 @@ export class FulfillmentService {
       };
     }
 
-    if (payment.status === target) {
-      await this.revokePurchaseEntitlements(payment.id, payment.organizationId, revokeReason);
-      return {
-        applied: false,
-        reason: "IDEMPOTENT" as const,
-        paymentId: payment.id,
-        status: payment.status,
-      };
-    }
-
-    await this.suspendOrRevokeAccess({
+    const outcome = await this.suspendOrRevokeAccess({
       payment,
       toStatus: target,
       purchaseStatus: target === "DISPUTED" ? "DISPUTED" : "REVOKED",
@@ -509,7 +597,12 @@ export class FulfillmentService {
       },
     });
 
-    return { applied: true, paymentId: payment.id, status: target };
+    return {
+      applied: outcome.transitioned,
+      reason: outcome.transitioned ? undefined : outcome.reason,
+      paymentId: payment.id,
+      status: outcome.status,
+    };
   }
 
   /**
@@ -548,7 +641,7 @@ export class FulfillmentService {
     }
 
     const fromStatus = payment.status;
-    let toStatus = fromStatus;
+    let toStatus: typeof payment.status = fromStatus;
     let revokeReason: string | null = null;
     let restore = false;
 
@@ -581,62 +674,37 @@ export class FulfillmentService {
       restore = true;
     }
 
-    if (toStatus !== fromStatus || restore || revokeReason) {
-      if (restore) {
-        await this.prisma.$transaction(async (tx) => {
-          await tx.payment.update({
-            where: { id: payment.id },
-            data: { status: "SUCCEEDED" },
-          });
-          if (payment.purchase) {
-            await tx.purchase.update({
-              where: { id: payment.purchase.id },
-              data: { status: "FULFILLED", refundedAt: null },
-            });
-          }
-          await tx.entitlementGrant.updateMany({
-            where: {
-              organizationId: payment.organizationId,
-              sourceType: "PURCHASE",
-              sourceId: payment.id,
-            },
-            data: {
-              revokedAt: null,
-              revokeReason: null,
-              validFrom: new Date(),
-            },
-          });
-          await tx.paymentDisputeAction.create({
-            data: {
-              paymentId: payment.id,
-              organizationId: payment.organizationId,
-              actorUserId: input.actor.id,
-              action: input.action,
-              reason: input.reason,
-              evidenceNote: input.evidenceNote ?? null,
-              providerChargebackRef: input.providerChargebackRef ?? null,
-              fromStatus,
-              toStatus,
-              requestId: input.requestId ?? null,
-            },
-          });
+    let finalStatus: typeof payment.status = fromStatus;
+
+    if (restore) {
+      const restored = await this.prisma.$transaction(async (tx) => {
+        // CAS: only DISPUTED may restore — concurrent chargeback/refund wins.
+        const claimed = await tx.payment.updateMany({
+          where: { id: payment.id, status: "DISPUTED" },
+          data: { status: "SUCCEEDED" },
         });
-      } else if (revokeReason) {
-        await this.suspendOrRevokeAccess({
-          payment,
-          toStatus: toStatus as "DISPUTED" | "CHARGEBACK",
-          purchaseStatus: toStatus === "DISPUTED" ? "DISPUTED" : "REVOKED",
-          revokeReason,
-          requestId: input.requestId,
-          auditAction:
-            toStatus === "DISPUTED" ? "billing.payment_disputed" : "billing.payment_chargeback",
-          metadata: {
-            manual: true,
-            action: input.action,
-            providerChargebackRef: input.providerChargebackRef ?? null,
+        if (claimed.count === 0) {
+          return false;
+        }
+        if (payment.purchase) {
+          await tx.purchase.update({
+            where: { id: payment.purchase.id },
+            data: { status: "FULFILLED", refundedAt: null },
+          });
+        }
+        await tx.entitlementGrant.updateMany({
+          where: {
+            organizationId: payment.organizationId,
+            sourceType: "PURCHASE",
+            sourceId: payment.id,
+          },
+          data: {
+            revokedAt: null,
+            revokeReason: null,
+            validFrom: new Date(),
           },
         });
-        await this.prisma.paymentDisputeAction.create({
+        await tx.paymentDisputeAction.create({
           data: {
             paymentId: payment.id,
             organizationId: payment.organizationId,
@@ -646,11 +714,53 @@ export class FulfillmentService {
             evidenceNote: input.evidenceNote ?? null,
             providerChargebackRef: input.providerChargebackRef ?? null,
             fromStatus,
-            toStatus,
+            toStatus: "SUCCEEDED",
             requestId: input.requestId ?? null,
           },
         });
+        return true;
+      });
+      if (!restored) {
+        const latest = await this.prisma.payment.findUniqueOrThrow({ where: { id: payment.id } });
+        throw new ConflictException({
+          message: "Merchant-favor resolve lost a race with chargeback/refund; access not restored",
+          code: "INVALID_DISPUTE_TRANSITION",
+          paymentStatus: latest.status,
+        });
       }
+      finalStatus = "SUCCEEDED";
+      toStatus = "SUCCEEDED";
+    } else if (revokeReason) {
+      const outcome = await this.suspendOrRevokeAccess({
+        payment,
+        toStatus: toStatus as "DISPUTED" | "CHARGEBACK",
+        purchaseStatus: toStatus === "DISPUTED" ? "DISPUTED" : "REVOKED",
+        revokeReason,
+        requestId: input.requestId,
+        auditAction:
+          toStatus === "DISPUTED" ? "billing.payment_disputed" : "billing.payment_chargeback",
+        metadata: {
+          manual: true,
+          action: input.action,
+          providerChargebackRef: input.providerChargebackRef ?? null,
+        },
+      });
+      finalStatus = outcome.status as typeof payment.status;
+      toStatus = outcome.status as typeof payment.status;
+      await this.prisma.paymentDisputeAction.create({
+        data: {
+          paymentId: payment.id,
+          organizationId: payment.organizationId,
+          actorUserId: input.actor.id,
+          action: input.action,
+          reason: input.reason,
+          evidenceNote: input.evidenceNote ?? null,
+          providerChargebackRef: input.providerChargebackRef ?? null,
+          fromStatus,
+          toStatus: finalStatus,
+          requestId: input.requestId ?? null,
+        },
+      });
     }
 
     await this.audit.record({
@@ -666,7 +776,7 @@ export class FulfillmentService {
         evidenceNote: input.evidenceNote ?? null,
         providerChargebackRef: input.providerChargebackRef ?? null,
         fromStatus,
-        toStatus,
+        toStatus: finalStatus,
         limitation:
           "Previously downloaded PDF files cannot be remotely recalled; only subsequent downloads are blocked.",
       },
@@ -676,11 +786,15 @@ export class FulfillmentService {
       paymentId: payment.id,
       reference: payment.reference,
       fromStatus,
-      toStatus,
+      toStatus: finalStatus,
       action: input.action,
     };
   }
 
+  /**
+   * CAS status transition + entitlement revoke. Concurrent webhooks cannot soften
+   * a harder status; losing racers still ensure grants remain revoked.
+   */
   private async suspendOrRevokeAccess(input: {
     payment: {
       id: string;
@@ -694,15 +808,45 @@ export class FulfillmentService {
     requestId?: string | null;
     auditAction: string;
     metadata?: Record<string, unknown>;
-  }) {
-    await this.prisma.$transaction(async (tx) => {
-      await tx.payment.update({
-        where: { id: input.payment.id },
+  }): Promise<{
+    transitioned: boolean;
+    status: string;
+    reason?: "OUT_OF_ORDER_IGNORED" | "IDEMPOTENT";
+  }> {
+    const predecessors = allowedDisputePredecessors(input.toStatus);
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      const claimed = await tx.payment.updateMany({
+        where: { id: input.payment.id, status: { in: predecessors as never[] } },
         data: {
           status: input.toStatus,
           ...(input.toStatus === "CHARGEBACK" ? { refundedAt: new Date() } : {}),
         },
       });
+
+      const latest = await tx.payment.findUniqueOrThrow({ where: { id: input.payment.id } });
+
+      if (claimed.count === 0) {
+        // Lost the race or already harder — never soften; still revoke grants.
+        await tx.entitlementGrant.updateMany({
+          where: {
+            organizationId: input.payment.organizationId,
+            sourceType: "PURCHASE",
+            sourceId: input.payment.id,
+            revokedAt: null,
+          },
+          data: { revokedAt: new Date(), revokeReason: input.revokeReason },
+        });
+        return {
+          transitioned: false,
+          status: latest.status,
+          reason:
+            disputeSeverity(latest.status) > disputeSeverity(input.toStatus)
+              ? ("OUT_OF_ORDER_IGNORED" as const)
+              : ("IDEMPOTENT" as const),
+        };
+      }
+
       if (input.payment.purchase) {
         await tx.purchase.update({
           where: { id: input.payment.purchase.id },
@@ -724,23 +868,28 @@ export class FulfillmentService {
           revokeReason: input.revokeReason,
         },
       });
+      return { transitioned: true, status: input.toStatus };
     });
 
-    await this.audit.record({
-      action: input.auditAction,
-      entityType: "payment",
-      entityId: input.payment.id,
-      organizationId: input.payment.organizationId,
-      requestId: input.requestId,
-      metadata: {
-        reference: input.payment.reference,
-        toStatus: input.toStatus,
-        revokeReason: input.revokeReason,
-        limitation:
-          "Previously downloaded PDF files cannot be remotely recalled; only subsequent downloads are blocked.",
-        ...input.metadata,
-      },
-    });
+    if (result.transitioned) {
+      await this.audit.record({
+        action: input.auditAction,
+        entityType: "payment",
+        entityId: input.payment.id,
+        organizationId: input.payment.organizationId,
+        requestId: input.requestId,
+        metadata: {
+          reference: input.payment.reference,
+          toStatus: input.toStatus,
+          revokeReason: input.revokeReason,
+          limitation:
+            "Previously downloaded PDF files cannot be remotely recalled; only subsequent downloads are blocked.",
+          ...input.metadata,
+        },
+      });
+    }
+
+    return result;
   }
 
   private async revokePurchaseEntitlements(
