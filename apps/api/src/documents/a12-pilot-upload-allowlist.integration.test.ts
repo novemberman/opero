@@ -210,6 +210,264 @@ describe("A12-A2-U pilot upload allowlist", () => {
     });
   });
 
+  describe("A12-A2-U-R4A completeUpload gate", () => {
+    const csv = Buffer.from(
+      "Label,Amount\nSYNTHETIC Revenue,1250000\nSYNTHETIC Net Income,400000\n",
+      "utf8",
+    );
+
+    async function complete(
+      app: INestApplication,
+      actor: Awaited<ReturnType<typeof signUp>>,
+      organizationId: string,
+      uploadId: string,
+    ) {
+      return request(app.getHttpServer())
+        .post(`/api/v1/organizations/${organizationId}/documents/uploads/${uploadId}/complete`)
+        .set("Cookie", actor.cookies)
+        .set("x-csrf-token", actor.csrfToken)
+        .attach("file", csv, "OPERO_LIVE_PILOT_SYNTHETIC_FS_2024.csv");
+    }
+
+    it("completes only during an authorized window and blocks after emergency/expiry", async () => {
+      const setup = await bootWindow({
+        EMERGENCY_DISABLE_UPLOADS: false,
+        PILOT_UPLOAD_ENABLED: false,
+      });
+      const owner = await signUp(setup.app, setup.mail, "a12u-c1");
+      const outsider = await signUp(setup.app, setup.mail, "a12u-c1o");
+      const orgId = await createOrganization(setup.app, owner, "a12u-c1-org");
+      const otherOrgId = await createOrganization(setup.app, outsider, "a12u-c1-other");
+      await setup.app.close();
+
+      const open = await createTestApp({
+        envOverrides: {
+          PAYMENT_PROVIDER: "mock",
+          EMERGENCY_DISABLE_CHECKOUT: true,
+          EMERGENCY_DISABLE_UPLOADS: false,
+          PILOT_UPLOAD_ENABLED: true,
+          PILOT_UPLOAD_ORG_ID: orgId,
+          PILOT_UPLOAD_EXPIRES_AT: futureExpiry,
+        },
+      });
+      let owner2 = await signUp(open.app, open.mail, "a12u-c1b");
+      let outsider2 = await signUp(open.app, open.mail, "a12u-c1ob");
+      await prisma.membership.create({
+        data: { organizationId: orgId, userId: owner2.userId, role: "OWNER" },
+      });
+      await prisma.membership.create({
+        data: { organizationId: otherOrgId, userId: outsider2.userId, role: "OWNER" },
+      });
+
+      const created = await post(open.app, owner2, `/organizations/${orgId}/documents/uploads`).send({
+        filename: "OPERO_LIVE_PILOT_SYNTHETIC_FS_2024.csv",
+        declaredFormat: "CSV",
+        declaredMimeType: "text/csv",
+      });
+      expect(created.status).toBe(201);
+      const uploadId = created.body.upload.uploadId as string;
+
+      const pending = await post(open.app, owner2, `/organizations/${orgId}/documents/uploads`).send({
+        filename: "pending-after-kill.csv",
+        declaredFormat: "CSV",
+        declaredMimeType: "text/csv",
+      });
+      expect(pending.status).toBe(201);
+      const pendingId = pending.body.upload.uploadId as string;
+
+      const expiredPending = await post(
+        open.app,
+        owner2,
+        `/organizations/${orgId}/documents/uploads`,
+      ).send({
+        filename: "pending-after-expiry.csv",
+        declaredFormat: "CSV",
+        declaredMimeType: "text/csv",
+      });
+      expect(expiredPending.status).toBe(201);
+      const expiredPendingId = expiredPending.body.upload.uploadId as string;
+
+      // Authorized completion during window.
+      const ok = await complete(open.app, owner2, orgId, uploadId);
+      expect(ok.status).toBe(201);
+      expect(ok.body.documentId).toBeTruthy();
+      expect(ok.body.processingJobId).toBeTruthy();
+      expect(await prisma.entitlementGrant.count()).toBe(0);
+      expect(await prisma.payment.count()).toBe(0);
+
+      // Idempotent already-completed → conflict (even if we later flip emergency).
+      const again = await complete(open.app, owner2, orgId, uploadId);
+      expect(again.status).toBe(409);
+
+      // Wrong org cannot complete (session scoped to path org → 404).
+      const wrongOrg = await complete(open.app, outsider2, otherOrgId, pendingId);
+      expect(wrongOrg.status).toBe(404);
+
+      // Concurrent second complete of still-open session: one wins, other conflicts.
+      // Use unique bytes so duplicate-sha256 does not mask the completion race.
+      const raceCsv = Buffer.from(
+        `Label,Amount\nSYNTHETIC Race ${randomUUID()},42\n`,
+        "utf8",
+      );
+      const raceA = await post(open.app, owner2, `/organizations/${orgId}/documents/uploads`).send({
+        filename: "race.csv",
+        declaredFormat: "CSV",
+        declaredMimeType: "text/csv",
+      });
+      const raceId = raceA.body.upload.uploadId as string;
+      const raceComplete = () =>
+        request(open.app.getHttpServer())
+          .post(`/api/v1/organizations/${orgId}/documents/uploads/${raceId}/complete`)
+          .set("Cookie", owner2.cookies)
+          .set("x-csrf-token", owner2.csrfToken)
+          .attach("file", raceCsv, "race.csv");
+      const [c1, c2] = await Promise.all([raceComplete(), raceComplete()]);
+      const statuses = [c1.status, c2.status].sort();
+      expect(statuses).toEqual([201, 409]);
+      expect(await prisma.documentProcessingJob.count({ where: { organizationId: orgId } })).toBe(
+        await prisma.document.count({ where: { organizationId: orgId } }),
+      );
+
+      await cleanupPhase6(open.app);
+      await open.app.close();
+
+      // Reboot with emergency kill switch — pending session cannot complete / enqueue.
+      const killed = await createTestApp({
+        envOverrides: {
+          PAYMENT_PROVIDER: "mock",
+          EMERGENCY_DISABLE_CHECKOUT: true,
+          EMERGENCY_DISABLE_UPLOADS: true,
+          PILOT_UPLOAD_ENABLED: true,
+          PILOT_UPLOAD_ORG_ID: orgId,
+          PILOT_UPLOAD_EXPIRES_AT: futureExpiry,
+        },
+      });
+      try {
+        owner2 = await signUp(killed.app, killed.mail, "a12u-c1c");
+        await prisma.membership.create({
+          data: { organizationId: orgId, userId: owner2.userId, role: "OWNER" },
+        });
+        const jobsBefore = await prisma.documentProcessingJob.count({
+          where: { organizationId: orgId },
+        });
+        const blocked = await complete(killed.app, owner2, orgId, pendingId);
+        expect(blocked.status).toBe(400);
+        expect(JSON.stringify(blocked.body)).toMatch(
+          /EMERGENCY_DISABLE_UPLOADS|temporarily disabled/i,
+        );
+        expect(await prisma.documentProcessingJob.count({ where: { organizationId: orgId } })).toBe(
+          jobsBefore,
+        );
+        // Already completed remains conflict, not emergency.
+        const idempotent = await complete(killed.app, owner2, orgId, uploadId);
+        expect(idempotent.status).toBe(409);
+      } finally {
+        await cleanupPhase6(killed.app);
+        await killed.app.close();
+      }
+
+      // Reboot with expired pilot window — pending session cannot complete.
+      const expiredApp = await createTestApp({
+        envOverrides: {
+          PAYMENT_PROVIDER: "mock",
+          EMERGENCY_DISABLE_CHECKOUT: true,
+          EMERGENCY_DISABLE_UPLOADS: false,
+          PILOT_UPLOAD_ENABLED: true,
+          PILOT_UPLOAD_ORG_ID: orgId,
+          PILOT_UPLOAD_EXPIRES_AT: pastExpiry,
+        },
+      });
+      try {
+        owner2 = await signUp(expiredApp.app, expiredApp.mail, "a12u-c1d");
+        await prisma.membership.create({
+          data: { organizationId: orgId, userId: owner2.userId, role: "OWNER" },
+        });
+        const jobsBefore = await prisma.documentProcessingJob.count({
+          where: { organizationId: orgId },
+        });
+        const expired = await complete(expiredApp.app, owner2, orgId, expiredPendingId);
+        expect(expired.status).toBe(400);
+        expect(JSON.stringify(expired.body)).toMatch(/PILOT_UPLOAD_EXPIRED|expired/i);
+        expect(await prisma.documentProcessingJob.count({ where: { organizationId: orgId } })).toBe(
+          jobsBefore,
+        );
+        expect(await prisma.entitlementGrant.count()).toBe(0);
+      } finally {
+        await cleanupPhase6(expiredApp.app);
+        await expiredApp.app.close();
+      }
+    });
+
+    it("rejects completion when pilot config is missing while enabled", async () => {
+      // Boot with allowlist disabled so we can create a session, then we cannot
+      // boot with PILOT_UPLOAD_ENABLED=true and missing org (env parse fails).
+      // Missing config is covered at create + parseApiEnv; completion uses the same gate.
+      expect(() =>
+        parseApiEnv({
+          NODE_ENV: "test",
+          APP_ENV: "test",
+          DATABASE_URL: "postgresql://opero:secret@127.0.0.1:54329/opero_test",
+          REDIS_HOST: "127.0.0.1",
+          REDIS_PORT: "63799",
+          REDIS_PASSWORD: "test-redis",
+          CSRF_SECRET: "test-csrf-secret-value-32chars!!",
+          APP_ORIGIN: "http://127.0.0.1:3000",
+          MAIL_DRIVER: "dev",
+          PILOT_UPLOAD_ENABLED: "true",
+        }),
+      ).toThrow(/PILOT_UPLOAD_ORG_ID|PILOT_UPLOAD_EXPIRES_AT/);
+    });
+
+    it("rejects completion when the upload session TTL has elapsed", async () => {
+      const setup = await bootWindow({
+        EMERGENCY_DISABLE_UPLOADS: false,
+        PILOT_UPLOAD_ENABLED: false,
+      });
+      const owner = await signUp(setup.app, setup.mail, "a12u-ttl");
+      const orgId = await createOrganization(setup.app, owner, "a12u-ttl-org");
+      await setup.app.close();
+
+      const open = await createTestApp({
+        envOverrides: {
+          PAYMENT_PROVIDER: "mock",
+          EMERGENCY_DISABLE_CHECKOUT: true,
+          EMERGENCY_DISABLE_UPLOADS: false,
+          PILOT_UPLOAD_ENABLED: true,
+          PILOT_UPLOAD_ORG_ID: orgId,
+          PILOT_UPLOAD_EXPIRES_AT: futureExpiry,
+        },
+      });
+      try {
+        const owner2 = await signUp(open.app, open.mail, "a12u-ttl2");
+        await prisma.membership.create({
+          data: { organizationId: orgId, userId: owner2.userId, role: "OWNER" },
+        });
+        const created = await post(open.app, owner2, `/organizations/${orgId}/documents/uploads`).send(
+          {
+            filename: "ttl.csv",
+            declaredFormat: "CSV",
+            declaredMimeType: "text/csv",
+          },
+        );
+        expect(created.status).toBe(201);
+        const uploadId = created.body.upload.uploadId as string;
+        await prisma.documentUpload.update({
+          where: { id: uploadId },
+          data: { expiresAt: new Date(Date.now() - 60_000) },
+        });
+        const expiredSession = await complete(open.app, owner2, orgId, uploadId);
+        expect(expiredSession.status).toBe(400);
+        expect(JSON.stringify(expiredSession.body)).toMatch(/authorization expired|expired/i);
+        expect(
+          await prisma.documentProcessingJob.count({ where: { organizationId: orgId } }),
+        ).toBe(0);
+      } finally {
+        await cleanupPhase6(open.app);
+        await open.app.close();
+      }
+    });
+  });
+
   describe("env boot rules", () => {
     const base = {
       NODE_ENV: "test" as const,

@@ -139,9 +139,24 @@ export class DocumentsService {
     if (!upload) {
       throw new NotFoundException("Upload not found");
     }
+    // Idempotent conflict for already-finalized sessions (before gate), so retries
+    // after an emergency flip still surface "already completed" rather than shutdown.
     if (upload.consumedAt) {
       throw new ConflictException("Upload already completed");
     }
+    // Path org is membership-checked upstream; bind gate to the stored session org.
+    if (upload.organizationId !== input.organizationId) {
+      throw new ForbiddenException("Upload organization mismatch");
+    }
+    // A12-A2-U-R4A: re-check emergency + pilot allowlist/expiry before any putObject
+    // or worker enqueue (server time). Rejected completions leave no quarantine object.
+    assertPilotUploadAllowed({
+      organizationId: upload.organizationId,
+      emergencyDisableUploads: this.config.get("EMERGENCY_DISABLE_UPLOADS", { infer: true }),
+      pilotUploadEnabled: this.config.get("PILOT_UPLOAD_ENABLED", { infer: true }),
+      pilotUploadOrgId: this.config.get("PILOT_UPLOAD_ORG_ID", { infer: true }),
+      pilotUploadExpiresAt: this.config.get("PILOT_UPLOAD_EXPIRES_AT", { infer: true }),
+    });
     if (upload.expiresAt.getTime() <= Date.now()) {
       throw new BadRequestException("Upload authorization expired");
     }

@@ -11,11 +11,12 @@ export type PilotUploadGateInput = {
 };
 
 /**
- * Upload initiation gate.
+ * Upload initiation + completion gate (createUpload and completeUpload).
  * 1) EMERGENCY_DISABLE_UPLOADS always wins.
  * 2) When PILOT_UPLOAD_ENABLED is true, only the allowlisted org may upload before expiry.
  * 3) When PILOT_UPLOAD_ENABLED is false, callers rely on emergency + auth only
  *    (staging/dev). Production boot forbids emergency=false without the pilot window.
+ * Reject before quarantine putObject / worker enqueue so denied completions leave no objects.
  */
 export function assertPilotUploadAllowed(input: PilotUploadGateInput): void {
   if (input.emergencyDisableUploads) {
