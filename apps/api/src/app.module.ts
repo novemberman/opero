@@ -18,6 +18,7 @@ import { DiagnosticsModule } from "./diagnostics/diagnostics.module";
 import { DocumentsModule } from "./documents/documents.module";
 import { HealthModule } from "./health/health.module";
 import { OrganizationsModule } from "./organizations/organizations.module";
+import { PilotModule } from "./pilot/pilot.module";
 import { ReadinessModule } from "./readiness/readiness.module";
 import { ReconciliationModule } from "./reconciliation/reconciliation.module";
 import { ReportsModule } from "./reports/reports.module";
@@ -119,6 +120,7 @@ import { StorageModule } from "./storage/storage.module";
     AuthorizationModule,
     AuthModule,
     OrganizationsModule,
+    PilotModule,
     DocumentsModule,
     DiagnosticsModule,
     StatementsModule,

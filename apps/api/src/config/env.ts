@@ -97,8 +97,21 @@ export const apiEnvSchema = z
     /**
      * When set, GET /api/v1/ops/status requires matching X-Ops-Token (or Bearer).
      * Unset keeps staging scrapers working with the non-secret payload only.
+     * Creating pilot bootstrap invitations always requires this token to be set.
      */
     OPS_STATUS_TOKEN: z.string().min(16).max(256).optional(),
+    /** TTL for ops-issued pilot bootstrap invitations (hours). */
+    PILOT_BOOTSTRAP_INVITE_TTL_HOURS: z.coerce.number().int().min(1).max(168).default(72),
+    /**
+     * A12 live-pilot probe checkout. Default false.
+     * When true (and emergency checkout is off), only the allowlisted org/report
+     * may charge the hidden ₦100 probe price; public XRAY_PRO checkout is locked.
+     */
+    LIVE_PILOT_ENABLED: boolFromEnv.default(false),
+    LIVE_PILOT_EXPIRES_AT: z.string().datetime().optional(),
+    LIVE_PILOT_ORG_ID: z.string().uuid().optional(),
+    LIVE_PILOT_REPORT_ID: z.string().uuid().optional(),
+    LIVE_PILOT_MAX_SUCCESSES: z.coerce.number().int().min(1).max(10).default(1),
   })
   .superRefine((env, ctx) => {
     // Prefer APP_ENV when set so Railway staging can use NODE_ENV=production runtime

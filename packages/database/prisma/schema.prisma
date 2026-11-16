@@ -295,6 +295,7 @@ model Organization {
 
   memberships       Membership[]
   invitations       OrganizationInvitation[]
+  pilotBootstrapInvitationsConsumed PilotBootstrapInvitation[] @relation("PilotInviteConsumedOrg")
   auditEvents       AuditEvent[]
   documents         Document[]
   documentUploads   DocumentUpload[]
@@ -335,6 +336,7 @@ model User {
   emailVerificationTokens  EmailVerificationToken[]
   passwordResetTokens      PasswordResetToken[]
   invitationsSent          OrganizationInvitation[] @relation("InvitationInviter")
+  pilotBootstrapInvitationsConsumed PilotBootstrapInvitation[] @relation("PilotInviteConsumedUser")
   auditEvents              AuditEvent[]
   uploadedDocuments        Document[]               @relation("DocumentUploader")
   documentUploads          DocumentUpload[]         @relation("DocumentUploadActor")
@@ -443,6 +445,32 @@ model OrganizationInvitation {
   @@index([organizationId, email])
   @@index([organizationId])
   @@map("organization_invitations")
+}
+
+/// Owner/ops-issued single-use invitation that bootstraps a user + organization
+/// while PUBLIC_REGISTRATION_ENABLED remains false (PILOT_MODE compatible).
+model PilotBootstrapInvitation {
+  id                 String    @id @default(uuid()) @db.Uuid
+  email              String
+  organizationName   String    @map("organization_name")
+  organizationSlug   String    @map("organization_slug")
+  tokenHash          String    @unique @map("token_hash")
+  expiresAt          DateTime  @map("expires_at")
+  consumedAt         DateTime? @map("consumed_at")
+  revokedAt          DateTime? @map("revoked_at")
+  /// Ops actor label (not a user FK) — invitations are created via OPS_STATUS_TOKEN.
+  createdByLabel     String    @map("created_by_label")
+  consumedUserId     String?   @map("consumed_user_id") @db.Uuid
+  consumedOrganizationId String? @map("consumed_organization_id") @db.Uuid
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  consumedUser         User?         @relation("PilotInviteConsumedUser", fields: [consumedUserId], references: [id], onDelete: SetNull)
+  consumedOrganization Organization? @relation("PilotInviteConsumedOrg", fields: [consumedOrganizationId], references: [id], onDelete: SetNull)
+
+  @@index([email])
+  @@index([expiresAt])
+  @@map("pilot_bootstrap_invitations")
 }
 
 /// Append-only record. Organization context is optional for auth events.
@@ -1331,6 +1359,8 @@ model PlanEntitlement {
   @@map("plan_entitlements")
 }
 
+/// Partial unique index (SQL migration): one active XRAY_PRO_LIVE_PROBE attempt
+/// per (organization_id, report_id) while status ∈ CREATED|REDIRECTED|PENDING_PAYMENT.
 model CheckoutIntent {
   id                 String          @id @default(uuid()) @db.Uuid
   organizationId     String          @map("organization_id") @db.Uuid

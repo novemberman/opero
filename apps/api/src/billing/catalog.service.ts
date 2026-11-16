@@ -1,6 +1,11 @@
 import { Inject, Injectable, NotFoundException } from "@nestjs/common";
 import type { PrismaClient } from "@opero/database";
 import { formatNgnFromMinor } from "@opero/payments";
+import {
+  LIVE_PILOT_AMOUNT_MINOR,
+  LIVE_PILOT_PRICE_CODE,
+  LIVE_PILOT_PRODUCT_CODE,
+} from "@opero/shared";
 import { PRISMA_CLIENT } from "../database/database.constants";
 
 @Injectable()
@@ -34,13 +39,14 @@ export class CatalogService {
 
   async publicCatalog() {
     const version = await this.getActivePricingVersion();
+    const products = version.products.filter((product) => product.code !== LIVE_PILOT_PRODUCT_CODE);
     return {
       pricingVersion: {
         code: version.code,
         label: version.label,
         effectiveFrom: version.effectiveFrom,
       },
-      products: version.products.map((product) => ({
+      products: products.map((product) => ({
         code: product.code,
         name: product.name,
         description: product.description,
@@ -66,11 +72,28 @@ export class CatalogService {
   }
 
   async requireActivePriceByProductCode(productCode: string) {
+    if (productCode === LIVE_PILOT_PRODUCT_CODE) {
+      throw new NotFoundException(`Product ${productCode} not found`);
+    }
     const version = await this.getActivePricingVersion();
     const product = version.products.find((row) => row.code === productCode);
     if (!product) throw new NotFoundException(`Product ${productCode} not found`);
     const price = product.prices[0];
     if (!price) throw new NotFoundException(`No active price for ${productCode}`);
     return { version, product, price, plan: product.plans[0] ?? null };
+  }
+
+  /** Hidden ₦100 probe price — never exposed via public catalog helpers. */
+  async requireLivePilotProbePrice() {
+    const version = await this.getActivePricingVersion();
+    const product = version.products.find((row) => row.code === LIVE_PILOT_PRODUCT_CODE);
+    if (!product) throw new NotFoundException("Live pilot probe product not configured");
+    const price =
+      product.prices.find((row) => row.code === LIVE_PILOT_PRICE_CODE) ?? product.prices[0];
+    if (!price) throw new NotFoundException("Live pilot probe price not configured");
+    if (price.amountMinor !== LIVE_PILOT_AMOUNT_MINOR || price.currency !== "NGN") {
+      throw new NotFoundException("Live pilot probe price misconfigured");
+    }
+    return { version, product, price };
   }
 }

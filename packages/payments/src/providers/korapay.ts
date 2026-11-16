@@ -2,6 +2,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { korapayAmountMajor } from "../korapay-urls.js";
 import { majorToMinorUnits } from "../money/amount.js";
 import { extractKorapayWebhookPaymentReference } from "../webhook-references.js";
+import { PaymentInitError } from "./init-errors.js";
 import type {
   InitializeCheckoutInput,
   InitializeCheckoutResult,
@@ -84,21 +85,48 @@ export class KorapayProvider implements PaymentProvider {
       ...(input.metadata ? { metadata: input.metadata } : {}),
     };
 
-    const response = await this.fetchImpl(`${this.baseUrl}/merchant/api/v1/charges/initialize`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${this.secretKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(body),
-    });
-    const json = (await response.json()) as {
+    let response: Response;
+    try {
+      response = await this.fetchImpl(`${this.baseUrl}/merchant/api/v1/charges/initialize`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${this.secretKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
+    } catch (cause) {
+      throw new PaymentInitError(
+        cause instanceof Error ? cause.message : "Korapay checkout initialization network failure",
+        "ambiguous",
+        { cause },
+      );
+    }
+
+    let json: {
       status?: boolean;
       message?: string;
       data?: { reference?: string; checkout_url?: string };
     };
+    try {
+      json = (await response.json()) as typeof json;
+    } catch (cause) {
+      throw new PaymentInitError(
+        "Korapay checkout initialization returned an unreadable body",
+        response.status >= 500 ? "ambiguous" : "definite",
+        { cause },
+      );
+    }
+
     if (!response.ok || !json.status || !json.data?.checkout_url || !json.data.reference) {
-      throw new Error(json.message ?? "Korapay checkout initialization failed");
+      const kind =
+        !response.ok && response.status >= 500
+          ? "ambiguous"
+          : ("definite" as const);
+      throw new PaymentInitError(
+        json.message ?? "Korapay checkout initialization failed",
+        kind,
+      );
     }
     return {
       provider: "korapay",

@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Inject,
   Injectable,
@@ -7,14 +8,17 @@ import {
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { randomUUID } from "node:crypto";
-import type { PrismaClient } from "@opero/database";
+import { Prisma, type PrismaClient } from "@opero/database";
 import type { PaymentProvider } from "@opero/payments";
 import {
   buildKorapayNotificationUrl,
+  isAmbiguousPaymentInitError,
   minorToMajorUnits,
   MockKorapayProvider,
+  PaymentInitError,
   type MockChargeState,
 } from "@opero/payments";
+import { LIVE_PILOT_AMOUNT_MINOR, LIVE_PILOT_PRODUCT_CODE } from "@opero/shared";
 import { AuditService } from "../audit/audit.service";
 import { resolveAppEnv, type ApiEnv } from "../config/env";
 import { PRISMA_CLIENT } from "../database/database.constants";
@@ -26,6 +30,8 @@ import { PAYMENT_PROVIDER } from "./payment.tokens";
 const CHECKOUT_TTL_MS = 60 * 60 * 1000;
 const MOCK_SETTLE_OUTCOMES = ["success", "failed", "abandoned"] as const;
 type MockSettleOutcome = (typeof MOCK_SETTLE_OUTCOMES)[number];
+
+const LIVE_PILOT_ACTIVE_STATUSES = ["CREATED", "REDIRECTED", "PENDING_PAYMENT"] as const;
 
 @Injectable()
 export class CheckoutService {
@@ -54,6 +60,16 @@ export class CheckoutService {
     }
   }
 
+  /** When the live-pilot window is armed, block public catalog checkouts. */
+  private assertNotLivePilotLocked(): void {
+    if (this.config.get("LIVE_PILOT_ENABLED", { infer: true })) {
+      throw new BadRequestException({
+        message: "Public checkout is locked during the live-pilot window.",
+        code: "LIVE_PILOT_LOCK",
+      });
+    }
+  }
+
   async startXrayProCheckout(input: {
     organizationId: string;
     actor: AuthenticatedUser;
@@ -63,6 +79,7 @@ export class CheckoutService {
     requestId?: string;
   }) {
     this.assertCheckoutEnabled();
+    this.assertNotLivePilotLocked();
     const report = await this.prisma.xRayReport.findFirst({
       where: { id: input.reportId, organizationId: input.organizationId },
       select: { id: true },
@@ -170,6 +187,339 @@ export class CheckoutService {
     });
   }
 
+  /**
+   * Hidden ₦100 live-pilot checkout. Kill switch always wins.
+   * Only the env-allowlisted org/report may charge; public XRAY_PRO stays ₦15,000.
+   *
+   * Concurrency (A12-P3-R2): reserve intent+payment in a serialized DB transaction
+   * *before* any Korapay initializeCheckout call so competing requests cannot double-initiate.
+   */
+  async startLivePilotCheckout(input: {
+    organizationId: string;
+    actor: AuthenticatedUser;
+    reportId: string;
+    idempotencyKey: string;
+    redirectUrl?: string;
+    requestId?: string;
+  }) {
+    // Global kill switch always takes precedence over LIVE_PILOT_ENABLED.
+    this.assertCheckoutEnabled();
+
+    if (!this.config.get("LIVE_PILOT_ENABLED", { infer: true })) {
+      throw new BadRequestException({
+        message: "Live pilot checkout is disabled.",
+        code: "LIVE_PILOT_DISABLED",
+      });
+    }
+
+    const expiresAtRaw = this.config.get("LIVE_PILOT_EXPIRES_AT", { infer: true });
+    if (!expiresAtRaw) {
+      throw new BadRequestException({
+        message: "Live pilot window expiry is not configured.",
+        code: "LIVE_PILOT_NOT_CONFIGURED",
+      });
+    }
+    const windowExpiresAt = new Date(expiresAtRaw);
+    if (Number.isNaN(windowExpiresAt.getTime()) || windowExpiresAt.getTime() <= Date.now()) {
+      throw new BadRequestException({
+        message: "Live pilot checkout window has expired.",
+        code: "LIVE_PILOT_EXPIRED",
+      });
+    }
+
+    const allowedOrg = this.config.get("LIVE_PILOT_ORG_ID", { infer: true });
+    const allowedReport = this.config.get("LIVE_PILOT_REPORT_ID", { infer: true });
+    if (!allowedOrg || !allowedReport) {
+      throw new BadRequestException({
+        message: "Live pilot allowlist is not configured.",
+        code: "LIVE_PILOT_NOT_CONFIGURED",
+      });
+    }
+    if (input.organizationId !== allowedOrg || input.reportId !== allowedReport) {
+      throw new ForbiddenException({
+        message: "Live pilot checkout is not authorized for this organization or report.",
+        code: "LIVE_PILOT_FORBIDDEN",
+      });
+    }
+
+    const report = await this.prisma.xRayReport.findFirst({
+      where: { id: input.reportId, organizationId: input.organizationId },
+      select: { id: true },
+    });
+    if (!report) throw new NotFoundException("Report not found");
+
+    const existing = await this.prisma.checkoutIntent.findUnique({
+      where: { idempotencyKey: input.idempotencyKey },
+      include: { payment: true },
+    });
+    if (existing) {
+      return this.livePilotIdempotentReplay(existing, input.organizationId);
+    }
+
+    const { version, product, price } = await this.catalog.requireLivePilotProbePrice();
+    if (price.amountMinor !== LIVE_PILOT_AMOUNT_MINOR) {
+      throw new BadRequestException({
+        message: "Live pilot amount misconfigured.",
+        code: "LIVE_PILOT_AMOUNT_INVALID",
+      });
+    }
+
+    const reference = `opero_${randomUUID().replace(/-/g, "")}`;
+    const expiresAt = new Date(Date.now() + CHECKOUT_TTL_MS);
+    const maxSuccesses = this.config.get("LIVE_PILOT_MAX_SUCCESSES", { infer: true });
+
+    // Commit reservation before any external provider call.
+    const reserved = await this.prisma.$transaction(async (tx) => {
+      const lockKey = `live-pilot:${input.organizationId}:${input.reportId}`;
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`;
+
+      const raced = await tx.checkoutIntent.findUnique({
+        where: { idempotencyKey: input.idempotencyKey },
+        include: { payment: true },
+      });
+      if (raced) {
+        return { kind: "replay" as const, intent: raced };
+      }
+
+      const successCount = await tx.payment.count({
+        where: {
+          organizationId: input.organizationId,
+          status: "SUCCEEDED",
+          checkoutIntent: {
+            productCode: LIVE_PILOT_PRODUCT_CODE,
+            reportId: input.reportId,
+          },
+        },
+      });
+      if (successCount >= maxSuccesses) {
+        throw new BadRequestException({
+          message: "Live pilot payment success limit reached.",
+          code: "LIVE_PILOT_MAX_SUCCESSES",
+        });
+      }
+
+      await this.expireStaleLivePilotAttempts(tx, input.organizationId, input.reportId);
+
+      const pending = await tx.checkoutIntent.findFirst({
+        where: {
+          organizationId: input.organizationId,
+          reportId: input.reportId,
+          productCode: LIVE_PILOT_PRODUCT_CODE,
+          status: { in: [...LIVE_PILOT_ACTIVE_STATUSES] },
+          payment: { status: "PENDING" },
+        },
+      });
+      if (pending) {
+        throw new ConflictException({
+          message: "A live-pilot payment attempt is already in progress for this report.",
+          code: "LIVE_PILOT_ATTEMPT_IN_PROGRESS",
+        });
+      }
+
+      let created;
+      try {
+        created = await tx.checkoutIntent.create({
+          data: {
+            organizationId: input.organizationId,
+            actorUserId: input.actor.id,
+            purpose: "XRAY_PRO_REPORT",
+            status: "CREATED",
+            priceId: price.id,
+            amountMinor: price.amountMinor,
+            currency: price.currency,
+            pricingVersionCode: version.code,
+            productCode: product.code,
+            reportId: input.reportId,
+            idempotencyKey: input.idempotencyKey,
+            paymentReference: reference,
+            provider: this.payments.name,
+            checkoutUrl: null,
+            customerEmail: input.actor.email,
+            customerName: input.actor.name,
+            redirectUrl: input.redirectUrl ?? null,
+            expiresAt,
+          },
+        });
+      } catch (error) {
+        // Partial unique index / idempotency key collision under contention.
+        if (
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          error.code === "P2002"
+        ) {
+          throw new ConflictException({
+            message: "A live-pilot payment attempt is already in progress for this report.",
+            code: "LIVE_PILOT_ATTEMPT_IN_PROGRESS",
+          });
+        }
+        throw error;
+      }
+      await tx.payment.create({
+        data: {
+          organizationId: input.organizationId,
+          checkoutIntentId: created.id,
+          reference,
+          provider: this.payments.name,
+          status: "PENDING",
+          amountMinor: price.amountMinor,
+          currency: price.currency,
+        },
+      });
+      return { kind: "reserved" as const, intent: created };
+    });
+
+    if (reserved.kind === "replay") {
+      return this.livePilotIdempotentReplay(reserved.intent, input.organizationId);
+    }
+
+    let initialized;
+    try {
+      initialized = await this.payments.initializeCheckout({
+        reference,
+        amountMinor: price.amountMinor,
+        currency: price.currency,
+        customerEmail: input.actor.email,
+        customerName: input.actor.name,
+        redirectUrl: input.redirectUrl,
+        notificationUrl: this.notificationUrl(),
+        narration: `Opero live-pilot probe report ${input.reportId}`,
+        metadata: {
+          org: input.organizationId.slice(0, 20),
+          purpose: "live-pilot",
+        },
+      });
+    } catch (error) {
+      await this.handleLivePilotProviderInitFailure(reserved.intent.id, error);
+      throw error;
+    }
+
+    if (initialized.reference !== reference) {
+      // Ambiguous identity — keep reservation; never open a second provider slot.
+      throw new PaymentInitError(
+        "Provider returned a different payment reference than reserved",
+        "ambiguous",
+      );
+    }
+
+    const intent = await this.prisma.checkoutIntent.update({
+      where: { id: reserved.intent.id },
+      data: {
+        status: "REDIRECTED",
+        checkoutUrl: initialized.checkoutUrl,
+      },
+    });
+
+    await this.audit.record({
+      action: "billing.live_pilot_checkout_created",
+      entityType: "checkout_intent",
+      entityId: intent.id,
+      organizationId: input.organizationId,
+      actorUserId: input.actor.id,
+      requestId: input.requestId,
+      metadata: {
+        purpose: intent.purpose,
+        productCode: product.code,
+        amountMinor: price.amountMinor,
+        currency: price.currency,
+        reportId: input.reportId,
+        reference,
+        pricingVersion: version.code,
+        provider: this.payments.name,
+        livePilot: true,
+        windowExpiresAt: windowExpiresAt.toISOString(),
+      },
+    });
+
+    return this.toCheckoutResponse(intent, {
+      organizationId: input.organizationId,
+      reportId: input.reportId,
+    });
+  }
+
+  private livePilotIdempotentReplay(
+    existing: {
+      organizationId: string;
+      productCode: string;
+      reportId: string | null;
+      id: string;
+      status: string;
+      purpose: string;
+      amountMinor: number;
+      currency: string;
+      checkoutUrl: string | null;
+      paymentReference: string;
+      expiresAt: Date;
+      pricingVersionCode: string;
+    },
+    organizationId: string,
+  ) {
+    if (existing.organizationId !== organizationId) {
+      throw new ForbiddenException("Idempotency key belongs to another organization");
+    }
+    if (existing.productCode !== LIVE_PILOT_PRODUCT_CODE) {
+      throw new ForbiddenException("Idempotency key is not a live-pilot checkout");
+    }
+    return this.toCheckoutResponse(existing, {
+      organizationId,
+      reportId: existing.reportId,
+    });
+  }
+
+  /** Mark TTL-elapsed active pilot attempts terminal so a new reservation may proceed. */
+  private async expireStaleLivePilotAttempts(
+    tx: Prisma.TransactionClient,
+    organizationId: string,
+    reportId: string,
+  ) {
+    const now = new Date();
+    const stale = await tx.checkoutIntent.findMany({
+      where: {
+        organizationId,
+        reportId,
+        productCode: LIVE_PILOT_PRODUCT_CODE,
+        status: { in: [...LIVE_PILOT_ACTIVE_STATUSES] },
+        expiresAt: { lte: now },
+        payment: { status: "PENDING" },
+      },
+      select: { id: true },
+    });
+    for (const row of stale) {
+      await tx.checkoutIntent.update({
+        where: { id: row.id },
+        data: { status: "EXPIRED" },
+      });
+      await tx.payment.updateMany({
+        where: { checkoutIntentId: row.id, status: "PENDING" },
+        data: { status: "CANCELLED" },
+      });
+    }
+  }
+
+  /**
+   * Definite provider rejection → release reservation (FAILED).
+   * Ambiguous / timeout → keep CREATED+PENDING so competitors cannot initiate.
+   */
+  private async handleLivePilotProviderInitFailure(
+    checkoutIntentId: string,
+    error: unknown,
+  ): Promise<void> {
+    if (isAmbiguousPaymentInitError(error)) {
+      return;
+    }
+    await this.prisma.$transaction(async (tx) => {
+      await tx.checkoutIntent.updateMany({
+        where: {
+          id: checkoutIntentId,
+          status: { in: [...LIVE_PILOT_ACTIVE_STATUSES] },
+        },
+        data: { status: "FAILED" },
+      });
+      await tx.payment.updateMany({
+        where: { checkoutIntentId, status: "PENDING" },
+        data: { status: "FAILED", failedAt: new Date() },
+      });
+    });
+  }
+
   async startSubscriptionCheckout(input: {
     organizationId: string;
     actor: AuthenticatedUser;
@@ -181,6 +531,7 @@ export class CheckoutService {
     requestId?: string;
   }) {
     this.assertCheckoutEnabled();
+    this.assertNotLivePilotLocked();
     const existing = await this.prisma.checkoutIntent.findUnique({
       where: { idempotencyKey: input.idempotencyKey },
     });

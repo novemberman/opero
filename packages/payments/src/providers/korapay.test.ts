@@ -1,5 +1,6 @@
 import { createHmac } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
+import { PaymentInitError } from "./init-errors.js";
 import { KorapayProvider } from "./korapay.js";
 
 function signedWebhook(
@@ -138,6 +139,51 @@ describe("KorapayProvider", () => {
     expect(parsed.eventType).toBe("chargeback.pending");
     expect(parsed.reference).toBe("opero_charge_abc");
     expect(parsed.providerEventKey).toContain("KPY-CHG-xYvpQYHw7wYIfzs");
+  });
+
+  it("classifies network failures as ambiguous PaymentInitError", async () => {
+    const fetchImpl = vi.fn(async () => {
+      throw new Error("fetch failed");
+    });
+    const provider = new KorapayProvider({ secretKey: secret, fetchImpl: fetchImpl as typeof fetch });
+    await expect(
+      provider.initializeCheckout({
+        reference: "r-net",
+        amountMinor: 10_000,
+        currency: "NGN",
+        customerEmail: "a@b.c",
+      }),
+    ).rejects.toMatchObject({ name: "PaymentInitError", kind: "ambiguous" } satisfies Partial<PaymentInitError>);
+  });
+
+  it("classifies 4xx provider rejections as definite PaymentInitError", async () => {
+    const fetchImpl = vi.fn(async () =>
+      Response.json({ status: false, message: "Invalid amount" }, { status: 400 }),
+    );
+    const provider = new KorapayProvider({ secretKey: secret, fetchImpl: fetchImpl as typeof fetch });
+    await expect(
+      provider.initializeCheckout({
+        reference: "r-4xx",
+        amountMinor: 10_000,
+        currency: "NGN",
+        customerEmail: "a@b.c",
+      }),
+    ).rejects.toMatchObject({ name: "PaymentInitError", kind: "definite" } satisfies Partial<PaymentInitError>);
+  });
+
+  it("classifies 5xx provider responses as ambiguous PaymentInitError", async () => {
+    const fetchImpl = vi.fn(async () =>
+      Response.json({ status: false, message: "upstream" }, { status: 503 }),
+    );
+    const provider = new KorapayProvider({ secretKey: secret, fetchImpl: fetchImpl as typeof fetch });
+    await expect(
+      provider.initializeCheckout({
+        reference: "r-5xx",
+        amountMinor: 10_000,
+        currency: "NGN",
+        customerEmail: "a@b.c",
+      }),
+    ).rejects.toMatchObject({ name: "PaymentInitError", kind: "ambiguous" } satisfies Partial<PaymentInitError>);
   });
 
   it("sends the secret only as Bearer auth, never in JSON bodies or query strings", async () => {

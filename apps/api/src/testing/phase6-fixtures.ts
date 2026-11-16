@@ -79,6 +79,7 @@ export async function resetDatabase(): Promise<void> {
   await prisma.document.deleteMany();
   await prisma.membership.deleteMany();
   await prisma.organizationInvitation.deleteMany();
+  await prisma.pilotBootstrapInvitation.deleteMany();
   await prisma.session.deleteMany();
   await prisma.emailVerificationToken.deleteMany();
   await prisma.passwordResetToken.deleteMany();

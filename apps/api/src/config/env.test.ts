@@ -275,6 +275,9 @@ describe("parseApiEnv", () => {
     expect(env.PUBLIC_REGISTRATION_ENABLED).toBe(true);
     expect(env.EMERGENCY_DISABLE_CHECKOUT).toBe(false);
     expect(env.EMERGENCY_DISABLE_UPLOADS).toBe(false);
+    expect(env.LIVE_PILOT_ENABLED).toBe(false);
+    expect(env.LIVE_PILOT_MAX_SUCCESSES).toBe(1);
+    expect(env.PILOT_BOOTSTRAP_INVITE_TTL_HOURS).toBe(72);
     expect(env.ENABLE_API_DOCS).toBeUndefined();
     expect(env.OPS_STATUS_TOKEN).toBeUndefined();
   });

@@ -15,12 +15,16 @@ const CSRF_EXEMPT_SUFFIXES = [
   "/auth/verify-email",
   "/auth/forgot-password",
   "/auth/reset-password",
+  // Ops-issued pilot bootstrap accept (single-use token; no session yet).
+  "/auth/pilot-invitations/accept",
   "/invitations/accept-public",
   "/docs",
   // Korapay server-to-server webhooks (signature-verified, no browser CSRF).
   "/billing/webhooks/korapay",
   // Public enterprise quotation intake (no session required).
   "/billing/enterprise-quotes",
+  // Ops pilot invitation admin (OPS_STATUS_TOKEN gated; no browser session).
+  "/ops/pilot-invitations",
 ];
 
 function isCsrfExempt(path: string): boolean {
@@ -29,7 +33,9 @@ function isCsrfExempt(path: string): boolean {
     (suffix) =>
       normalized === suffix ||
       normalized.endsWith(suffix) ||
-      normalized.startsWith(`${suffix}/`),
+      normalized.startsWith(`${suffix}/`) ||
+      // Nested routes under a global prefix (e.g. /api/v1/ops/pilot-invitations/:id/revoke).
+      normalized.includes(`${suffix}/`),
   );
 }
 

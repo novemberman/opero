@@ -158,6 +158,56 @@ export const acceptInvitationBodySchema = z
   })
   .strict();
 
+/** Ops-issued pilot bootstrap invitation (creates user + organization). */
+export const createPilotBootstrapInvitationBodySchema = z
+  .object({
+    email: z.email().max(320),
+    organizationName: z.string().trim().min(1).max(120),
+    organizationSlug: z
+      .string()
+      .trim()
+      .min(2)
+      .max(64)
+      .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Slug must be lowercase letters, numbers, and hyphens"),
+    /** Optional ops actor label for audit (not a password). */
+    createdByLabel: z.string().trim().min(1).max(120).default("ops"),
+    /** Optional override TTL hours (1–168); defaults to API env. */
+    ttlHours: z.number().int().min(1).max(168).optional(),
+  })
+  .strict();
+
+export type CreatePilotBootstrapInvitationBody = z.infer<
+  typeof createPilotBootstrapInvitationBodySchema
+>;
+
+export const acceptPilotBootstrapInvitationBodySchema = z
+  .object({
+    token: z.string().min(1).max(500),
+    name: z.string().trim().min(1).max(120),
+    password: z.string().min(12).max(200),
+  })
+  .strict();
+
+export type AcceptPilotBootstrapInvitationBody = z.infer<
+  typeof acceptPilotBootstrapInvitationBodySchema
+>;
+
+/** Live-pilot ₦100 checkout (allowlisted org/report only). */
+export const livePilotCheckoutBodySchema = z
+  .object({
+    reportId: z.uuid(),
+    idempotencyKey: z.string().trim().min(8).max(120),
+    redirectUrl: z.url().max(500).optional(),
+  })
+  .strict();
+
+export type LivePilotCheckoutBody = z.infer<typeof livePilotCheckoutBodySchema>;
+
+/** Hidden probe product/price codes — never mutate public XRAY_PRO.NGN. */
+export const LIVE_PILOT_PRODUCT_CODE = "XRAY_PRO_LIVE_PROBE" as const;
+export const LIVE_PILOT_PRICE_CODE = "XRAY_PRO_LIVE_PROBE.NGN" as const;
+export const LIVE_PILOT_AMOUNT_MINOR = 10_000 as const;
+
 export const documentFormatSchema = z.enum(["PDF", "XLSX", "CSV"]);
 
 export const createDocumentUploadBodySchema = z

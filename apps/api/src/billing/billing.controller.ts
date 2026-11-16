@@ -11,6 +11,7 @@ import {
 } from "@nestjs/common";
 import { Throttle } from "@nestjs/throttler";
 import type { Request } from "express";
+import { livePilotCheckoutBodySchema } from "@opero/shared";
 import { z } from "zod";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { SessionAuthGuard } from "../auth/guards/session-auth.guard";
@@ -147,6 +148,28 @@ export class BillingController {
     @Req() req: Request,
   ) {
     return this.checkout.startXrayProCheckout({
+      organizationId,
+      actor,
+      reportId: body.reportId,
+      idempotencyKey: body.idempotencyKey,
+      redirectUrl: body.redirectUrl,
+      requestId: req.requestId,
+    });
+  }
+
+  /** Hidden ₦100 live-pilot path — allowlisted org/report only; kill switch still applies. */
+  @Post("organizations/:organizationId/billing/checkout/live-pilot")
+  @UseGuards(SessionAuthGuard, OrgMembershipGuard, PermissionsGuard)
+  @RequirePermissions("billing:manage")
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  async checkoutLivePilot(
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @CurrentUser() actor: AuthenticatedUser,
+    @Body(new ZodBodyPipe(livePilotCheckoutBodySchema))
+    body: z.infer<typeof livePilotCheckoutBodySchema>,
+    @Req() req: Request,
+  ) {
+    return this.checkout.startLivePilotCheckout({
       organizationId,
       actor,
       reportId: body.reportId,
