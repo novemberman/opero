@@ -241,8 +241,15 @@ Before any further action:
 
 ## 8. Release candidate
 
-Local commit prepared with **allowlist-only** files (see §6.1).  
-Candidate SHA: **recorded after commit in this section below / git log.**
+Local commit prepared with **allowlist-only** files (see §6.1).
+
+| Field | Value |
+|-------|-------|
+| Candidate SHA | `8a4159bdca59f7d0404cacd49ac94c68ec1d1f7f` |
+| Short | `8a4159b` |
+| Message | `feat(a12): add dormant pilot upload allowlist gate (A12-A2-U)` |
+| Branch | `main` (local only — not pushed) |
+| Parent | `f59e65e` (web pilot accept page) |
 
 Unrelated audit docs remain untracked/uncommitted.
 
