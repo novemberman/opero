@@ -95,6 +95,14 @@ export const apiEnvSchema = z
     EMERGENCY_DISABLE_CHECKOUT: boolFromEnv.default(false),
     EMERGENCY_DISABLE_UPLOADS: boolFromEnv.default(false),
     /**
+     * Timed pilot upload window (A12-A2-U). Default false.
+     * EMERGENCY_DISABLE_UPLOADS always takes precedence.
+     * When true, only PILOT_UPLOAD_ORG_ID may initiate uploads before PILOT_UPLOAD_EXPIRES_AT.
+     */
+    PILOT_UPLOAD_ENABLED: boolFromEnv.default(false),
+    PILOT_UPLOAD_ORG_ID: z.string().uuid().optional(),
+    PILOT_UPLOAD_EXPIRES_AT: z.string().datetime().optional(),
+    /**
      * When set, GET /api/v1/ops/status requires matching X-Ops-Token (or Bearer).
      * Unset keeps staging scrapers working with the non-secret payload only.
      * Creating pilot bootstrap invitations always requires this token to be set.
@@ -275,6 +283,39 @@ export const apiEnvSchema = z
         path: ["PUBLIC_REGISTRATION_ENABLED"],
         message:
           "PUBLIC_REGISTRATION_ENABLED must be false when PILOT_MODE=true in production (invitation-only pilot)",
+      });
+    }
+    if (env.PILOT_UPLOAD_ENABLED) {
+      if (!env.PILOT_UPLOAD_ORG_ID) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["PILOT_UPLOAD_ORG_ID"],
+          message: "PILOT_UPLOAD_ORG_ID is required when PILOT_UPLOAD_ENABLED=true",
+        });
+      }
+      if (!env.PILOT_UPLOAD_EXPIRES_AT) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["PILOT_UPLOAD_EXPIRES_AT"],
+          message: "PILOT_UPLOAD_EXPIRES_AT is required when PILOT_UPLOAD_ENABLED=true",
+        });
+      } else {
+        const expiresAt = new Date(env.PILOT_UPLOAD_EXPIRES_AT);
+        if (Number.isNaN(expiresAt.getTime())) {
+          ctx.addIssue({
+            code: "custom",
+            path: ["PILOT_UPLOAD_EXPIRES_AT"],
+            message: "PILOT_UPLOAD_EXPIRES_AT must be a valid ISO-8601 timestamp",
+          });
+        }
+      }
+    }
+    if (isProduction && !env.EMERGENCY_DISABLE_UPLOADS && !env.PILOT_UPLOAD_ENABLED) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["PILOT_UPLOAD_ENABLED"],
+        message:
+          "PILOT_UPLOAD_ENABLED must be true when EMERGENCY_DISABLE_UPLOADS=false in production (timed org allowlist required)",
       });
     }
   });

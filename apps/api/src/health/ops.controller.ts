@@ -18,6 +18,7 @@ import {
   type ApiEnv,
 } from "../config/env";
 import { PRISMA_CLIENT } from "../database/database.constants";
+import { pilotUploadWindowOpen } from "../documents/pilot-upload-gate";
 import { timingSafeStringEqual } from "../security/timing-safe-equal";
 
 type QueueDepths = {
@@ -159,6 +160,17 @@ export class OpsController {
       emergency: {
         disableCheckout: this.config.get("EMERGENCY_DISABLE_CHECKOUT", { infer: true }),
         disableUploads: this.config.get("EMERGENCY_DISABLE_UPLOADS", { infer: true }),
+      },
+      pilotUpload: {
+        enabled: this.config.get("PILOT_UPLOAD_ENABLED", { infer: true }),
+        orgConfigured: Boolean(this.config.get("PILOT_UPLOAD_ORG_ID", { infer: true })),
+        expiresAt: this.config.get("PILOT_UPLOAD_EXPIRES_AT", { infer: true }) ?? null,
+        windowOpen: pilotUploadWindowOpen({
+          emergencyDisableUploads: this.config.get("EMERGENCY_DISABLE_UPLOADS", { infer: true }),
+          pilotUploadEnabled: this.config.get("PILOT_UPLOAD_ENABLED", { infer: true }),
+          pilotUploadOrgId: this.config.get("PILOT_UPLOAD_ORG_ID", { infer: true }),
+          pilotUploadExpiresAt: this.config.get("PILOT_UPLOAD_EXPIRES_AT", { infer: true }),
+        }),
       },
       checks,
       queues,

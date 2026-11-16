@@ -25,6 +25,7 @@ import { PRISMA_CLIENT } from "../database/database.constants";
 import { OBJECT_STORAGE } from "../storage/storage.constants";
 import type { AuthenticatedUser } from "../types/express";
 import { DOCUMENT_PROCESS_JOB, DOCUMENTS_QUEUE_NAME } from "./documents.queue";
+import { assertPilotUploadAllowed } from "./pilot-upload-gate";
 
 @Injectable()
 export class DocumentsService {
@@ -71,12 +72,13 @@ export class DocumentsService {
     expectedByteSize?: number;
     requestId?: string;
   }) {
-    if (this.config.get("EMERGENCY_DISABLE_UPLOADS", { infer: true })) {
-      throw new BadRequestException({
-        message: "Document uploads are temporarily disabled by the operator.",
-        code: "EMERGENCY_DISABLE_UPLOADS",
-      });
-    }
+    assertPilotUploadAllowed({
+      organizationId: input.organizationId,
+      emergencyDisableUploads: this.config.get("EMERGENCY_DISABLE_UPLOADS", { infer: true }),
+      pilotUploadEnabled: this.config.get("PILOT_UPLOAD_ENABLED", { infer: true }),
+      pilotUploadOrgId: this.config.get("PILOT_UPLOAD_ORG_ID", { infer: true }),
+      pilotUploadExpiresAt: this.config.get("PILOT_UPLOAD_EXPIRES_AT", { infer: true }),
+    });
     if (input.expectedByteSize && input.expectedByteSize > this.maxBytes()) {
       throw new BadRequestException(`File exceeds maximum size of ${this.maxBytes()} bytes`);
     }

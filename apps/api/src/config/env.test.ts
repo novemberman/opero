@@ -275,6 +275,7 @@ describe("parseApiEnv", () => {
     expect(env.PUBLIC_REGISTRATION_ENABLED).toBe(true);
     expect(env.EMERGENCY_DISABLE_CHECKOUT).toBe(false);
     expect(env.EMERGENCY_DISABLE_UPLOADS).toBe(false);
+    expect(env.PILOT_UPLOAD_ENABLED).toBe(false);
     expect(env.LIVE_PILOT_ENABLED).toBe(false);
     expect(env.LIVE_PILOT_MAX_SUCCESSES).toBe(1);
     expect(env.PILOT_BOOTSTRAP_INVITE_TTL_HOURS).toBe(72);
@@ -325,11 +326,14 @@ describe("parseApiEnv", () => {
       REDIS_PASSWORD: "prod-redis-password",
       PILOT_MODE: "true",
       PUBLIC_REGISTRATION_ENABLED: "false",
+      EMERGENCY_DISABLE_UPLOADS: "true",
+      EMERGENCY_DISABLE_CHECKOUT: "true",
       PILOT_MAX_ORGANIZATIONS: "25",
       PILOT_MAX_USERS: "100",
     });
     expect(env.PILOT_MODE).toBe(true);
     expect(env.PUBLIC_REGISTRATION_ENABLED).toBe(false);
+    expect(env.EMERGENCY_DISABLE_UPLOADS).toBe(true);
     expect(env.PILOT_MAX_ORGANIZATIONS).toBe(25);
   });
 

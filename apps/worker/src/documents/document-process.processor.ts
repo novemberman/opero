@@ -74,6 +74,9 @@ export class DocumentProcessProcessor extends WorkerHost {
     if (!document) {
       throw new Error("Document not found for tenant context");
     }
+    // Tenant isolation: jobs are only enqueued after API upload gates
+    // (EMERGENCY_DISABLE_UPLOADS + optional PILOT_UPLOAD_* allowlist). Existing
+    // authorized jobs may finish after the upload window expires.
     if (!document.quarantineKey?.startsWith(`org/${organizationId}/`)) {
       throw new Error("Quarantine key organization mismatch");
     }
