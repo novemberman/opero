@@ -130,13 +130,15 @@ railway redeploy -s opero-api -e korapay-rehearsal \
 
 | Field | Value |
 |-------|-------|
-| Full SHA | `539e892f65c5a1b1bd5be82a3e862002a05679b3` |
-| Short | `539e892` |
-| Ahead of origin | +1 feature (+ stamp commit if present; local only; **not pushed**) |
+| Feature (code) SHA | `539e892f65c5a1b1bd5be82a3e862002a05679b3` (`539e892`) |
+| Docs stamp SHA | `c2f99cec833c6d47f92d0c3752d00d0cd0ad1e07` (`c2f99ce`) |
+| Tip vs feature | Tip may include docs-only stamp/clarify commits; API tree at tip ≡ feature for runtime |
+| Ahead of origin | Local only; **not pushed** |
 
 ---
 
 ## STOP FOR OWNER REVIEW
 
 **PASS** — R4B release candidate packaged locally.  
+**Release candidate SHA:** `539e892f65c5a1b1bd5be82a3e862002a05679b3`  
 **No push. No deploy. Uploads remain disabled.**
