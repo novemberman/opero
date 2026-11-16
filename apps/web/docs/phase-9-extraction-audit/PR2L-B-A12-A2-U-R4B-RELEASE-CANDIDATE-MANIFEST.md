@@ -5,7 +5,7 @@
 **Authorization used:** Local release preparation only (no push / no deploy)
 
 **Parent / current prod+rehearsal API:** `126d3b0571e12a1c969bce1c377bb5ecd41169fb`  
-**Release candidate SHA:** *(recorded after local commit below)*
+**Release candidate SHA:** `539e892f65c5a1b1bd5be82a3e862002a05679b3`
 
 ---
 
@@ -82,8 +82,8 @@ Upload initiation and payment paths are unchanged except completion now shares t
 |-------|-------|
 | Branch | `main` (local) |
 | Feature message | `fix(a12): recheck pilot upload gate on completeUpload (R4A)` |
-| Full SHA | **SEE §8 after commit** |
-| Base | `126d3b0` (current `origin/main` / prod / rehearsal API) |
+| Full SHA | `539e892f65c5a1b1bd5be82a3e862002a05679b3` |
+| Base | `126d3b0571e12a1c969bce1c377bb5ecd41169fb` (current `origin/main` / prod / rehearsal API) |
 
 Unrelated untracked audit docs were **not** staged.
 
@@ -130,9 +130,9 @@ railway redeploy -s opero-api -e korapay-rehearsal \
 
 | Field | Value |
 |-------|-------|
-| Full SHA | `PLACEHOLDER_PENDING_COMMIT` |
-| Short | `PLACEHOLDER` |
-| Ahead of origin | +1 (local only; **not pushed**) |
+| Full SHA | `539e892f65c5a1b1bd5be82a3e862002a05679b3` |
+| Short | `539e892` |
+| Ahead of origin | +1 feature (+ stamp commit if present; local only; **not pushed**) |
 
 ---
 
