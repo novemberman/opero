@@ -245,11 +245,11 @@ Local commit prepared with **allowlist-only** files (see §6.1).
 
 | Field | Value |
 |-------|-------|
-| Candidate SHA | `8a4159bdca59f7d0404cacd49ac94c68ec1d1f7f` |
-| Short | `8a4159b` |
-| Message | `feat(a12): add dormant pilot upload allowlist gate (A12-A2-U)` |
-| Branch | `main` (local only — not pushed) |
-| Parent | `f59e65e` (web pilot accept page) |
+| Feature RC SHA (code) | `8a4159bdca59f7d0404cacd49ac94c68ec1d1f7f` (`8a4159b`) |
+| Feature message | `feat(a12): add dormant pilot upload allowlist gate (A12-A2-U)` |
+| Local tip | `main` HEAD including this review (see `git log -3 --oneline`; **not pushed**) |
+| Deploy recommendation | API from tip of local `main` after R1, or from `8a4159b` for code-only |
+| Parent of feature | `f59e65e` (web pilot accept page) |
 
 Unrelated audit docs remain untracked/uncommitted.
 
