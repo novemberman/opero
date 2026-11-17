@@ -70,4 +70,13 @@ export class EntitlementsService {
       reportId,
     });
   }
+
+  /** Required to publish / generate a PDF for a report (D-P0-005). */
+  async canGenerateReport(organizationId: string, reportId: string): Promise<boolean> {
+    return this.hasEntitlement({
+      organizationId,
+      code: "xray.report_generate",
+      reportId,
+    });
+  }
 }

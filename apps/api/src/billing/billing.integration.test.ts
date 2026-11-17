@@ -15,6 +15,7 @@ import {
   cleanupPhase6,
   createOrganization,
   get,
+  grantReportGenerateAccess,
   post,
   resetDatabase,
   runDiagnostic,
@@ -67,6 +68,8 @@ describe("Phase 7A billing (mock Korapay)", () => {
     const path = `/organizations/${organizationId}/reports/${reportId}`;
     await post(app, owner, `${path}/submit-review`).send({}).expect(200);
     await post(app, owner, `${path}/approve`).send({}).expect(200);
+    // Publication requires generate entitlement; view/PDF stay locked until purchase.
+    await grantReportGenerateAccess(prisma, organizationId, reportId);
     await post(app, owner, `${path}/publish`).send({}).expect(200);
     return { owner, viewer, outsider, organizationId, otherOrganizationId, reportId, path };
   }
@@ -162,11 +165,18 @@ describe("Phase 7A billing (mock Korapay)", () => {
     const grants = await prisma.entitlementGrant.findMany({
       where: { organizationId: ctx.organizationId, scopeId: ctx.reportId },
     });
-    expect(grants.map((g) => g.code).sort()).toEqual([
+    const purchaseCodes = [
+      ...new Set(
+        grants
+          .filter((g) => g.sourceType === "PURCHASE")
+          .map((g) => g.code),
+      ),
+    ].sort();
+    expect(purchaseCodes).toEqual([
       "xray.full_report",
       "xray.pdf_download",
+      "xray.report_generate",
     ]);
-    expect(grants).toHaveLength(2);
 
     await get(app, ctx.viewer, `${ctx.path}/pdf`).expect(200);
     const unlocked = await get(app, ctx.viewer, ctx.path).expect(200);
@@ -225,9 +235,13 @@ describe("Phase 7A billing (mock Korapay)", () => {
     expect(replay.body.duplicate).toBe(true);
     expect(
       await prisma.entitlementGrant.count({
-        where: { organizationId: ctx.organizationId, scopeId: ctx.reportId },
+        where: {
+          organizationId: ctx.organizationId,
+          scopeId: ctx.reportId,
+          sourceType: "PURCHASE",
+        },
       }),
-    ).toBe(2);
+    ).toBe(3);
   });
 
   it("rejects amount and currency mismatches after provider verify", async () => {
@@ -360,9 +374,14 @@ describe("Phase 7A billing (mock Korapay)", () => {
     expect(["FULFILLED", "ALREADY_FULFILLED"]).toContain(final.body.fulfillment.status);
     expect(
       await prisma.entitlementGrant.count({
-        where: { organizationId: ctx.organizationId, scopeId: ctx.reportId, revokedAt: null },
+        where: {
+          organizationId: ctx.organizationId,
+          scopeId: ctx.reportId,
+          revokedAt: null,
+          sourceType: "PURCHASE",
+        },
       }),
-    ).toBe(2);
+    ).toBe(3);
   });
 
   it("expires subscription benefits while retaining one-time report purchases", async () => {
@@ -453,6 +472,7 @@ describe("Phase 7A billing (mock Korapay)", () => {
     expect(purchaseGrants.map((g) => g.code).sort()).toEqual([
       "xray.full_report",
       "xray.pdf_download",
+      "xray.report_generate",
     ]);
     await get(app, ctx.viewer, `${ctx.path}/pdf`).expect(200);
   });
@@ -564,9 +584,14 @@ describe("Phase 7A billing (mock Korapay)", () => {
     expect(replay.body.fulfillment.status).toBe("ALREADY_FULFILLED");
     expect(
       await prisma.entitlementGrant.count({
-        where: { organizationId: ctx.organizationId, scopeId: ctx.reportId, revokedAt: null },
+        where: {
+          organizationId: ctx.organizationId,
+          scopeId: ctx.reportId,
+          revokedAt: null,
+          sourceType: "PURCHASE",
+        },
       }),
-    ).toBe(2);
+    ).toBe(3);
 
     await get(app, ctx.viewer, `${ctx.path}/pdf`).expect(200);
 
@@ -601,6 +626,7 @@ describe("Phase 7A billing (mock Korapay)", () => {
     const siblingPath = `/organizations/${ctx.organizationId}/reports/${siblingId}`;
     await post(app, ctx.owner, `${siblingPath}/submit-review`).send({}).expect(200);
     await post(app, ctx.owner, `${siblingPath}/approve`).send({}).expect(200);
+    await grantReportGenerateAccess(prisma, ctx.organizationId, siblingId);
     await post(app, ctx.owner, `${siblingPath}/publish`).send({}).expect(200);
 
     // Purchase sibling separately so it remains accessible after chargeback on primary.

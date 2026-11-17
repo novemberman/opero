@@ -23,6 +23,7 @@ import {
   seedDocument,
   signUp,
   testPrisma,
+  grantReportGenerateAccess,
 } from "../testing/phase6-fixtures";
 
 class InstrumentedMockProvider extends MockKorapayProvider {
@@ -86,6 +87,7 @@ describe("A12-P3-R2 live-pilot concurrency hardening", () => {
     const path = `/organizations/${organizationId}/reports/${reportId}`;
     await post(app, owner, `${path}/submit-review`).send({}).expect(200);
     await post(app, owner, `${path}/approve`).send({}).expect(200);
+    await grantReportGenerateAccess(prisma, organizationId, reportId);
     await post(app, owner, `${path}/publish`).send({}).expect(200);
     return { owner, outsider, organizationId, otherOrganizationId, reportId };
   }

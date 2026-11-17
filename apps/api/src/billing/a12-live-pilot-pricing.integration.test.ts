@@ -18,6 +18,7 @@ import {
   seedDocument,
   signUp,
   testPrisma,
+  grantReportGenerateAccess,
 } from "../testing/phase6-fixtures";
 
 describe("A12-P2 live-pilot pricing controls", () => {
@@ -45,6 +46,7 @@ describe("A12-P2 live-pilot pricing controls", () => {
     const path = `/organizations/${organizationId}/reports/${reportId}`;
     await post(app, owner, `${path}/submit-review`).send({}).expect(200);
     await post(app, owner, `${path}/approve`).send({}).expect(200);
+    await grantReportGenerateAccess(prisma, organizationId, reportId);
     await post(app, owner, `${path}/publish`).send({}).expect(200);
     return { owner, outsider, organizationId, otherOrganizationId, reportId };
   }
@@ -219,6 +221,7 @@ describe("A12-P2 live-pilot pricing controls", () => {
       const otherPath = `/organizations/${otherOrganizationId}/reports/${otherReportId}`;
       await post(app, outsider, `${otherPath}/submit-review`).send({}).expect(200);
       await post(app, outsider, `${otherPath}/approve`).send({}).expect(200);
+      await grantReportGenerateAccess(prisma, otherOrganizationId, otherReportId);
       await post(app, outsider, `${otherPath}/publish`).send({}).expect(200);
       await app.close();
 
@@ -321,8 +324,10 @@ describe("A12-P2 live-pilot pricing controls", () => {
           organizationId,
           scopeId: reportId,
           revokedAt: null,
+          sourceType: { in: ["PURCHASE", "SUBSCRIPTION"] },
         },
       });
+      // Fixture may hold MANUAL xray.report_generate for publish; paid grants stay 0 until settle.
       expect(grantsBeforeSettle).toBe(0);
 
       const audit = await prisma.auditEvent.findFirst({

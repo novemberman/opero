@@ -10,14 +10,15 @@ import { getCookie, mergeCookies } from "./app-factory";
 import type { MemoryEmailService } from "./memory-email.service";
 import { deletePhase6Data } from "./phase6-cleanup";
 
-/** Test-only: grants report-scoped X-Ray Pro entitlements without a payment. */
-export async function grantXrayProAccess(
+/** Test-only: upsert a report-scoped entitlement grant without a payment. */
+async function grantReportScoped(
   prisma: PrismaClient,
   organizationId: string,
   reportId: string,
-  sourceId = `test_${randomUUID()}`,
+  codes: readonly string[],
+  sourceId: string,
 ): Promise<void> {
-  for (const code of XRAY_PRO_ENTITLEMENTS) {
+  for (const code of codes) {
     await prisma.entitlementGrant.upsert({
       where: {
         organizationId_code_scopeType_scopeId_sourceId: {
@@ -40,6 +41,29 @@ export async function grantXrayProAccess(
       update: { revokedAt: null, revokeReason: null, validUntil: null },
     });
   }
+}
+
+/**
+ * Test-only: allows PDF publication without unlocking view/download.
+ * Models paying for generation separately from full X-Ray Pro unlock in fixtures.
+ */
+export async function grantReportGenerateAccess(
+  prisma: PrismaClient,
+  organizationId: string,
+  reportId: string,
+  sourceId = `test_gen_${randomUUID()}`,
+): Promise<void> {
+  await grantReportScoped(prisma, organizationId, reportId, ["xray.report_generate"], sourceId);
+}
+
+/** Test-only: grants report-scoped X-Ray Pro entitlements without a payment. */
+export async function grantXrayProAccess(
+  prisma: PrismaClient,
+  organizationId: string,
+  reportId: string,
+  sourceId = `test_${randomUUID()}`,
+): Promise<void> {
+  await grantReportScoped(prisma, organizationId, reportId, XRAY_PRO_ENTITLEMENTS, sourceId);
 }
 
 export type TestSession = {

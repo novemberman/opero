@@ -65,8 +65,8 @@ describe("X-Ray reports integration", () => {
     const path = `/organizations/${organizationId}/reports/${reportId}`;
     await post(app, publisher, `${path}/submit-review`).send({}).expect(200);
     await post(app, publisher, `${path}/approve`).send({}).expect(200);
-    const published = await post(app, publisher, `${path}/publish`).send({}).expect(200);
     await grantXrayProAccess(prisma, organizationId, reportId);
+    const published = await post(app, publisher, `${path}/publish`).send({}).expect(200);
     return published;
   }
 
@@ -178,10 +178,14 @@ describe("X-Ray reports integration", () => {
     expect(approved.body.report.status).toBe("APPROVED");
     await post(app, analyst, `${path}/publish`).send({}).expect(403);
 
+    const deniedGenerate = await post(app, owner, `${path}/publish`)
+      .send({ note: "Approved for release" })
+      .expect(403);
+    expect(deniedGenerate.body.code).toBe("ENTITLEMENT_REQUIRED");
+    await grantXrayProAccess(prisma, organizationId, reportId);
     const published = await post(app, owner, `${path}/publish`)
       .send({ note: "Approved for release" })
       .expect(200);
-    await grantXrayProAccess(prisma, organizationId, reportId);
     expect(published.body.report).toMatchObject({
       status: "PUBLISHED",
       verifiedPublication: true,
@@ -474,6 +478,7 @@ describe("X-Ray reports integration", () => {
       data: { deletionStatus: "ACTIVE", deletedAt: null },
     });
 
+    await grantXrayProAccess(prisma, organizationId, reportId);
     const published = await post(app, owner, `${path}/publish`).send({}).expect(200);
     expect(published.body.report.status).toBe("PUBLISHED");
   });
@@ -604,8 +609,8 @@ describe("X-Ray reports integration", () => {
     expect((await get(app, owner, path).expect(200)).body.report.status).toBe("REVIEW_REQUIRED");
 
     await post(app, admin, `${path}/approve`).send({ note: "Checked" }).expect(200);
-    const published = await post(app, admin, `${path}/publish`).send({}).expect(200);
     await grantXrayProAccess(prisma, organizationId, reportId);
+    const published = await post(app, admin, `${path}/publish`).send({}).expect(200);
     expect(published.body.report).toMatchObject({ status: "PUBLISHED", verifiedPublication: true });
     const contentHash = (published.body.report.versions[0] as VersionSummary).contentHash;
     await download(app, viewer, `${path}/pdf`).expect(200);

@@ -159,12 +159,12 @@ describe("Phase 6 complete workflow", () => {
     await post(app, owner, `${org}/reports/${reportId}/approve`)
       .send({ note: "Owner acceptance approval" })
       .expect(200);
+    await grantXrayProAccess(prisma, organizationId, reportId);
     const published = await post(app, owner, `${org}/reports/${reportId}/publish`)
       .send({})
       .expect(200);
     expect(published.body.report.status).toBe("PUBLISHED");
     expect(published.body.preview.verifiedPublication).toBe(scoreBefore.status === "SCORED");
-    await grantXrayProAccess(prisma, organizationId, reportId);
 
     // 7. Private PDF download (requires commercial entitlement after Phase 7A)
     const pdf = await get(app, owner, `${org}/reports/${reportId}/pdf`)

@@ -209,8 +209,8 @@ describe("Phase 6B publication integrity", () => {
 
   async function publishedReport(): Promise<Report & { version: VersionSummary }> {
     const report = await approvedReport();
-    await post(app, owner, `${report.path}/publish`).send({}).expect(200);
     await grantXrayProAccess(prisma, organizationId, report.reportId);
+    await post(app, owner, `${report.path}/publish`).send({}).expect(200);
     return { ...report, version: await currentVersion(report) };
   }
 
@@ -417,6 +417,7 @@ describe("Phase 6B publication integrity", () => {
     const { aiVersionId } = await interpret(groundedNarrative());
     expect(await flagsOf(aiVersionId)).toEqual([]);
     const clean = await approvedReport(aiVersionId);
+    await grantXrayProAccess(prisma, organizationId, clean.reportId);
     await post(app, owner, `${clean.path}/publish`).send({}).expect(200);
   });
 
@@ -506,8 +507,8 @@ describe("Phase 6B publication integrity", () => {
       criticalCount: 0,
     });
 
-    const published = await post(app, owner, `${report.path}/publish`).send({}).expect(200);
     await grantXrayProAccess(prisma, organizationId, report.reportId);
+    const published = await post(app, owner, `${report.path}/publish`).send({}).expect(200);
     expect(published.body.report.status).toBe("PUBLISHED");
     const versions = published.body.report.versions as VersionSummary[];
     expect(versions.map((v) => [v.versionNumber, v.status, v.aiInterpretationVersionId])).toEqual([
@@ -678,8 +679,8 @@ describe("Phase 6B publication integrity", () => {
     const secondVersionId = revised.body.report.versions[0].id as string;
     await post(app, owner, `${report.path}/submit-review`).send({}).expect(200);
     await post(app, owner, `${report.path}/approve`).send({}).expect(200);
-    const republished = await post(app, owner, `${report.path}/publish`).send({}).expect(200);
     await grantXrayProAccess(prisma, organizationId, report.reportId);
+    const republished = await post(app, owner, `${report.path}/publish`).send({}).expect(200);
     const versions = republished.body.report.versions as VersionSummary[];
     expect(versions.map((v) => [v.versionNumber, v.status])).toEqual([
       [2, "PUBLISHED"],
@@ -713,6 +714,7 @@ describe("Phase 6B publication integrity", () => {
 
   it("refuses to publish over an object that already exists at the version's key", async () => {
     const report = await approvedReport();
+    await grantXrayProAccess(prisma, organizationId, report.reportId);
     const key = reportStorageKey(organizationId, report.reportId, report.versionId);
     const existing = Buffer.from("%PDF-written-by-an-earlier-publisher");
     await storage.putObject({ bucket, key, body: existing, contentType: "application/pdf" });
@@ -750,8 +752,8 @@ describe("Phase 6B publication integrity", () => {
     await post(app, owner, `${report.path}/versions`).send({}).expect(201);
     await post(app, owner, `${report.path}/submit-review`).send({}).expect(200);
     await post(app, owner, `${report.path}/approve`).send({}).expect(200);
-    const published = await post(app, owner, `${report.path}/publish`).send({}).expect(200);
     await grantXrayProAccess(prisma, organizationId, report.reportId);
+    const published = await post(app, owner, `${report.path}/publish`).send({}).expect(200);
     const latest = published.body.report.versions[0] as VersionSummary;
     expect(latest.storageKey).not.toBe(key);
     const pdf = await download(app, owner, `${report.path}/pdf`).expect(200);
@@ -807,8 +809,8 @@ describe("Phase 6B publication integrity", () => {
     await post(app, owner, `${report.path}/versions`).send({}).expect(201);
     await post(app, owner, `${report.path}/submit-review`).send({}).expect(200);
     await post(app, owner, `${report.path}/approve`).send({}).expect(200);
-    await post(app, owner, `${report.path}/publish`).send({}).expect(200);
     await grantXrayProAccess(prisma, organizationId, report.reportId);
+    await post(app, owner, `${report.path}/publish`).send({}).expect(200);
     const replacement = await download(app, viewer, `${report.path}/pdf`).expect(200);
     expect(replacement.headers["content-disposition"]).toContain("opero-xray-report-v2.pdf");
     const lost = await get(app, viewer, `${report.path}/pdf?versionId=${report.versionId}`).expect(
@@ -870,6 +872,7 @@ describe("Phase 6B publication integrity", () => {
 
   it("publishes exactly once when publication is requested concurrently", async () => {
     const report = await approvedReport();
+    await grantXrayProAccess(prisma, organizationId, report.reportId);
     const reports = app.get(ReportsService);
     const user = await prisma.user.findUniqueOrThrow({ where: { id: owner.userId } });
     const actor = {

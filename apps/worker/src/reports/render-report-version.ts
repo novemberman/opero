@@ -26,6 +26,9 @@ function sha256(buffer: Buffer): string {
 /**
  * Verifies a published PDF artifact. Never regenerates or overwrites.
  * Missing or corrupt objects fail closed with an integrity audit event.
+ *
+ * PDF generation itself is API-only (`ReportsService.publishInner`) and requires
+ * `xray.report_generate` (D-P0-005). This worker path must not create objects.
  */
 export async function renderReportVersion(
   prisma: PrismaClient,

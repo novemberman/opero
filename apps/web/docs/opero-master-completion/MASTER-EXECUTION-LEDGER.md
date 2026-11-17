@@ -26,11 +26,11 @@ Pilot doc `cc04b221-…`: **READY** / **SUCCEEDED** after OWNER status read; 19 
 | M3 | Financial intelligence engine | COMPLETE (local RC) | diagnostics 72 PASS; READY gate; missing KPIs added; deploy pending |
 | M4 | AI interpretation | COMPLETE (local RC) | `ai.interpret.v2` + grounding; mock PASS; live OpenAI unverified |
 | M5 | Reporting | COMPLETE (local RC) | PDF/model + lifecycle IT + FREE_PREVIEW UI; no prod reports |
-| M6 | Billing / entitlements | VALIDATED mock / BLOCKED live | billing integration PASS; Korapay external |
-| M7 | Customer experience | PARTIAL | Confirm UX shipped locally; broader CX polish deferred |
-| M8 | Security / reliability | DOCUMENTED + security IT PASS | No prod changes |
-| M9 | Comprehensive QA | PARTIAL | Strong API/package evidence; browser E2E gap |
-| M10 | Release / commercial readiness | DOCS COMPLETE | FINAL-OWNER-REVIEW; deploy blocked |
+| M6 | Billing / entitlements | COMPLETE local mock / BLOCKED live | D-P0-005 generate gate; Korapay external |
+| M7 | Customer experience | COMPLETE (billing/members) | JSON dumps removed; residual list polish |
+| M8 | Security / reliability | COMPLETE local audit | Shared-bucket plan only; no remap |
+| M9 | Comprehensive QA | COMPLETE composable + Docker PW | Live providers not claimed |
+| M10 | Release / commercial readiness | COMPLETE docs | Rehearsal GO; commercial launch NO-GO |
 
 ---
 
@@ -139,6 +139,20 @@ Incorporated findings from frontend + backend architecture audits.
 **External:** Live OpenAI unverified. No push/deploy. D-P0-005 generate entitlement still open.
 
 **Local RC:** `4f7b19361f1cab0fa073b61f8bbdb5e24b00f634` (not pushed).
+
+**Boundary:** **STOP FOR OWNER REVIEW.**
+
+### 2026-11-17 — M6–M10 billing, CX, security, E2E, release pack (local RC)
+
+**Scope:** Enforce `xray.report_generate` on publish; grant with X-Ray Pro + OS plans; polish billing/members CX; security audit + shared-bucket plan; composable E2E evidence; final release docs.
+
+**Migration:** `20261117120000_m6_report_generate_entitlement`
+
+**Tests:** diagnostics 72 · ai 151 · reports 61 · web 99 · billing/reports/phase6/security IT PASS · Docker Playwright 5/5
+
+**Docs:** M6–M10 acceptance + `MASTER-FINAL-COMPLETION-REPORT.md`
+
+**External:** Live Korapay + live OpenAI unverified. No push/deploy.
 
 **Boundary:** **STOP FOR OWNER REVIEW.**
 

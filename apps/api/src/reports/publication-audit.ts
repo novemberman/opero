@@ -58,7 +58,13 @@ export function classifyPublicationFailure(code: string): PublicationFailureClas
   if (RECON_CODES.has(code)) return "RECONCILIATION";
   if (APPROVAL_CODES.has(code)) return "APPROVAL";
   if (INTEGRITY_CODES.has(code)) return "INTEGRITY";
-  if (code === "MISSING_PERMISSION" || code === "NOT_A_MEMBER") return "PERMISSION";
+  if (
+    code === "MISSING_PERMISSION" ||
+    code === "NOT_A_MEMBER" ||
+    code === "ENTITLEMENT_REQUIRED"
+  ) {
+    return "PERMISSION";
+  }
   if (
     code === "INVALID_STATE" ||
     code === "ALREADY_PUBLISHED" ||

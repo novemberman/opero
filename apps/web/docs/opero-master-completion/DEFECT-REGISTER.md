@@ -1,6 +1,6 @@
 # Defect Register
 
-**Updated:** 2026-11-17 (M4+M5 local RC)  
+**Updated:** 2026-11-17 (M6–M10 local RC)  
 **Status key:** OPEN / FIXED_LOCAL / BLOCKED_EXTERNAL / ACCEPTED_RISK
 
 | ID | Sev | Title | Status | Evidence / notes |
@@ -11,7 +11,7 @@
 | D-P2-009 | P2 | Live OpenAI interpretation unverified in this program | BLOCKED_EXTERNAL | Provider-neutral architecture + mock/fake IT PASS; production keys/cost not exercised. |
 | D-P0-003 | P0 | Worker may set document `READY` while lines still PENDING | OPEN | Mitigated by eligibility/readiness + post-review reconcile; worker initial status still may open READY before confirms. `document-process.processor.ts`. |
 | D-P0-004 | P0 | B2.2 concepts extractable but unused in KPI formulas | OPEN | Partial M3: ROA/ROE/asset turnover/profit growth/margin movement/debt-to-assets/cash coverage + PBT/tax/BS identity checks. Remaining unused: investing/financing/net cash change, share capital, retained earnings, tax payable as standalone KPIs. |
-| D-P0-005 | P0 | `xray.report_generate` entitlement never enforced | OPEN | Create/publish free; only view/PDF gated. Product decision before enforcing. |
+| D-P0-005 | P0 | `xray.report_generate` entitlement never enforced | FIXED_LOCAL | Publish requires `xray.report_generate` after integrity gates; granted via `XRAY_PRO_ENTITLEMENTS` + OS plan migration. Draft/review remain free. Needs API deploy + migration. |
 | D-P1-001 | P1 | Document stays `REVIEW_REQUIRED` after material confirms | FIXED | `reconcileDocumentReviewStatus` on review **and** `status()` (M2-P4/P5). Prod API `77ecbf6…` (`baa04a73-…`); pilot doc reconciled READY on OWNER status read. |
 | D-P1-002 | P1 | Confirm UX ambiguous (dropdown vs Submit) | FIXED_LOCAL | One-click Confirm; Correct/Reject secondary. |
 | D-P1-003 | P1 | Korapay hosted checkout / settlement unverified | BLOCKED_EXTERNAL | Gate C unresolved. |
@@ -20,7 +20,7 @@
 | D-P1-006 | P1 | CSRF exempt matching used `includes`/`endsWith` | FIXED_LOCAL | Exact `/api/v1`-relative allowlist; nested only where intended. |
 | D-P1-007 | P1 | Multer 25 MiB vs `DOCUMENT_MAX_BYTES` 20 MiB | FIXED_LOCAL | Multer limit aligned to 20 MiB. |
 | D-P1-008 | P1 | “Continue to readiness / review” navigated away from line review | FIXED_LOCAL | Primary CTA scrolls to `#extracted-figures`. |
-| D-P1-009 | P1 | Billing / reports / members UI unfinished (JSON dumps) | OPEN | Frontend audit; DS inconsistency. |
+| D-P1-009 | P1 | Billing / reports / members UI unfinished (JSON dumps) | FIXED_LOCAL | Billing + members structured UI (M7). Reports list polish still uneven. |
 | D-P1-010 | P1 | Diagnostics can start without readiness READY | FIXED_LOCAL | API requires `processingStatus=READY`; web lists READY-only. Soft INSUFFICIENT_DATA remains for incomplete confirmed sets. |
 | D-P1-011 | P1 | Upload retention purge not implemented | OPEN | Soft-delete + `retentionUntil` metadata only. |
 | D-P2-001 | P2 | Shared physical S3 bucket prefixes | ACCEPTED_RISK | Owner-approved migration only. |

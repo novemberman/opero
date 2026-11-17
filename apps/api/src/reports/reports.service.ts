@@ -634,6 +634,34 @@ export class ReportsService {
     // Final narrative must pass critical grounding again at publish time.
     const groundingValidation = assertNoCriticalGrounding(payload, "publish");
 
+    // Commercial gate after integrity gates, before PDF bytes are produced (D-P0-005).
+    // Draft/review stay free; publication is paid (X-Ray Pro or OS plan).
+    const canGenerate = await this.entitlements.canGenerateReport(
+      input.organizationId,
+      input.reportId,
+    );
+    if (!canGenerate) {
+      await this.audit.record({
+        action: "billing.entitlement_denied",
+        entityType: "xray_report",
+        entityId: input.reportId,
+        organizationId: input.organizationId,
+        actorUserId: input.actor.id,
+        requestId: input.requestId,
+        metadata: {
+          entitlement: "xray.report_generate",
+          reason: "MISSING_ENTITLEMENT",
+          versionId: version.id,
+        },
+      });
+      throw new ForbiddenException({
+        message:
+          "X-Ray Pro or an active Opero OS subscription is required to generate and publish this report PDF",
+        code: "ENTITLEMENT_REQUIRED",
+        productCode: "XRAY_PRO",
+      });
+    }
+
     // Without a produced score the report is published limitations-forward only.
     // Contaminated historical snapshots also cannot be verified publications.
     const integrity = await this.diagnosticIntegrity(input.organizationId, run.id);
