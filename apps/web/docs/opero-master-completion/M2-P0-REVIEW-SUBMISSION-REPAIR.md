@@ -2,7 +2,7 @@
 
 **Verdict: PASS (local) / BLOCKED (Playwright host libs + production deploy)**  
 **Date:** 2026-11-17  
-**Local tip SHA (after this change set):** *(see git commit below)*  
+**Local tip SHA (after this change set):** `430fa49ecb223aa3755a18d79168da796dbb7e25`*  
 **Production web still:** `f59e65e6f220f96f58d08868a75aaa4d91bc384a` (dropdown + “Submit review”)
 
 ---
