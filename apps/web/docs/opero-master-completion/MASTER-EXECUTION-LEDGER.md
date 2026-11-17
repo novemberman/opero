@@ -154,6 +154,8 @@ Incorporated findings from frontend + backend architecture audits.
 
 **External:** Live Korapay + live OpenAI unverified. No push/deploy.
 
+**Local RC:** `3e64963fe2e0688c5e1227d6bb8c9beddfb3649c` (not pushed).
+
 **Boundary:** **STOP FOR OWNER REVIEW.**
 
 ---

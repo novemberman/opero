@@ -1,8 +1,9 @@
 # M10 RELEASE READINESS
 
 **Date:** 2026-11-17  
-**Integrated local RC tip:** *(filled at commit)*  
-**Feature code tip (M6–M10):** *(filled at commit)*  
+**Integrated local RC tip:** `3e64963fe2e0688c5e1227d6bb8c9beddfb3649c`  
+**Feature code tip (M6–M10):** `3e64963fe2e0688c5e1227d6bb8c9beddfb3649c`  
+
 
 ## Feature-completion inventory
 
