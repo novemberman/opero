@@ -174,7 +174,7 @@ Incorporated findings from frontend + backend architecture audits.
 
 **Doc:** `FINAL-INTEGRATED-RELEASE-STABILIZATION.md`
 
-**Local RC tip:** `92d835ab93d066512efbfc8fcb50db4cd45b11cd`
+**Local RC tip:** `62ca85bb77bd8dbf128dd297db379ef8f94f9c32`
 **Stabilization feature SHA:** `a27806648dd5f708072dbd58a305f9a1a43f4143`
 
 **Verdict:** **PARTIAL PASS** — internal blockers locally cleared; Korapay Gate C + live AI external; commercial **NO-GO**; rehearsal **GO** after owner deploy auth.
