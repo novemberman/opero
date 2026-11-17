@@ -214,6 +214,25 @@ export default function DiagnosticRunPage() {
             </p>
           )}
         </div>
+        {(() => {
+          const missing = metrics.filter((m) => m.status === "INSUFFICIENT_INPUTS");
+          const undefinedMath = metrics.filter((m) => m.status === "UNDEFINED");
+          const incompatible = metrics.filter((m) => m.status === "INCOMPATIBLE");
+          if (!missing.length && !undefinedMath.length && !incompatible.length) return null;
+          return (
+            <Alert tone="warning" title="Missing or blocked metric inputs">
+              <p>
+                {missing.length ? `${missing.length} insufficient` : null}
+                {missing.length && (undefinedMath.length || incompatible.length) ? " · " : null}
+                {undefinedMath.length ? `${undefinedMath.length} undefined` : null}
+                {undefinedMath.length && incompatible.length ? " · " : null}
+                {incompatible.length ? `${incompatible.length} incompatible` : null}
+                . Missing values are not treated as zero; confirm source figures or supply comparable
+                periods where required.
+              </p>
+            </Alert>
+          );
+        })()}
         <MetricDimensionSections metrics={metrics} />
       </section>
 

@@ -49,6 +49,23 @@ function scoreProfitability(metrics: MetricResult[]): { score: number | null; co
     codes.push("REVENUE_GROWTH");
     parts.push(bandScore(growth, [{ max: -0.05, score: 30 }, { max: 0, score: 45 }, { max: 0.1, score: 65 }, { max: Infinity, score: 80 }]));
   }
+  const roa = metricValue(metrics, "RETURN_ON_ASSETS");
+  if (roa != null) {
+    codes.push("RETURN_ON_ASSETS");
+    parts.push(bandScore(roa, [{ max: 0, score: 25 }, { max: 0.05, score: 50 }, { max: 0.15, score: 70 }, { max: Infinity, score: 85 }]));
+  }
+  const roe = metricValue(metrics, "RETURN_ON_EQUITY");
+  if (roe != null) {
+    codes.push("RETURN_ON_EQUITY");
+    parts.push(bandScore(roe, [{ max: 0, score: 25 }, { max: 0.08, score: 50 }, { max: 0.2, score: 70 }, { max: Infinity, score: 85 }]));
+  }
+  const profitGrowth = metricValue(metrics, "PROFIT_GROWTH");
+  if (profitGrowth != null) {
+    codes.push("PROFIT_GROWTH");
+    parts.push(
+      bandScore(profitGrowth, [{ max: -0.05, score: 30 }, { max: 0, score: 45 }, { max: 0.1, score: 65 }, { max: Infinity, score: 80 }]),
+    );
+  }
   if (!parts.length) return { score: null, codes };
   return { score: Math.round(parts.reduce((a, b) => a + b, 0) / parts.length), codes };
 }
@@ -71,6 +88,13 @@ function scoreLiquidity(metrics: MetricResult[]): { score: number | null; codes:
     codes.push("WORKING_CAPITAL");
     parts.push(wc >= 0 ? 75 : 30);
   }
+  const cashCoverage = metricValue(metrics, "CASH_COVERAGE");
+  if (cashCoverage != null) {
+    codes.push("CASH_COVERAGE");
+    parts.push(
+      bandScore(cashCoverage, [{ max: 1, score: 25 }, { max: 2, score: 45 }, { max: 4, score: 70 }, { max: Infinity, score: 85 }]),
+    );
+  }
   if (!parts.length) return { score: null, codes };
   return { score: Math.round(parts.reduce((a, b) => a + b, 0) / parts.length), codes };
 }
@@ -88,6 +112,11 @@ function scoreLeverage(metrics: MetricResult[]): { score: number | null; codes: 
     codes.push("DEBT_TO_EQUITY");
     parts.push(bandScore(de, [{ max: 0.5, score: 85 }, { max: 1, score: 65 }, { max: 2, score: 40 }, { max: Infinity, score: 20 }]));
   }
+  const da = metricValue(metrics, "DEBT_TO_ASSETS");
+  if (da != null) {
+    codes.push("DEBT_TO_ASSETS");
+    parts.push(bandScore(da, [{ max: 0.3, score: 85 }, { max: 0.5, score: 65 }, { max: 0.7, score: 40 }, { max: Infinity, score: 20 }]));
+  }
   const ic = metricValue(metrics, "INTEREST_COVERAGE");
   if (ic != null) {
     codes.push("INTEREST_COVERAGE");
@@ -100,6 +129,13 @@ function scoreLeverage(metrics: MetricResult[]): { score: number | null; codes: 
 function scoreEfficiency(metrics: MetricResult[]): { score: number | null; codes: string[] } {
   const codes: string[] = [];
   const parts: number[] = [];
+  const assetTurnover = metricValue(metrics, "ASSET_TURNOVER");
+  if (assetTurnover != null) {
+    codes.push("ASSET_TURNOVER");
+    parts.push(
+      bandScore(assetTurnover, [{ max: 0.5, score: 35 }, { max: 1, score: 55 }, { max: 1.5, score: 75 }, { max: Infinity, score: 85 }]),
+    );
+  }
   const dso = metricValue(metrics, "DSO");
   if (dso != null) {
     codes.push("DSO");

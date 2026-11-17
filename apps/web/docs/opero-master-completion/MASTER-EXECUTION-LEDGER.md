@@ -4,16 +4,16 @@
 **Workspace SHA at start:** `bc1567a70c54a16c776390f887d8ca9cb8636859`  
 **Mode:** Local implementation + local tests only (no push, no deploy, no production mutations)
 
-## Production baseline (revalidated 2026-11-17 M2-P4)
+## Production baseline (revalidated 2026-11-17 M2-P5)
 
 | Service | Deploy commit | Notes |
 |---------|---------------|-------|
-| API | `bc1567a70c54a16c776390f887d8ca9cb8636859` | Lacks status-poll reconcile; `/ready.version` stamp still `31749a3…` |
+| API | `77ecbf6b4954387888bfda24dc747ac038fa6175` | Status-poll reconcile live (`baa04a73-…`); `/ready.version` env stamp still `31749a3…` |
 | Web | `15299f14affb4b0c710462329d84f4f0d6c3f395` | Confirm UX + confirmed-figure visibility |
 | Worker | `31749a375ae5d7a89a66fc6dba05636988429ce3` | |
 
 Gates: uploads emergency **on**, checkout emergency **on**, public registration **off**, pilot upload **off**.  
-Pilot doc `cc04b221-…`: **18/18** mapped CONFIRMED + optional PPE CONFIRMED; badge still `REVIEW_REQUIRED` until API RC deploy. Migrations: **14**.
+Pilot doc `cc04b221-…`: **READY** / **SUCCEEDED** after OWNER status read; 19 CONFIRMED; 1 reconcile audit. Migrations: **14**.
 
 ---
 
@@ -22,8 +22,8 @@ Pilot doc `cc04b221-…`: **18/18** mapped CONFIRMED + optional PPE CONFIRMED; b
 | ID | Milestone | Local status | Notes |
 |----|-----------|--------------|-------|
 | M1 | Architecture & defect audit | COMPLETE (local docs) | ARCHITECTURE-AUDIT / DEFECT-REGISTER |
-| M2 | Extraction / review / readiness | COMPLETE (local) + M2-P4 RC | Confirm UX + visibility + status-poll reconcile; prod API deploy pending |
-| M3 | Financial intelligence engine | VALIDATED (local) | diagnostics 65 PASS |
+| M2 | Extraction / review / readiness | COMPLETE (prod API M2-P5) | Confirm UX + visibility + status-poll reconcile live on prod API `77ecbf6…` |
+| M3 | Financial intelligence engine | COMPLETE (local RC) | diagnostics 72 PASS; READY gate; missing KPIs added; deploy pending |
 | M4 | AI interpretation | VALIDATED (local) | ai 151 PASS |
 | M5 | Reporting | VALIDATED (local) | reports 61 PASS |
 | M6 | Billing / entitlements | VALIDATED mock / BLOCKED live | billing integration PASS; Korapay external |
@@ -96,6 +96,28 @@ Incorporated findings from frontend + backend architecture audits.
 
 **Doc:** `M2-P4-READINESS-RECONCILIATION.md`  
 **Boundary:** stop for owner **API-only** deploy authorization. No push/deploy from this gate.
+
+### 2026-11-17 — M2-P5 readiness reconciliation API release
+
+**Authorization:** `AUTHORIZE OPERO M2-P5 API RELEASE`
+
+**Released:** API-only tip `77ecbf6…` (feature `eccef00` + race-safe harden). Rehearsal `a1490cb7-…` → production `baa04a73-…`. Web/worker unchanged. Migrations none pending.
+
+**Acceptance:** OWNER status GET → pilot doc **READY**/**SUCCEEDED**; one `document.review_status_reconciled`; figures/reviews unchanged; emergencies intact.
+
+**Doc:** `M2-P5-READINESS-API-RELEASE-REPORT.md`  
+**Boundary:** **STOP FOR OWNER REVIEW.**
+
+### 2026-11-17 — M3 financial diagnostics + Business Health Score (local RC)
+
+**Scope:** Local engine/API/UI completion for required profitability/liquidity/solvency/efficiency/growth KPIs; BHS transparency preserved; READY start gate; NGN golden fixture identities; no prod diagnostic execution, push, or deploy.
+
+**Engine adds:** `RETURN_ON_ASSETS`, `RETURN_ON_EQUITY`, `DEBT_TO_ASSETS`, `ASSET_TURNOVER`, `PROFIT_GROWTH`, `NET_MARGIN_MOVEMENT`, `CASH_COVERAGE`; quality identities for GP/op/PBT/net/BS; score bands consume new metrics when computed.
+
+**Evidence:** diagnostics **72 PASS**; API diagnostics/readiness IT **6 PASS**; web presentation **11 PASS**; typecheck/build PASS; Playwright **BLOCKED** (host perms/libs).
+
+**Doc:** `M3-FINANCIAL-DIAGNOSTICS-ACCEPTANCE.md`  
+**Boundary:** **STOP FOR OWNER REVIEW** at release (push/deploy/prod diagnostic run require separate authorization).
 
 ---
 

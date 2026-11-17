@@ -50,6 +50,14 @@ export class DiagnosticsService {
         "One or more documents are missing, not clean-scanned, or not in this organization",
       );
     }
+    // Diagnostics require READY evidence state so incomplete review badges cannot start a run.
+    // Unconfirmed lines still soft-fail to INSUFFICIENT_DATA inside the engine.
+    const notReady = documents.filter((doc) => doc.processingStatus !== "READY");
+    if (notReady.length) {
+      throw new BadRequestException(
+        "Diagnostics require READY documents; complete material figure review first",
+      );
+    }
 
     const activeRun = await this.prisma.diagnosticRun.findFirst({
       where: {

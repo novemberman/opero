@@ -392,4 +392,48 @@ describe("diagnostics integration", () => {
       .set("Cookie", viewer.session)
       .expect(200);
   });
+
+  it("rejects diagnostic start when documents are not READY", async () => {
+    const suffix = `${Date.now()}-nr`;
+    const owner = await registerVerifyLogin(app, mail, {
+      email: `diag.nr.${suffix}@example.com`,
+      name: "NotReady",
+      password: "diag-nr-pass123",
+    });
+    const org = await request(app.getHttpServer())
+      .post("/api/v1/organizations")
+      .set("Cookie", owner.cookies)
+      .set("x-csrf-token", owner.csrfToken)
+      .send({ name: "NR Org", slug: `nr-org-${suffix}` })
+      .expect(201);
+    const organizationId = org.body.organization.id as string;
+    const me = await request(app.getHttpServer())
+      .get("/api/v1/auth/me")
+      .set("Cookie", owner.session)
+      .expect(200);
+    const documentId = await seedFinancialDocument({
+      organizationId,
+      userId: me.body.user.id,
+    });
+    const prisma = createPrismaClient(process.env.DATABASE_URL!);
+    await prisma.document.update({
+      where: { id: documentId },
+      data: { processingStatus: "REVIEW_REQUIRED" },
+    });
+    await prisma.$disconnect();
+
+    const blocked = await request(app.getHttpServer())
+      .post(`/api/v1/organizations/${organizationId}/diagnostics`)
+      .set("Cookie", owner.cookies)
+      .set("x-csrf-token", owner.csrfToken)
+      .send({ documentIds: [documentId] })
+      .expect(400);
+    expect(String(blocked.body.message ?? "")).toMatch(/READY/i);
+
+    const runs = await request(app.getHttpServer())
+      .get(`/api/v1/organizations/${organizationId}/diagnostics`)
+      .set("Cookie", owner.session)
+      .expect(200);
+    expect(runs.body.runs ?? []).toHaveLength(0);
+  });
 });

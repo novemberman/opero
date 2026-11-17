@@ -17,6 +17,13 @@ describe("KPI engine", () => {
     expect(Number(byCode.DEBT_TO_EQUITY?.value)).toBeCloseTo(1 / 3, 10);
     expect(byCode.FREE_CASH_FLOW?.value).toBe("300"); // 350-50
     expect(byCode.REVENUE_GROWTH?.value).toBe("0.2"); // (1200-1000)/1000
+    expect(byCode.RETURN_ON_ASSETS?.value).toBe("0.3");
+    expect(byCode.RETURN_ON_EQUITY?.value).toBe("0.5");
+    expect(byCode.ASSET_TURNOVER?.value).toBe("1.2");
+    expect(byCode.DEBT_TO_ASSETS?.value).toBe("0.2");
+    expect(byCode.CASH_COVERAGE?.value).toBe("8.75");
+    expect(byCode.PROFIT_GROWTH?.value).toBe("0.2");
+    expect(byCode.NET_MARGIN_MOVEMENT?.value).toBe("0");
   });
 
   it("does not treat missing inventory as zero for quick ratio", () => {

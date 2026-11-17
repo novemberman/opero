@@ -72,10 +72,63 @@ export function assessQuality(
   const revenue = resolveConcept(snapshot, "REVENUE");
   const cogs = resolveConcept(snapshot, "COST_OF_GOODS_SOLD");
   const gross = resolveConcept(snapshot, "GROSS_PROFIT");
+  const opex = resolveConcept(snapshot, "OPERATING_EXPENSES");
+  const opProfit = resolveConcept(snapshot, "OPERATING_PROFIT");
+  const interest = resolveConcept(snapshot, "INTEREST_EXPENSE");
+  const pbt = resolveConcept(snapshot, "PROFIT_BEFORE_TAX");
+  const tax = resolveConcept(snapshot, "INCOME_TAX_EXPENSE");
+  const net = resolveConcept(snapshot, "NET_PROFIT");
+  const totalAssets = resolveConcept(snapshot, "TOTAL_ASSETS");
+  const totalLiab = resolveConcept(snapshot, "TOTAL_LIABILITIES");
+  const equity = resolveConcept(snapshot, "EQUITY");
+  const totalLE = resolveConcept(snapshot, "TOTAL_LIABILITIES_AND_EQUITY");
+
+  function identityOk(
+    left: ReturnType<typeof d>,
+    right: ReturnType<typeof d>,
+    basis: ReturnType<typeof d>,
+  ): boolean {
+    return left.minus(right).abs().lte(basis.abs().mul("0.02").plus(1));
+  }
+
   if (revenue.amount && cogs.amount && gross.amount) {
     consistencyChecks += 1;
     const derived = revenue.amount.value.minus(cogs.amount.value);
-    if (!derived.minus(gross.amount.value).abs().lte(d(gross.amount.value).abs().mul("0.02").plus(1))) {
+    if (!identityOk(derived, gross.amount.value, gross.amount.value)) {
+      consistencyFlags += 1;
+    }
+  }
+  if (gross.amount && opex.amount && opProfit.amount) {
+    consistencyChecks += 1;
+    const derived = gross.amount.value.minus(opex.amount.value);
+    if (!identityOk(derived, opProfit.amount.value, opProfit.amount.value)) {
+      consistencyFlags += 1;
+    }
+  }
+  if (opProfit.amount && interest.amount && pbt.amount) {
+    consistencyChecks += 1;
+    const derived = opProfit.amount.value.minus(interest.amount.value);
+    if (!identityOk(derived, pbt.amount.value, pbt.amount.value)) {
+      consistencyFlags += 1;
+    }
+  }
+  if (pbt.amount && tax.amount && net.amount) {
+    consistencyChecks += 1;
+    const derived = pbt.amount.value.minus(tax.amount.value);
+    if (!identityOk(derived, net.amount.value, net.amount.value)) {
+      consistencyFlags += 1;
+    }
+  }
+  if (totalAssets.amount && totalLiab.amount && equity.amount) {
+    consistencyChecks += 1;
+    const derived = totalLiab.amount.value.plus(equity.amount.value);
+    if (!identityOk(derived, totalAssets.amount.value, totalAssets.amount.value)) {
+      consistencyFlags += 1;
+    }
+  }
+  if (totalAssets.amount && totalLE.amount) {
+    consistencyChecks += 1;
+    if (!identityOk(totalLE.amount.value, totalAssets.amount.value, totalAssets.amount.value)) {
       consistencyFlags += 1;
     }
   }

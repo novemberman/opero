@@ -78,7 +78,7 @@ export default function DiagnosticsPage() {
     setRuns(runsRes.body.runs ?? []);
     setDocuments(
       (docsRes.body.documents ?? []).filter(
-        (d) => d.scanStatus === "CLEAN" && ["READY", "REVIEW_REQUIRED"].includes(d.processingStatus),
+        (d) => d.scanStatus === "CLEAN" && d.processingStatus === "READY",
       ),
     );
     setError(null);
@@ -103,7 +103,8 @@ export default function DiagnosticsPage() {
         `/organizations/${orgId}/diagnostics`,
         {
           method: "POST",
-          json: { documentIds: selected, currency: "USD" },
+          // Omit currency so the engine derives statement currency (e.g. NGN); do not force USD.
+          json: { documentIds: selected },
         },
       );
       if (res.status >= 400) {
@@ -173,7 +174,7 @@ export default function DiagnosticsPage() {
       {!loading && !latestSucceeded && latestPresentation == null ? (
         <EmptyState
           title="No completed diagnostics yet"
-          description="Run diagnostics on clean-scanned documents to see Business Health Score eligibility and ratio analysis."
+          description="Run diagnostics on READY, clean-scanned documents to see Business Health Score eligibility and ratio analysis."
           action={
             <Link
               href={`/organizations/${orgId}/documents`}

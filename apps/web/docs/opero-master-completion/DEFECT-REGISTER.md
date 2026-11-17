@@ -9,18 +9,18 @@
 | D-P0-002 | P0 | False success on review without server ack | FIXED_LOCAL | Requires `lineItem` in response; shared submit helper. |
 | D-P1-012 | P1 | Playwright E2E cannot run on current Hetzner host | BLOCKED_EXTERNAL | Missing Chromium shared libs (`libnspr4`…); no sudo. Specs in `apps/web/e2e/`; happy-dom + contract E2E PASS. |
 | D-P0-003 | P0 | Worker may set document `READY` while lines still PENDING | OPEN | Mitigated by eligibility/readiness + post-review reconcile; worker initial status still may open READY before confirms. `document-process.processor.ts`. |
-| D-P0-004 | P0 | B2.2 concepts extractable but unused in KPI formulas | OPEN | Schema Increment A/B1; not wired in `@opero/diagnostics` KPIs. |
+| D-P0-004 | P0 | B2.2 concepts extractable but unused in KPI formulas | OPEN | Partial M3: ROA/ROE/asset turnover/profit growth/margin movement/debt-to-assets/cash coverage + PBT/tax/BS identity checks. Remaining unused: investing/financing/net cash change, share capital, retained earnings, tax payable as standalone KPIs. |
 | D-P0-005 | P0 | `xray.report_generate` entitlement never enforced | OPEN | Create/publish free; only view/PDF gated. Product decision before enforcing. |
-| D-P1-001 | P1 | Document stays `REVIEW_REQUIRED` after material confirms | FIXED_LOCAL | `reconcileDocumentReviewStatus` on review **and** `status()` (M2-P4). Prod API still `bc1567a` until authorized API deploy. |
+| D-P1-001 | P1 | Document stays `REVIEW_REQUIRED` after material confirms | FIXED | `reconcileDocumentReviewStatus` on review **and** `status()` (M2-P4/P5). Prod API `77ecbf6…` (`baa04a73-…`); pilot doc reconciled READY on OWNER status read. |
 | D-P1-002 | P1 | Confirm UX ambiguous (dropdown vs Submit) | FIXED_LOCAL | One-click Confirm; Correct/Reject secondary. |
 | D-P1-003 | P1 | Korapay hosted checkout / settlement unverified | BLOCKED_EXTERNAL | Gate C unresolved. |
-| D-P1-004 | P1 | Production deploy SHA skew (API/web/worker) | OPEN | Web `15299f1`; API `bc1567a`; worker `31749a3`. Next authorize: API-only for M2-P4. |
+| D-P1-004 | P1 | Production deploy SHA skew (API/web/worker) | OPEN | Web `15299f1`; API `77ecbf6` (M2-P5); worker `31749a3`. Intentional service-isolated tips. |
 | D-P1-005 | P1 | Uploads/checkout emergency shutdown still on | ACCEPTED_RISK | Intentional. |
 | D-P1-006 | P1 | CSRF exempt matching used `includes`/`endsWith` | FIXED_LOCAL | Exact `/api/v1`-relative allowlist; nested only where intended. |
 | D-P1-007 | P1 | Multer 25 MiB vs `DOCUMENT_MAX_BYTES` 20 MiB | FIXED_LOCAL | Multer limit aligned to 20 MiB. |
 | D-P1-008 | P1 | “Continue to readiness / review” navigated away from line review | FIXED_LOCAL | Primary CTA scrolls to `#extracted-figures`. |
 | D-P1-009 | P1 | Billing / reports / members UI unfinished (JSON dumps) | OPEN | Frontend audit; DS inconsistency. |
-| D-P1-010 | P1 | Diagnostics can start without readiness READY | OPEN | CLEAN docs only; unconfirmed → INSUFFICIENT_DATA. |
+| D-P1-010 | P1 | Diagnostics can start without readiness READY | FIXED_LOCAL | API requires `processingStatus=READY`; web lists READY-only. Soft INSUFFICIENT_DATA remains for incomplete confirmed sets. |
 | D-P1-011 | P1 | Upload retention purge not implemented | OPEN | Soft-delete + `retentionUntil` metadata only. |
 | D-P2-001 | P2 | Shared physical S3 bucket prefixes | ACCEPTED_RISK | Owner-approved migration only. |
 | D-P2-002 | P2 | Limited browser E2E automation | OPEN | |

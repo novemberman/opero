@@ -35,23 +35,30 @@ Within a run:
 | Metric code | Formula | Required inputs | Failure modes |
 | --- | --- | --- | --- |
 | `REVENUE_GROWTH` | `(Rev_t − Rev_{t-1}) / \|Rev_{t-1}\|` | Revenue two comparable periods | Missing prior, zero prior → `UNDEFINED` |
+| `PROFIT_GROWTH` | `(NI_t − NI_{t-1}) / \|NI_{t-1}\|` | Net profit two comparable periods | Missing prior, zero prior → `UNDEFINED` |
+| `NET_MARGIN_MOVEMENT` | `NI_t/Rev_t − NI_{t-1}/Rev_{t-1}` | Aligned Rev+NI two comparable periods | Absolute margin-point change |
 | `GROSS_MARGIN` | `GrossProfit / Revenue` or `(Rev−COGS)/Rev` | Revenue + GP or COGS | Zero/neg revenue → `UNDEFINED` |
 | `OPERATING_MARGIN` | `OperatingProfit / Revenue` | Op profit, Revenue | |
 | `NET_MARGIN` | `NetProfit / Revenue` | Net profit, Revenue | |
+| `RETURN_ON_ASSETS` | `NetProfit / TotalAssets` | NI, Total assets | |
+| `RETURN_ON_EQUITY` | `NetProfit / Equity` | NI, Equity | Zero/neg equity → `UNDEFINED` |
 | `OPEX_RATIO` | `OperatingExpenses / Revenue` | Opex, Revenue | |
 | `COGS_RATIO` | `COGS / Revenue` | COGS, Revenue | Not total expenses |
 | `CURRENT_RATIO` | `CurrentAssets / CurrentLiabilities` | CA, CL | Zero/neg CL → `UNDEFINED` |
 | `QUICK_RATIO` | `(CA − Inventory) / CL` | CA, Inventory, CL | Inventory required; no silent omit |
 | `CASH_RATIO` | `Cash / CL` | Cash, CL | |
+| `CASH_COVERAGE` | `OCF / InterestExpense` | OCF, Interest | Cash interest coverage; missing not inferred |
 | `WORKING_CAPITAL` | `CA − CL` | CA, CL | Absolute amount |
 | `DEBT_TO_EQUITY` | `InterestBearingDebt / Equity` | Debt, Equity | **Not** total liabilities; zero/neg equity → `UNDEFINED` |
+| `DEBT_TO_ASSETS` | `InterestBearingDebt / TotalAssets` | Debt, Total assets | **Not** total liabilities |
 | `LIABILITIES_TO_ASSETS` | `TotalLiabilities / TotalAssets` | Totals | |
 | `INTEREST_COVERAGE` | `OperatingProfit / InterestExpense` | Op profit, Interest | Zero interest → `UNDEFINED` |
-| `RECEIVABLES_TURNOVER` | `Revenue / AvgAR` | Revenue, AR start+end (or flagged single point) | Needs period length for days |
+| `ASSET_TURNOVER` | `Revenue / TotalAssets` | Revenue, Total assets | Point-in-time balance flagged |
+| `RECEIVABLES_TURNOVER` | `Revenue / AR` (point-in-time; AvgAR when available) | Revenue, AR | Needs period length for days |
 | `DSO` | `DaysInPeriod / ReceivablesTurnover` | Turnover + period days | |
-| `INVENTORY_TURNOVER` | `COGS / AvgInventory` | COGS, Inventory averages | |
+| `INVENTORY_TURNOVER` | `COGS / Inventory` (point-in-time) | COGS, Inventory | |
 | `INVENTORY_DAYS` | `DaysInPeriod / InventoryTurnover` | | |
-| `PAYABLES_TURNOVER` | `COGS / AvgAP` | COGS, AP averages | |
+| `PAYABLES_TURNOVER` | `COGS / AP` (point-in-time; purchases not inferred) | COGS, AP | |
 | `CASH_CONVERSION_CYCLE` | `DSO + InventoryDays − PayablesDays` | All three day metrics | |
 | `OCF_MARGIN` | `OCF / Revenue` | OCF, Revenue | |
 | `OCF_TO_CURRENT_LIABILITIES` | `OCF / CL` | OCF, CL | |

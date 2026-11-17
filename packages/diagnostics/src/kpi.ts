@@ -212,6 +212,144 @@ export function computeMetrics(snapshot: DiagnosticSnapshot): MetricResult[] {
       formulaId: "calc.v1.cogs_ratio",
     }),
   );
+  metrics.push(
+    ratioOrUndefined(net, totalAssets, {
+      code: "RETURN_ON_ASSETS",
+      label: "Return on assets",
+      dimension: "profitability",
+      formulaId: "calc.v1.return_on_assets",
+    }),
+  );
+  metrics.push(
+    ratioOrUndefined(net, equity, {
+      code: "RETURN_ON_EQUITY",
+      label: "Return on equity",
+      dimension: "profitability",
+      formulaId: "calc.v1.return_on_equity",
+    }),
+  );
+
+  // Profit growth — comparable period length class required
+  const netPeriods = amountsByPeriod(snapshot, "NET_PROFIT");
+  if (netPeriods.length >= 2) {
+    const prev = netPeriods[netPeriods.length - 2]!;
+    const curr = netPeriods[netPeriods.length - 1]!;
+    const refs = [prev.amount.line.snapshotKey, curr.amount.line.snapshotKey];
+    if (!periodsAreComparable(prev, curr)) {
+      metrics.push(
+        fail(
+          "PROFIT_GROWTH",
+          "Net profit growth",
+          "profitability",
+          "calc.v1.profit_growth",
+          "INCOMPATIBLE",
+          refs,
+          ["Period length classes are not comparable"],
+        ),
+      );
+    } else if (isZero(prev.amount.value)) {
+      metrics.push(
+        fail("PROFIT_GROWTH", "Net profit growth", "profitability", "calc.v1.profit_growth", "UNDEFINED", refs, [
+          "Prior net profit is zero",
+        ]),
+      );
+    } else {
+      metrics.push(
+        metric({
+          code: "PROFIT_GROWTH",
+          label: "Net profit growth",
+          dimension: "profitability",
+          status: "COMPUTED",
+          value: toPlain(curr.amount.value.minus(prev.amount.value).div(prev.amount.value.abs())),
+          unit: "ratio",
+          formulaId: "calc.v1.profit_growth",
+          periodStart: curr.periodStart,
+          periodEnd: curr.periodEnd,
+          periodLabel: curr.periodLabel,
+          inputRefs: refs,
+        }),
+      );
+    }
+  } else {
+    metrics.push(
+      fail("PROFIT_GROWTH", "Net profit growth", "profitability", "calc.v1.profit_growth", "INSUFFICIENT_INPUTS", []),
+    );
+  }
+
+  // Net margin movement (period-over-period absolute change in net margin)
+  if (revPeriods.length >= 2 && netPeriods.length >= 2) {
+    const prevRev = revPeriods[revPeriods.length - 2]!;
+    const currRev = revPeriods[revPeriods.length - 1]!;
+    const prevNet = netPeriods[netPeriods.length - 2]!;
+    const currNet = netPeriods[netPeriods.length - 1]!;
+    const refs = [
+      prevRev.amount.line.snapshotKey,
+      currRev.amount.line.snapshotKey,
+      prevNet.amount.line.snapshotKey,
+      currNet.amount.line.snapshotKey,
+    ];
+    const periodsOk =
+      periodsAreComparable(prevRev, currRev) &&
+      periodsAreComparable(prevNet, currNet) &&
+      prevRev.periodStart === prevNet.periodStart &&
+      prevRev.periodEnd === prevNet.periodEnd &&
+      currRev.periodStart === currNet.periodStart &&
+      currRev.periodEnd === currNet.periodEnd;
+    if (!periodsOk) {
+      metrics.push(
+        fail(
+          "NET_MARGIN_MOVEMENT",
+          "Net margin movement",
+          "profitability",
+          "calc.v1.net_margin_movement",
+          "INCOMPATIBLE",
+          refs,
+          ["Comparable aligned revenue and net-profit periods required"],
+        ),
+      );
+    } else if (!isPositive(prevRev.amount.value) || !isPositive(currRev.amount.value)) {
+      metrics.push(
+        fail(
+          "NET_MARGIN_MOVEMENT",
+          "Net margin movement",
+          "profitability",
+          "calc.v1.net_margin_movement",
+          "UNDEFINED",
+          refs,
+          ["Non-positive revenue in prior or current period"],
+        ),
+      );
+    } else {
+      const prevMargin = prevNet.amount.value.div(prevRev.amount.value);
+      const currMargin = currNet.amount.value.div(currRev.amount.value);
+      metrics.push(
+        metric({
+          code: "NET_MARGIN_MOVEMENT",
+          label: "Net margin movement",
+          dimension: "profitability",
+          status: "COMPUTED",
+          value: toPlain(currMargin.minus(prevMargin)),
+          unit: "ratio",
+          formulaId: "calc.v1.net_margin_movement",
+          periodStart: currRev.periodStart,
+          periodEnd: currRev.periodEnd,
+          periodLabel: currRev.periodLabel,
+          inputRefs: refs,
+        }),
+      );
+    }
+  } else {
+    metrics.push(
+      fail(
+        "NET_MARGIN_MOVEMENT",
+        "Net margin movement",
+        "profitability",
+        "calc.v1.net_margin_movement",
+        "INSUFFICIENT_INPUTS",
+        [],
+      ),
+    );
+  }
 
   // Liquidity
   metrics.push(
@@ -349,6 +487,14 @@ export function computeMetrics(snapshot: DiagnosticSnapshot): MetricResult[] {
     }),
   );
   metrics.push(
+    ratioOrUndefined(debt, totalAssets, {
+      code: "DEBT_TO_ASSETS",
+      label: "Debt-to-assets ratio",
+      dimension: "leverage",
+      formulaId: "calc.v1.debt_to_assets",
+    }),
+  );
+  metrics.push(
     ratioOrUndefined(opProfit, interest, {
       code: "INTEREST_COVERAGE",
       label: "Interest coverage ratio",
@@ -401,6 +547,16 @@ export function computeMetrics(snapshot: DiagnosticSnapshot): MetricResult[] {
       warnings: ["Average balance unavailable; used point-in-time balance"],
     });
   }
+
+  metrics.push(
+    turnover(
+      "ASSET_TURNOVER",
+      "Asset turnover",
+      revenue,
+      totalAssets,
+      "calc.v1.asset_turnover",
+    ),
+  );
 
   const recvTurnover = turnover(
     "RECEIVABLES_TURNOVER",
@@ -564,6 +720,15 @@ export function computeMetrics(snapshot: DiagnosticSnapshot): MetricResult[] {
       label: "Operating cash flow to current liabilities",
       dimension: "cash_flow",
       formulaId: "calc.v1.ocf_to_cl",
+    }),
+  );
+  // Cash coverage of interest (OCF / interest) — liquidity/cash-flow supported coverage
+  metrics.push(
+    ratioOrUndefined(ocf, interest, {
+      code: "CASH_COVERAGE",
+      label: "Cash interest coverage",
+      dimension: "liquidity",
+      formulaId: "calc.v1.cash_coverage",
     }),
   );
 

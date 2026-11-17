@@ -37,6 +37,13 @@ describe("acceptance audit — formula independence", () => {
     expect(Number(m.OCF_MARGIN?.value)).toBeCloseTo(350 / 1200, 10);
     expect(Number(m.OCF_TO_CURRENT_LIABILITIES?.value)).toBeCloseTo(350 / 250, 10);
     expect(m.FREE_CASH_FLOW?.value).toBe("300"); // 350-50
+    expect(m.RETURN_ON_ASSETS?.value).toBe("0.3"); // 300/1000
+    expect(m.RETURN_ON_EQUITY?.value).toBe("0.5"); // 300/600
+    expect(m.ASSET_TURNOVER?.value).toBe("1.2"); // 1200/1000
+    expect(m.DEBT_TO_ASSETS?.value).toBe("0.2"); // 200/1000
+    expect(m.CASH_COVERAGE?.value).toBe("8.75"); // 350/40
+    expect(m.PROFIT_GROWTH?.value).toBe("0.2"); // (300-250)/250
+    expect(m.NET_MARGIN_MOVEMENT?.value).toBe("0"); // 0.25 − 0.25
   });
 
   it("does not use total liabilities as debt-to-equity", () => {

@@ -45,6 +45,11 @@ export function healthySnapshot() {
         periodStart: "2023-01-01",
         periodEnd: "2023-12-31",
       }),
+      line("NET_PROFIT", "250", {
+        periodLabel: "FY2023",
+        periodStart: "2023-01-01",
+        periodEnd: "2023-12-31",
+      }),
       line("REVENUE", "1200"),
       line("COST_OF_GOODS_SOLD", "480"),
       line("GROSS_PROFIT", "720"),
