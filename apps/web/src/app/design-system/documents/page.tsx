@@ -379,7 +379,7 @@ export default function DocumentsDesignSpecimen() {
           <ExtractionReviewBoard
             lines={fixtureLines}
             canWrite={false}
-            onReview={async () => undefined}
+            onSubmitReview={async () => undefined}
           />
         </section>
 
@@ -388,7 +388,7 @@ export default function DocumentsDesignSpecimen() {
           <ExtractionLineCard
             line={fixtureLines[1]!}
             canWrite={false}
-            onReview={async () => undefined}
+            onSubmitReview={async () => undefined}
           />
         </section>
 

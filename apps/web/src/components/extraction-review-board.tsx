@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   DEFAULT_EXTRACTION_REVIEW_FILTER,
   EXTRACTION_REVIEW_FILTER_LABELS,
@@ -12,7 +12,11 @@ import {
 } from "../lib/extraction-review-presentation";
 import { cn } from "../lib/cn";
 import { Alert, EmptyState, buttonClassName } from "./ui";
-import { ExtractionLineCard, type ExtractionLine } from "./extraction-line-card";
+import {
+  ExtractionLineCard,
+  type ExtractionLine,
+  type ExtractionReviewSubmitInput,
+} from "./extraction-line-card";
 
 function SummaryStat({
   label,
@@ -52,13 +56,15 @@ function SummaryStat({
 export function ExtractionReviewBoard({
   lines,
   canWrite,
-  onReview,
+  submittingLineId,
+  onSubmitReview,
   heading = "Extracted figures",
   description,
 }: {
   lines: ExtractionLine[];
   canWrite: boolean;
-  onReview: (event: FormEvent<HTMLFormElement>, lineItemId: string) => void | Promise<void>;
+  submittingLineId?: string | null;
+  onSubmitReview: (input: ExtractionReviewSubmitInput) => void | Promise<void>;
   heading?: string;
   description?: string;
 }) {
@@ -209,7 +215,13 @@ export function ExtractionReviewBoard({
 
       <ul className="mt-4 space-y-4" data-testid="extraction-review-list">
         {visibleLines.map((row) => (
-          <ExtractionLineCard key={row.id} line={row} canWrite={canWrite} onReview={onReview} />
+          <ExtractionLineCard
+            key={row.id}
+            line={row}
+            canWrite={canWrite}
+            submitting={submittingLineId === row.id}
+            onSubmitReview={onSubmitReview}
+          />
         ))}
       </ul>
 

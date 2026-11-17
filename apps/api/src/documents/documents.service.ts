@@ -9,6 +9,7 @@ import {
 import { ConfigService } from "@nestjs/config";
 import { InjectQueue } from "@nestjs/bullmq";
 import type { PrismaClient } from "@opero/database";
+import { materialMonetaryNeedsConfirmation } from "@opero/diagnostics";
 import {
   resolveActualMonetaryValue,
   sanitizeOriginalFilename,
@@ -543,7 +544,100 @@ export class DocumentsService {
       metadata: { action: input.action },
     });
 
+    await this.reconcileDocumentReviewStatus({
+      organizationId: input.organizationId,
+      documentId: input.documentId,
+    });
+
     return updated;
+  }
+
+  /**
+   * When material monetary confirmation is complete, promote sticky
+   * REVIEW_REQUIRED → READY so the document badge matches readiness semantics.
+   * Does not invent READY while material confirms remain.
+   */
+  private async reconcileDocumentReviewStatus(input: {
+    organizationId: string;
+    documentId: string;
+  }) {
+    const document = await this.prisma.document.findFirst({
+      where: { id: input.documentId, organizationId: input.organizationId },
+      include: {
+        extractions: {
+          orderBy: { createdAt: "desc" },
+          take: 1,
+          include: {
+            statements: {
+              include: { lineItems: true },
+            },
+          },
+        },
+      },
+    });
+    if (!document) return;
+    if (!["REVIEW_REQUIRED", "READY"].includes(document.processingStatus)) return;
+
+    const lineItems = document.extractions[0]?.statements.flatMap((s) => s.lineItems) ?? [];
+    const materialPending = lineItems.filter((item) =>
+      materialMonetaryNeedsConfirmation({
+        concept: item.concept,
+        quantityClass: item.quantityClass,
+        reviewStatus: item.reviewStatus,
+        unitScale: item.unitScale,
+        unitScaleRequiresReview: item.unitScaleRequiresReview,
+      }),
+    ).length;
+
+    const nextStatus = materialPending > 0 ? "REVIEW_REQUIRED" : "READY";
+    const nextExtractionStatus =
+      materialPending > 0
+        ? document.extractionStatus === "FAILED"
+          ? document.extractionStatus
+          : "MANUAL_REQUIRED"
+        : document.extractionStatus === "FAILED"
+          ? document.extractionStatus
+          : "SUCCEEDED";
+
+    if (
+      document.processingStatus === nextStatus &&
+      document.extractionStatus === nextExtractionStatus
+    ) {
+      return;
+    }
+
+    const job = await this.prisma.documentProcessingJob.findFirst({
+      where: { documentId: document.id, organizationId: input.organizationId },
+      orderBy: { createdAt: "desc" },
+    });
+    const progress = buildProcessingProgress({
+      documentId: document.id,
+      organizationId: input.organizationId,
+      processingStatus: nextStatus,
+      scanStatus: document.scanStatus,
+      extractionStatus: nextExtractionStatus,
+      jobAttemptCount: job?.attemptCount ?? 1,
+      jobMaxAttempts: job?.maxAttempts ?? 3,
+    });
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.document.update({
+        where: { id: document.id },
+        data: {
+          processingStatus: nextStatus,
+          extractionStatus: nextExtractionStatus,
+        },
+      });
+      if (job) {
+        await tx.documentProcessingJob.update({
+          where: { id: job.id },
+          data: {
+            status: nextStatus,
+            progress,
+          },
+        });
+      }
+    });
   }
 
   async softDelete(input: {

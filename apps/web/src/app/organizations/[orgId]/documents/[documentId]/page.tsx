@@ -8,13 +8,16 @@ import {
 } from "@opero/shared";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ExtractionReviewBoard } from "../../../../../components/extraction-review-board";
-import type { ExtractionLine } from "../../../../../components/extraction-line-card";
+import type {
+  ExtractionLine,
+  ExtractionReviewSubmitInput,
+} from "../../../../../components/extraction-line-card";
 import { ProcessingTimeline } from "../../../../../components/processing-timeline";
 import { StatementMetadataPanel } from "../../../../../components/statement-metadata";
 import { Alert, Badge, buttonClassName } from "../../../../../components/ui";
-import { apiFetch } from "../../../../../lib/api";
+import { apiErrorMessage, apiFetch } from "../../../../../lib/api";
 
 type Extraction = {
   id: string;
@@ -47,6 +50,7 @@ export default function DocumentDetailPage() {
   const [role, setRole] = useState<MembershipRole | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [submittingLineId, setSubmittingLineId] = useState<string | null>(null);
   const [startedAt] = useState(() => Date.now());
   const [now, setNow] = useState(() => Date.now());
   const delayRef = useRef(2000);
@@ -102,13 +106,11 @@ export default function DocumentDetailPage() {
     };
   }, [load]);
 
-  async function onReview(event: FormEvent<HTMLFormElement>, lineItemId: string) {
-    event.preventDefault();
-    if (!canWrite) return;
-    const form = new FormData(event.currentTarget);
-    const action = String(form.get("action") ?? "CONFIRM");
-    const newValue = String(form.get("newValue") ?? "").trim();
-    const reason = String(form.get("reason") ?? "");
+  async function onSubmitReview(input: ExtractionReviewSubmitInput) {
+    if (!canWrite || submittingLineId) return;
+    const action = input.action;
+    const newValue = input.newValue?.trim() ?? "";
+    const reason = input.reason?.trim() ?? "";
     // Draft corrected amounts must not be confirmed via Confirm — require Correct & confirm.
     if (action === "CONFIRM" && newValue) {
       setError(
@@ -120,24 +122,44 @@ export default function DocumentDetailPage() {
       setError("Correct & confirm requires a corrected statement-units value.");
       return;
     }
-    const { status: httpStatus, body } = await apiFetch<{ message?: string }>(
-      `/organizations/${orgId}/documents/${documentId}/review`,
-      {
+    setSubmittingLineId(input.lineItemId);
+    setError(null);
+    setMessage(null);
+    try {
+      const { status: httpStatus, body } = await apiFetch<{
+        message?: string;
+        lineItem?: { id: string; reviewStatus?: string };
+      }>(`/organizations/${orgId}/documents/${documentId}/review`, {
         method: "POST",
         json: {
-          lineItemId,
+          lineItemId: input.lineItemId,
           action,
           newValue: action === "CORRECT" ? newValue : undefined,
           reason: reason || undefined,
         },
-      },
-    );
-    if (httpStatus >= 400) {
-      setError(body.message ?? "Review failed");
-      return;
+      });
+      if (httpStatus >= 400) {
+        setError(apiErrorMessage(body, "Review failed"));
+        return;
+      }
+      // Never claim success until the server returns the persisted line.
+      if (!body.lineItem?.id) {
+        setError("Review response was incomplete; refresh and verify before continuing.");
+        return;
+      }
+      setMessage(
+        action === "CONFIRM"
+          ? "Figure confirmed — original raw evidence preserved"
+          : action === "CORRECT"
+            ? "Correction confirmed — original raw evidence preserved"
+            : "Figure rejected — original raw evidence preserved",
+      );
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Review request failed");
+    } finally {
+      setSubmittingLineId(null);
     }
-    setMessage("Review submitted — original raw evidence preserved");
-    await load();
   }
 
   const statements = extractions.flatMap((extraction) => extraction.statements);
@@ -255,7 +277,12 @@ export default function DocumentDetailPage() {
         </section>
       ) : null}
 
-      <ExtractionReviewBoard lines={lines} canWrite={canWrite} onReview={onReview} />
+      <ExtractionReviewBoard
+        lines={lines}
+        canWrite={canWrite}
+        submittingLineId={submittingLineId}
+        onSubmitReview={onSubmitReview}
+      />
     </div>
   );
 }

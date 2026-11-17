@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent } from "react";
+import { FormEvent, useState } from "react";
 import { formatFinancialConceptLabel } from "../lib/extraction-review-presentation";
 import { resolveMonetaryPresentation } from "../lib/monetary-presentation";
 import { cn } from "../lib/cn";
@@ -31,6 +31,13 @@ export type ExtractionLine = {
   } | null;
 };
 
+export type ExtractionReviewSubmitInput = {
+  lineItemId: string;
+  action: "CONFIRM" | "CORRECT" | "REJECT";
+  newValue?: string;
+  reason?: string;
+};
+
 function toneForReview(status: string): "warning" | "success" | "error" | "neutral" {
   if (status === "PENDING" || status === "CORRECTED") return "warning";
   if (status === "CONFIRMED") return "success";
@@ -55,12 +62,16 @@ function amountTone(
 export function ExtractionLineCard({
   line,
   canWrite,
-  onReview,
+  submitting,
+  onSubmitReview,
 }: {
   line: ExtractionLine;
   canWrite: boolean;
-  onReview: (event: FormEvent<HTMLFormElement>, lineItemId: string) => void | Promise<void>;
+  submitting?: boolean;
+  onSubmitReview: (input: ExtractionReviewSubmitInput) => void | Promise<void>;
 }) {
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [advancedAction, setAdvancedAction] = useState<"CORRECT" | "REJECT">("CORRECT");
   const presentation = resolveMonetaryPresentation(line);
   const needsAttention =
     line.reviewStatus === "PENDING" ||
@@ -71,6 +82,23 @@ export function ExtractionLineCard({
     line.concept === "UNMAPPED" ||
     presentation.kind === "provisional" ||
     presentation.kind === "undetermined";
+  const canConfirm =
+    canWrite && (line.reviewStatus === "PENDING" || line.reviewStatus === "CORRECTED");
+
+  async function onAdvancedSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!canWrite || submitting) return;
+    const form = new FormData(event.currentTarget);
+    const action = String(form.get("action") ?? advancedAction) as "CORRECT" | "REJECT";
+    const newValue = String(form.get("newValue") ?? "").trim();
+    const reason = String(form.get("reason") ?? "").trim();
+    await onSubmitReview({
+      lineItemId: line.id,
+      action,
+      newValue: action === "CORRECT" ? newValue : undefined,
+      reason: reason || undefined,
+    });
+  }
 
   return (
     <li
@@ -79,7 +107,9 @@ export function ExtractionLineCard({
         needsAttention ? "border-warning/40" : "border-border",
       )}
       data-testid="extraction-line-card"
+      data-line-id={line.id}
       data-amount-kind={presentation.kind}
+      data-review-status={line.reviewStatus}
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
@@ -202,28 +232,76 @@ export function ExtractionLineCard({
         </p>
       ) : null}
 
-      {canWrite ? (
-        <form
-          className="mt-4 grid gap-3 border-t border-border pt-4 sm:grid-cols-[10rem_1fr_1fr_auto]"
-          onSubmit={(event) => void onReview(event, line.id)}
-        >
-          <Select name="action" label="Action" defaultValue="CONFIRM">
-            <option value="CONFIRM">Confirm</option>
-            <option value="CORRECT">Correct &amp; confirm</option>
-            <option value="REJECT">Reject</option>
-          </Select>
-          <Input
-            name="newValue"
-            label="Corrected statement units"
-            placeholder="Required for Correct & confirm"
-          />
-          <Input name="reason" label="Reason" placeholder="Optional note" />
-          <div className="flex items-end">
-            <Button type="submit" size="sm">
-              Submit review
+      {canConfirm ? (
+        <div className="mt-4 space-y-3 border-t border-border pt-4">
+          <p className="text-sm text-text-secondary">
+            One click persists confirmation to the server. Selecting a filter or changing a dropdown
+            does not confirm.
+          </p>
+          <div className="flex flex-wrap items-center gap-3">
+            <Button
+              type="button"
+              size="sm"
+              loading={Boolean(submitting)}
+              disabled={Boolean(submitting)}
+              data-testid="confirm-figure"
+              onClick={() =>
+                void onSubmitReview({
+                  lineItemId: line.id,
+                  action: "CONFIRM",
+                })
+              }
+            >
+              Confirm figure
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              disabled={Boolean(submitting)}
+              data-testid="toggle-advanced-review"
+              onClick={() => setShowAdvanced((open) => !open)}
+            >
+              {showAdvanced ? "Hide correct / reject" : "Correct or reject…"}
             </Button>
           </div>
-        </form>
+          {showAdvanced ? (
+            <form
+              className="grid gap-3 sm:grid-cols-[10rem_1fr_1fr_auto]"
+              onSubmit={(event) => void onAdvancedSubmit(event)}
+              data-testid="advanced-review-form"
+            >
+              <Select
+                name="action"
+                label="Action"
+                value={advancedAction}
+                onChange={(event) =>
+                  setAdvancedAction(event.currentTarget.value as "CORRECT" | "REJECT")
+                }
+              >
+                <option value="CORRECT">Correct &amp; confirm</option>
+                <option value="REJECT">Reject</option>
+              </Select>
+              <Input
+                name="newValue"
+                label="Corrected statement units"
+                placeholder="Required for Correct & confirm"
+                disabled={advancedAction !== "CORRECT" || Boolean(submitting)}
+              />
+              <Input
+                name="reason"
+                label="Reason"
+                placeholder="Optional note"
+                disabled={Boolean(submitting)}
+              />
+              <div className="flex items-end">
+                <Button type="submit" size="sm" variant="secondary" loading={Boolean(submitting)}>
+                  {advancedAction === "REJECT" ? "Reject figure" : "Correct & confirm"}
+                </Button>
+              </div>
+            </form>
+          ) : null}
+        </div>
       ) : null}
     </li>
   );

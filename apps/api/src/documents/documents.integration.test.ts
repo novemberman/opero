@@ -382,6 +382,155 @@ describe("document ingestion integration", () => {
 
   });
 
+  it("persists CONFIRM with review row, audit attribution, refresh, and denies cross-tenant", async () => {
+    const suffix = `${Date.now()}-confirm`;
+    const auth = await registerVerifyLogin(app, mail, {
+      email: `docs.confirm.${suffix}@example.com`,
+      name: "Confirm Owner",
+      password: "docs-password-123",
+    });
+    const outsider = await registerVerifyLogin(app, mail, {
+      email: `docs.outsider.${suffix}@example.com`,
+      name: "Outsider",
+      password: "docs-password-123",
+    });
+    const org = await request(app.getHttpServer())
+      .post("/api/v1/organizations")
+      .set("Cookie", auth.cookies)
+      .set("x-csrf-token", auth.csrfToken)
+      .send({ name: "Confirm Org", slug: `confirm-org-${suffix}` })
+      .expect(201);
+    const organizationId = org.body.organization.id as string;
+    const outsiderOrg = await request(app.getHttpServer())
+      .post("/api/v1/organizations")
+      .set("Cookie", outsider.cookies)
+      .set("x-csrf-token", outsider.csrfToken)
+      .send({ name: "Outsider Org", slug: `outsider-org-${suffix}` })
+      .expect(201);
+    const outsiderOrganizationId = outsiderOrg.body.organization.id as string;
+
+    const upload = await request(app.getHttpServer())
+      .post(`/api/v1/organizations/${organizationId}/documents/uploads`)
+      .set("Cookie", auth.cookies)
+      .set("x-csrf-token", auth.csrfToken)
+      .send({
+        filename: "confirm.csv",
+        declaredFormat: "CSV",
+        declaredMimeType: "text/csv",
+      })
+      .expect(201);
+    const csv = Buffer.from(
+      ["Label,Amount", "Total Revenue,\"2,500.00\"", "Cost of sales,\"1,000.00\""].join("\n"),
+      "utf8",
+    );
+    const completed = await request(app.getHttpServer())
+      .post(
+        `/api/v1/organizations/${organizationId}/documents/uploads/${upload.body.upload.uploadId}/complete`,
+      )
+      .set("Cookie", auth.cookies)
+      .set("x-csrf-token", auth.csrfToken)
+      .attach("file", csv, "confirm.csv")
+      .expect(201);
+    const documentId = completed.body.documentId as string;
+    const processingJobId = completed.body.processingJobId as string;
+    await runPipeline({ organizationId, documentId, processingJobId, storage });
+    await runPipeline({ organizationId, documentId, processingJobId, storage });
+
+    const extractions = await request(app.getHttpServer())
+      .get(`/api/v1/organizations/${organizationId}/documents/${documentId}/extractions`)
+      .set("Cookie", auth.session)
+      .expect(200);
+    const revenue = (
+      extractions.body.extractions[0].statements[0].lineItems as Array<{
+        id: string;
+        concept: string;
+        reviewStatus: string;
+        rawValue: string;
+        normalizedValue: string;
+      }>
+    ).find((line) => line.concept === "REVENUE");
+    expect(revenue?.reviewStatus).toBe("PENDING");
+
+    const confirmed = await request(app.getHttpServer())
+      .post(`/api/v1/organizations/${organizationId}/documents/${documentId}/review`)
+      .set("Cookie", auth.cookies)
+      .set("x-csrf-token", auth.csrfToken)
+      .send({
+        lineItemId: revenue!.id,
+        action: "CONFIRM",
+        reason: "M2 confirm persistence acceptance",
+      })
+      .expect(201);
+    expect(confirmed.body.lineItem.reviewStatus).toBe("CONFIRMED");
+    expect(confirmed.body.lineItem.unitScaleRequiresReview).toBe(false);
+
+    // Duplicate CONFIRM remains safe and keeps CONFIRMED.
+    await request(app.getHttpServer())
+      .post(`/api/v1/organizations/${organizationId}/documents/${documentId}/review`)
+      .set("Cookie", auth.cookies)
+      .set("x-csrf-token", auth.csrfToken)
+      .send({ lineItemId: revenue!.id, action: "CONFIRM" })
+      .expect(201);
+
+    const after = await request(app.getHttpServer())
+      .get(`/api/v1/organizations/${organizationId}/documents/${documentId}/extractions`)
+      .set("Cookie", auth.session)
+      .expect(200);
+    const refreshed = after.body.extractions[0].statements[0].lineItems.find(
+      (line: { id: string }) => line.id === revenue!.id,
+    );
+    expect(refreshed.reviewStatus).toBe("CONFIRMED");
+    expect(refreshed.rawValue).toBe(revenue!.rawValue);
+    expect(refreshed.normalizedValue).toBe(revenue!.normalizedValue);
+
+    const { createPrismaClient } = await loadDatabaseModule();
+    const prisma = createPrismaClient(process.env.DATABASE_URL!);
+    const owner = await prisma.user.findUniqueOrThrow({
+      where: { email: `docs.confirm.${suffix}@example.com` },
+    });
+    const reviews = await prisma.extractionReview.findMany({
+      where: { lineItemId: revenue!.id },
+      orderBy: { createdAt: "asc" },
+    });
+    expect(reviews.length).toBeGreaterThanOrEqual(2);
+    expect(reviews.every((row) => row.action === "CONFIRM")).toBe(true);
+    expect(reviews.every((row) => row.actorUserId === owner.id)).toBe(true);
+
+    const access = await prisma.documentAccessEvent.findMany({
+      where: { documentId, action: "REVIEW" },
+    });
+    expect(access.length).toBeGreaterThanOrEqual(2);
+    expect(access.every((row) => row.actorUserId === owner.id)).toBe(true);
+
+    const audits = await prisma.auditEvent.findMany({
+      where: {
+        organizationId,
+        action: "document.reviewed",
+        entityId: revenue!.id,
+      },
+    });
+    expect(audits.length).toBeGreaterThanOrEqual(2);
+    expect(audits.every((row) => row.actorUserId === owner.id)).toBe(true);
+
+    // Cross-tenant: outsider cannot confirm into another org's document.
+    await request(app.getHttpServer())
+      .post(`/api/v1/organizations/${organizationId}/documents/${documentId}/review`)
+      .set("Cookie", outsider.cookies)
+      .set("x-csrf-token", outsider.csrfToken)
+      .send({ lineItemId: revenue!.id, action: "CONFIRM" })
+      .expect(404);
+
+    // Cross-tenant: outsider org path with foreign line id is denied.
+    await request(app.getHttpServer())
+      .post(`/api/v1/organizations/${outsiderOrganizationId}/documents/${documentId}/review`)
+      .set("Cookie", outsider.cookies)
+      .set("x-csrf-token", outsider.csrfToken)
+      .send({ lineItemId: revenue!.id, action: "CONFIRM" })
+      .expect(404);
+
+    await prisma.$disconnect();
+  });
+
   it("persists Revenue of 144,000 NGN thousands and exposes scaled actualMonetaryValue", async () => {
     const suffix = `${Date.now()}-fy24`;
     const auth = await registerVerifyLogin(app, mail, {
