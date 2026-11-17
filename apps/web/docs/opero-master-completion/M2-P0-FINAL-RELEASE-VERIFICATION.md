@@ -2,7 +2,8 @@
 
 **Date:** 2026-11-17  
 **Verdict: PASS**  
-**Release candidate tip (local only):** `86dc4b2d0eb55dfe66ba4573c7b3fd324913a77a`  
+**Release candidate SHA (web behavior):** `86dc4b2d0eb55dfe66ba4573c7b3fd324913a77a`  
+**Local tip:** deploy `HEAD` on this branch (docs stamps may sit atop the release SHA)  
 **Prior blocked tip:** `163e078a2fbe54ef1a81bebe255a2e5cc642fafd`  
 **Production baseline:** API `bc1567a70c54a16c776390f887d8ca9cb8636859` · Web `f59e65e6f220f96f58d08868a75aaa4d91bc384a`
 

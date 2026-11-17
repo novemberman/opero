@@ -2,8 +2,8 @@
 
 **Date:** 2026-11-17  
 **Verdict: PASS**  
-**Exact release SHA (401 fix + packaging docs):** `86dc4b2d0eb55dfe66ba4573c7b3fd324913a77a`  
-**Deploy local tip (docs stamps only after that SHA):** `git rev-parse HEAD` on owner machine after pull — currently `83262c37890769a49be85cf997fe44d238ebc239` at packaging time  
+**Exact release SHA (web behavior):** `86dc4b2d0eb55dfe66ba4573c7b3fd324913a77a`  
+**Local tip to deploy:** whichever docs-stamp descendant is `HEAD` on this branch (must contain `86dc4b2`; packaging tip was recorded in the final owner response)  
 **Production web still:** `f59e65e6f220f96f58d08868a75aaa4d91bc384a`  
 **Production API (compatible, unchanged):** `bc1567a70c54a16c776390f887d8ca9cb8636859`
 
