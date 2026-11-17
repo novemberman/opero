@@ -181,6 +181,52 @@ Incorporated findings from frontend + backend architecture audits.
 
 **Boundary:** **STOP FOR OWNER REVIEW.** No push/deploy/prod migrate.
 
+### 2026-11-17 — M12-C evidence reliability / score gate investigation
+
+**Scope:** Explain production diagnostic `ad64efd5-…` **INSUFFICIENT_DATA** vs M12-A expected SCORED 46; decide whether `score.v1` is wrong.
+
+**Finding:** Correct rejection (**A**) + preflight defect (**D**). Reliability = confirmed × extraction quality; CONFIRMED×LOW ⇒ 0.40 < 0.50. Human confirmation does not rewrite immutable extraction quality (frozen LOW from extract-time scale UNKNOWN).
+
+**Code:** No methodology change. Comment in `quality.ts`; `evidence-reliability-gates.test.ts`; fixture helper pass-through for scale-review fields.
+
+**Tests:** `@opero/diagnostics` **88 PASS**.
+
+**Docs:** `M12-C-EVIDENCE-RELIABILITY-INVESTIGATION.md`; defect **D-P1-013**.
+
+**Disposition:** Correct fixture outcome remains **INSUFFICIENT_DATA**. Stage 1 may resume AI/draft only if owner accepts that BHS outcome (or authorizes new extraction stamps — not in-place silent elevate).
+
+**Boundary:** **STOP FOR OWNER REVIEW.** Production read-only; no deploy.
+
+### 2026-11-17 — M12-E report entitlement denial acceptance
+
+**Scope:** One controlled production publish attempt without `xray.report_generate` on draft `0823d65f-…`.
+
+**Result:** **PASS** — draft-state publish **409** `INVALID_STATE`; after submit/approve, publish **403** `ENTITLEMENT_REQUIRED` / `XRAY_PRO`. End state **APPROVED** / unpublished; PDF **0**; grants/payments/checkouts **0**; fingerprint + diagnostic unchanged. Session `m12e-acceptance` revoked.
+
+**Docs:** `M12-E-REPORT-ENTITLEMENT-DENIAL-ACCEPTANCE.md`.
+
+**Boundary:** **STOP FOR OWNER REVIEW.** No grants, successful publish, PDF, payments, deploy, or emergency changes.
+
+### 2026-11-17 — M12-F synthetic publication / PDF acceptance
+
+**Scope:** Authorized synthetic entitlement → publish APPROVED report `0823d65f-…` → PDF → revoke.
+
+**Result:** **BLOCKED** at Phase 2. No production admin test-grant API (pilot-scoped, TTL, auditable, revocable) without DB bypass or Korapay settlement. Phase 1 preflight PASS; Phases 3–6 not executed. Grants/payments/PDF remain **0**; report stays **APPROVED** unpublished.
+
+**Docs:** `M12-F-SYNTHETIC-PUBLICATION-PDF-ACCEPTANCE.md`.
+
+**Boundary:** **STOP FOR OWNER REVIEW.** No invented grant pathway; no DB bypass; no checkout activation.
+
+### 2026-11-17 — M12-G restricted synthetic entitlement infrastructure
+
+**Scope:** Local implementation of ops-gated, allowlisted, time-limited MANUAL issue/revoke (unblocks M12-F without Korapay or DB bypass).
+
+**Result:** **PASS** (initial) then **PASS** final hardening — separate `xray.report_generate` and `xray.pdf_download` grants; revoke available during issuance shutdown; IT **41 PASS** + reports/billing/pilot suites green; API typecheck PASS. No Prisma migration. No production deploy/grants.
+
+**Docs:** `M12-G-TEST-ENTITLEMENT-INFRASTRUCTURE.md`, `M12-G-FINAL-RELEASE-ACCEPTANCE.md`; defect **D-P1-014** FIXED_LOCAL.
+
+**Boundary:** **STOP FOR OWNER REVIEW.** Owner API deploy + timed flag enable required before production M12-F retry.
+
 ---
 
 ## Release discipline map (this program)

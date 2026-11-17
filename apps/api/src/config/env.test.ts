@@ -281,6 +281,38 @@ describe("parseApiEnv", () => {
     expect(env.PILOT_BOOTSTRAP_INVITE_TTL_HOURS).toBe(72);
     expect(env.ENABLE_API_DOCS).toBeUndefined();
     expect(env.OPS_STATUS_TOKEN).toBeUndefined();
+    expect(env.SYNTHETIC_ENTITLEMENT_ENABLED).toBe(false);
+    expect(env.SYNTHETIC_ENTITLEMENT_DEFAULT_TTL_HOURS).toBe(2);
+  });
+
+  it("requires ops token, confirmation, and org allowlist when synthetic entitlements are enabled", () => {
+    expect(() =>
+      parseApiEnv({
+        ...valid,
+        SYNTHETIC_ENTITLEMENT_ENABLED: "true",
+      }),
+    ).toThrow(/OPS_STATUS_TOKEN|SYNTHETIC_ENTITLEMENT/);
+
+    expect(() =>
+      parseApiEnv({
+        ...valid,
+        SYNTHETIC_ENTITLEMENT_ENABLED: "true",
+        OPS_STATUS_TOKEN: "ops-token-sixteen-chars",
+        SYNTHETIC_ENTITLEMENT_CONFIRMATION_TOKEN: "synthetic-confirm-16c",
+        SYNTHETIC_ENTITLEMENT_ORG_IDS: "not-a-uuid",
+      }),
+    ).toThrow(/SYNTHETIC_ENTITLEMENT_ORG_IDS/);
+
+    const env = parseApiEnv({
+      ...valid,
+      SYNTHETIC_ENTITLEMENT_ENABLED: "true",
+      OPS_STATUS_TOKEN: "ops-token-sixteen-chars",
+      SYNTHETIC_ENTITLEMENT_CONFIRMATION_TOKEN: "synthetic-confirm-16c",
+      SYNTHETIC_ENTITLEMENT_ORG_IDS: "11111111-1111-4111-8111-111111111111",
+      SYNTHETIC_ENTITLEMENT_DEFAULT_TTL_HOURS: 4,
+    });
+    expect(env.SYNTHETIC_ENTITLEMENT_ENABLED).toBe(true);
+    expect(env.SYNTHETIC_ENTITLEMENT_DEFAULT_TTL_HOURS).toBe(4);
   });
 
   it("rejects short OPS_STATUS_TOKEN values", () => {

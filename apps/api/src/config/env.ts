@@ -120,6 +120,23 @@ export const apiEnvSchema = z
     LIVE_PILOT_ORG_ID: z.string().uuid().optional(),
     LIVE_PILOT_REPORT_ID: z.string().uuid().optional(),
     LIVE_PILOT_MAX_SUCCESSES: z.coerce.number().int().min(1).max(10).default(1),
+    /**
+     * M12-G restricted synthetic entitlement ops. Default false.
+     * When true: OPS_STATUS_TOKEN + confirmation secret + allowlisted org IDs required.
+     * Issues MANUAL `xray.report_generate` only — never payments.
+     */
+    SYNTHETIC_ENTITLEMENT_ENABLED: boolFromEnv.default(false),
+    /** Comma-separated organization UUIDs allowed to receive test grants. */
+    SYNTHETIC_ENTITLEMENT_ORG_IDS: z.string().optional(),
+    /** Optional wall-clock end for the feature window (ISO-8601). */
+    SYNTHETIC_ENTITLEMENT_EXPIRES_AT: z.string().datetime().optional(),
+    /** Default grant TTL hours (1–24). */
+    SYNTHETIC_ENTITLEMENT_DEFAULT_TTL_HOURS: z.coerce.number().int().min(1).max(24).default(2),
+    /**
+     * Second operator secret (independent of OPS_STATUS_TOKEN).
+     * Required in header X-Synthetic-Entitlement-Confirmation when issuing/revoking.
+     */
+    SYNTHETIC_ENTITLEMENT_CONFIRMATION_TOKEN: z.string().min(16).max(256).optional(),
   })
   .superRefine((env, ctx) => {
     // Prefer APP_ENV when set so Railway staging can use NODE_ENV=production runtime
@@ -317,6 +334,55 @@ export const apiEnvSchema = z
         message:
           "PILOT_UPLOAD_ENABLED must be true when EMERGENCY_DISABLE_UPLOADS=false in production (timed org allowlist required)",
       });
+    }
+    if (env.SYNTHETIC_ENTITLEMENT_ENABLED) {
+      if (!env.OPS_STATUS_TOKEN) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["OPS_STATUS_TOKEN"],
+          message: "OPS_STATUS_TOKEN is required when SYNTHETIC_ENTITLEMENT_ENABLED=true",
+        });
+      }
+      if (!env.SYNTHETIC_ENTITLEMENT_CONFIRMATION_TOKEN) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["SYNTHETIC_ENTITLEMENT_CONFIRMATION_TOKEN"],
+          message:
+            "SYNTHETIC_ENTITLEMENT_CONFIRMATION_TOKEN is required when SYNTHETIC_ENTITLEMENT_ENABLED=true",
+        });
+      }
+      const orgIds = (env.SYNTHETIC_ENTITLEMENT_ORG_IDS ?? "")
+        .split(",")
+        .map((part) => part.trim())
+        .filter(Boolean);
+      if (orgIds.length === 0) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["SYNTHETIC_ENTITLEMENT_ORG_IDS"],
+          message:
+            "SYNTHETIC_ENTITLEMENT_ORG_IDS must list at least one UUID when SYNTHETIC_ENTITLEMENT_ENABLED=true",
+        });
+      } else {
+        for (const id of orgIds) {
+          if (!z.string().uuid().safeParse(id).success) {
+            ctx.addIssue({
+              code: "custom",
+              path: ["SYNTHETIC_ENTITLEMENT_ORG_IDS"],
+              message: `Invalid organization UUID in SYNTHETIC_ENTITLEMENT_ORG_IDS: ${id}`,
+            });
+          }
+        }
+      }
+      if (env.SYNTHETIC_ENTITLEMENT_EXPIRES_AT) {
+        const expiresAt = new Date(env.SYNTHETIC_ENTITLEMENT_EXPIRES_AT);
+        if (Number.isNaN(expiresAt.getTime())) {
+          ctx.addIssue({
+            code: "custom",
+            path: ["SYNTHETIC_ENTITLEMENT_EXPIRES_AT"],
+            message: "SYNTHETIC_ENTITLEMENT_EXPIRES_AT must be a valid ISO-8601 timestamp",
+          });
+        }
+      }
     }
   });
 

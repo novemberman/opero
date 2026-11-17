@@ -203,6 +203,55 @@ export const livePilotCheckoutBodySchema = z
 
 export type LivePilotCheckoutBody = z.infer<typeof livePilotCheckoutBodySchema>;
 
+/**
+ * Ops-only synthetic test entitlements (M12-G).
+ * Allowlisted codes only — never payments, subscriptions, or arbitrary scopes.
+ * Publication (`xray.report_generate`) and PDF download (`xray.pdf_download`)
+ * are issued as separate grants so denial paths can be tested independently.
+ */
+export const SYNTHETIC_ENTITLEMENT_CODES = [
+  "xray.report_generate",
+  "xray.pdf_download",
+] as const;
+export type SyntheticEntitlementCode = (typeof SYNTHETIC_ENTITLEMENT_CODES)[number];
+/** @deprecated Prefer SYNTHETIC_ENTITLEMENT_CODES — kept for call-site clarity. */
+export const SYNTHETIC_ENTITLEMENT_CODE = "xray.report_generate" as const;
+export const SYNTHETIC_ENTITLEMENT_SOURCE_PREFIX = "synthetic_test:" as const;
+
+export const syntheticEntitlementCodeSchema = z.enum(SYNTHETIC_ENTITLEMENT_CODES);
+
+export const issueSyntheticEntitlementBodySchema = z
+  .object({
+    organizationId: z.uuid(),
+    reportId: z.uuid(),
+    code: syntheticEntitlementCodeSchema,
+    /** Gate / ticket reference (e.g. M12-F). */
+    acceptanceReference: z.string().trim().min(3).max(120),
+    reason: z.string().trim().min(8).max(500),
+    createdByLabel: z.string().trim().min(1).max(120).default("ops"),
+    /** Grant TTL hours (1–24); defaults to API env. */
+    ttlHours: z.number().int().min(1).max(24).optional(),
+  })
+  .strict();
+
+export type IssueSyntheticEntitlementBody = z.infer<
+  typeof issueSyntheticEntitlementBodySchema
+>;
+
+export const revokeSyntheticEntitlementBodySchema = z
+  .object({
+    organizationId: z.uuid(),
+    reportId: z.uuid(),
+    code: syntheticEntitlementCodeSchema,
+    reason: z.string().trim().min(3).max(500),
+    createdByLabel: z.string().trim().min(1).max(120).default("ops"),
+  })
+  .strict();
+
+export type RevokeSyntheticEntitlementBody = z.infer<
+  typeof revokeSyntheticEntitlementBodySchema
+>;
+
 /** Hidden probe product/price codes — never mutate public XRAY_PRO.NGN. */
 export const LIVE_PILOT_PRODUCT_CODE = "XRAY_PRO_LIVE_PROBE" as const;
 export const LIVE_PILOT_PRICE_CODE = "XRAY_PRO_LIVE_PROBE.NGN" as const;

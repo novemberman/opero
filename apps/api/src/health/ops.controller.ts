@@ -19,6 +19,11 @@ import {
 } from "../config/env";
 import { PRISMA_CLIENT } from "../database/database.constants";
 import { pilotUploadWindowOpen } from "../documents/pilot-upload-gate";
+import {
+  evaluateSyntheticEntitlementGate,
+  resolveSyntheticEntitlementAllowlist,
+  SYNTHETIC_ENTITLEMENT_CODES,
+} from "../pilot/synthetic-entitlement-gate";
 import { timingSafeStringEqual } from "../security/timing-safe-equal";
 
 type QueueDepths = {
@@ -172,6 +177,25 @@ export class OpsController {
           pilotUploadExpiresAt: this.config.get("PILOT_UPLOAD_EXPIRES_AT", { infer: true }),
         }),
       },
+      syntheticEntitlement: (() => {
+        const enabled = this.config.get("SYNTHETIC_ENTITLEMENT_ENABLED", { infer: true });
+        const orgIdsRaw = this.config.get("SYNTHETIC_ENTITLEMENT_ORG_IDS", { infer: true });
+        const gate = evaluateSyntheticEntitlementGate({
+          enabled,
+          orgIdsRaw,
+          expiresAt: this.config.get("SYNTHETIC_ENTITLEMENT_EXPIRES_AT", { infer: true }),
+        });
+        const allowlist = resolveSyntheticEntitlementAllowlist(orgIdsRaw);
+        return {
+          enabled,
+          windowOpen: gate.ok,
+          issuanceOpen: gate.ok,
+          revocationAvailable: allowlist.ok,
+          allowlistedOrgCount: allowlist.ok ? allowlist.allowlistedOrgIds.length : 0,
+          expiresAt: this.config.get("SYNTHETIC_ENTITLEMENT_EXPIRES_AT", { infer: true }) ?? null,
+          capabilities: [...SYNTHETIC_ENTITLEMENT_CODES],
+        };
+      })(),
       checks,
       queues,
       alertNote:

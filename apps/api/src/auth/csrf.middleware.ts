@@ -29,6 +29,8 @@ const CSRF_EXEMPT_ROUTES: Array<{ path: string; nested?: boolean }> = [
   { path: "/billing/enterprise-quotes" },
   // Ops pilot invitation admin (OPS_STATUS_TOKEN gated; no browser session).
   { path: "/ops/pilot-invitations", nested: true },
+  // Ops synthetic entitlement admin (dual ops+confirmation tokens; no browser session).
+  { path: "/ops/synthetic-entitlements", nested: true },
 ];
 
 /** Normalize to an `/api/v1`-relative path beginning with `/`. */

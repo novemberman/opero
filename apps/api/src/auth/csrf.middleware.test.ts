@@ -13,6 +13,8 @@ describe("isCsrfExemptPath", () => {
   it("exempts nested ops invitation and docs children only", () => {
     expect(isCsrfExemptPath("/api/v1/ops/pilot-invitations")).toBe(true);
     expect(isCsrfExemptPath("/api/v1/ops/pilot-invitations/x/revoke")).toBe(true);
+    expect(isCsrfExemptPath("/api/v1/ops/synthetic-entitlements")).toBe(true);
+    expect(isCsrfExemptPath("/api/v1/ops/synthetic-entitlements/revoke")).toBe(true);
     expect(isCsrfExemptPath("/api/v1/docs/swagger")).toBe(true);
   });
 
