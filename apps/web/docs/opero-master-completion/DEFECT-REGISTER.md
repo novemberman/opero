@@ -1,11 +1,11 @@
 # Defect Register
 
-**Updated:** 2026-11-17 (M13-B2 post-payment redirect repair)  
+**Updated:** 2026-11-17 (M13-B3 redirect production release PASS)  
 **Status key:** OPEN / FIXED_LOCAL / PARTIAL_LOCAL / BLOCKED_EXTERNAL / ACCEPTED_RISK / DEFERRED
 
 | ID | Sev | Title | Status | Evidence / notes |
 |----|-----|-------|--------|------------------|
-| D-P1-015 | P1 | Korapay post-payment redirect 404 (`/billing/return`) | FIXED_LOCAL | Gate C redirect_url pointed at missing Next route. Added `/billing/return` + `GET /billing/payments/return-context` + same-origin default redirect. See `M13-B2-KORAPAY-REDIRECT-REPAIR-ACCEPTANCE.md`. Needs API+web deploy. |
+| D-P1-015 | P1 | Korapay post-payment redirect 404 (`/billing/return`) | FIXED_LOCAL | Fixed in `e3c676b`; **production API+web deployed** M13-B3 (`0c56128f-…` / `2c5ba76c-…`). `/billing/return` 200; return-context 401/404 scoped. See `M13-B3-KORAPAY-REDIRECT-PRODUCTION-RELEASE.md`. |
 | D-P1-003 | P1 | Korapay hosted checkout / settlement unverified | PARTIAL_LOCAL | **Sandbox Gate C PASS** on `opero_29ef2711…`. **Live** settlement still unverified. Redirect UX fixed under D-P1-015. See M13-B / M13-B2. |
 | D-P1-014 | P1 | No production-safe synthetic entitlement grant/revoke API (M12-F BLOCKED) | FIXED_LOCAL | M12-G ops dual-token `/ops/synthetic-entitlements` (+ revoke); separate MANUAL grants for `xray.report_generate` and `xray.pdf_download`; flag off by default; revoke-during-shutdown; IT PASS. Prod API deployed M12-H1; issuance OFF after M12-H2. |
 | D-P1-013 | P1 | M12-A expected BHS 46 ignored production `quality=LOW` reliability gate | ACCEPTED_RISK / DOCUMENTED | Prod run `ad64efd5-…` correctly **INSUFFICIENT_DATA** (reliability 0.4 < 0.50). Confirmation ≠ rewrite of extraction quality. score.v1 unchanged; regression tests added. See M12-C. |

@@ -36,6 +36,15 @@ Pilot doc `cc04b221-…`: **READY** / **SUCCEEDED** after OWNER status read; 19 
 
 ## Change log
 
+### 2026-11-17 — M13-B3 Korapay redirect production promotion (PASS)
+
+**Auth:** `AUTHORIZE OPERO M13-B3 REDIRECT PRODUCTION PROMOTION`  
+**SHA:** `e3c676bd07677b51639557635002420db212e052`  
+**Deploys:** API `0c56128f-…` SUCCESS · Web `2c5ba76c-…` SUCCESS · Worker unchanged `09037c7…`  
+**Accept:** `/billing/return` 200; return-context 401 unauth / 404 sandbox-ref; checkout emergency still blocks; payments/grants 0; migrations 15 unchanged.  
+**Docs:** `M13-B3-KORAPAY-REDIRECT-PRODUCTION-RELEASE.md` · D-P1-015 prod-closed.  
+**Boundary:** **STOP FOR OWNER REVIEW.** Checkout remains dormant.
+
 ### 2026-11-17 — M13-B2 Korapay post-payment redirect repair (PASS local)
 
 **Root cause:** Checkout `redirect_url` → `/billing/return` had no Next.js page → HTTP 404 after successful sandbox pay (settlement itself was already PASS).

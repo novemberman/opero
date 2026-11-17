@@ -78,7 +78,7 @@
 | Control | Verdict | Evidence |
 |---------|---------|----------|
 | Hosted checkout | **PASS** (sandbox) | M13-B: Opero checkout → `test-checkout.korapay.com` → sandbox instrument → Korapay `success` ₦15,000 (`opero_29ef2711…`). Historical unpaid `opero_af4def5d…` retained as unpaid-session note |
-| Post-payment browser return | **PASS** (local; deploy pending) | M13-B2: root cause was missing `/billing/return` route (404). Added return page + return-context API + same-origin default redirect (D-P1-015) |
+| Post-payment browser return | **PASS** (production) | M13-B2 fix + M13-B3 prod API/web @ `e3c676b`: `/billing/return` 200; return-context authz; sandbox refs do not unlock prod (D-P1-015) |
 | Callback / verify | **PASS** | `verifyAndFulfill` + provider verify `success`; response `ALREADY_FULFILLED` after webhook path |
 | Webhook signature verification | **PASS** | Authentic `charge.success` with `signature_valid=true`; forged signature → `valid:false` / `invalid_signature` / no grant |
 | Settlement status | **PASS** (sandbox) / **BLOCKED** (live) | Sandbox: payment+intent `SUCCEEDED`, fulfilled, amount match. Live money: not exercised |
