@@ -626,14 +626,24 @@ export class DocumentsService {
     const priorStatus = document.processingStatus;
     const priorExtractionStatus = document.extractionStatus;
 
-    await this.prisma.$transaction(async (tx) => {
-      await tx.document.update({
-        where: { id: document.id },
+    // Conditional update so concurrent status polls cannot double-write or
+    // emit duplicate transition audits if another request already won the race.
+    const transitioned = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.document.updateMany({
+        where: {
+          id: document.id,
+          organizationId: input.organizationId,
+          processingStatus: priorStatus,
+          extractionStatus: priorExtractionStatus,
+        },
         data: {
           processingStatus: nextStatus,
           extractionStatus: nextExtractionStatus,
         },
       });
+      if (updated.count !== 1) {
+        return false;
+      }
       if (job) {
         await tx.documentProcessingJob.update({
           where: { id: job.id },
@@ -643,9 +653,10 @@ export class DocumentsService {
           },
         });
       }
+      return true;
     });
 
-    if (priorStatus !== nextStatus || priorExtractionStatus !== nextExtractionStatus) {
+    if (transitioned) {
       await this.audit.record({
         action: "document.review_status_reconciled",
         entityType: "document",
