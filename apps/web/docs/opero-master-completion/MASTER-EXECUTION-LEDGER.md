@@ -63,6 +63,18 @@ Pilot doc `cc04b221-…`: extraction OK; **0/18** CONFIRMED in production (pre-f
 
 **Local commit:** `da1322e60fe5dd358caefcad7abac018ceac3a31` (not pushed).
 
+### 2026-11-17 — Audit follow-up (local)
+
+Incorporated findings from frontend + backend architecture audits.
+
+**Fixed locally:**
+- CSRF exempt path matching tightened (exact allowlist; unit tests)
+- Multer upload limit aligned to 20 MiB
+- Document page CTA: review stays on-page; readiness is secondary
+- Review-complete copy no longer says “corrected”
+
+**Documented OPEN (no silent product change):** D-P0-003 READY-vs-PENDING semantics, D-P0-004 B2.2 KPI wiring, D-P0-005 `xray.report_generate` gate, billing UI scaffold, retention purge.
+
 ---
 
 ## Release discipline map (this program)

@@ -65,7 +65,8 @@ export class DocumentsController {
   @UseInterceptors(
     FileInterceptor("file", {
       storage: memoryStorage(),
-      limits: { fileSize: 25 * 1024 * 1024 },
+      // Align with DOCUMENT_MAX_BYTES default (20 MiB); service re-validates.
+      limits: { fileSize: 20 * 1024 * 1024 },
     }),
   )
   async completeUpload(

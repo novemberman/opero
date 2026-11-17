@@ -213,15 +213,25 @@ export default function DocumentDetailPage() {
       ) : null}
 
       <div className="flex flex-wrap gap-3">
-        <a href="#extracted-figures" className={buttonClassName({ variant: "secondary" })}>
-          View extraction
-        </a>
-        {readyForDiagnostics || needsReview ? (
+        {needsReview ? (
+          <a href="#extracted-figures" className={buttonClassName()}>
+            Review extracted figures
+          </a>
+        ) : (
+          <a href="#extracted-figures" className={buttonClassName({ variant: "secondary" })}>
+            View extraction
+          </a>
+        )}
+        {readyForDiagnostics ? (
+          <Link className={buttonClassName()} href={`/organizations/${orgId}/readiness`}>
+            Continue to diagnostics
+          </Link>
+        ) : needsReview ? (
           <Link
-            className={buttonClassName()}
+            className={buttonClassName({ variant: "secondary" })}
             href={`/organizations/${orgId}/readiness`}
           >
-            {needsReview ? "Continue to readiness / review" : "Continue to diagnostics"}
+            Open readiness checklist
           </Link>
         ) : null}
       </div>

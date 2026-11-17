@@ -6,37 +6,51 @@ import {
 import type { NextFunction, Request, Response } from "express";
 import { CsrfService } from "./csrf.service";
 
-const CSRF_EXEMPT_SUFFIXES = [
-  "/health",
-  "/ready",
-  "/auth/csrf",
-  "/auth/register",
-  "/auth/login",
-  "/auth/verify-email",
-  "/auth/forgot-password",
-  "/auth/reset-password",
+/**
+ * Paths relative to the `/api/v1` global prefix (also accepted with the prefix).
+ * Nested children are allowed only when `nested` is true.
+ */
+const CSRF_EXEMPT_ROUTES: Array<{ path: string; nested?: boolean }> = [
+  { path: "/health" },
+  { path: "/ready" },
+  { path: "/auth/csrf" },
+  { path: "/auth/register" },
+  { path: "/auth/login" },
+  { path: "/auth/verify-email" },
+  { path: "/auth/forgot-password" },
+  { path: "/auth/reset-password" },
   // Ops-issued pilot bootstrap accept (single-use token; no session yet).
-  "/auth/pilot-invitations/accept",
-  "/invitations/accept-public",
-  "/docs",
+  { path: "/auth/pilot-invitations/accept" },
+  { path: "/invitations/accept-public" },
+  { path: "/docs", nested: true },
   // Korapay server-to-server webhooks (signature-verified, no browser CSRF).
-  "/billing/webhooks/korapay",
+  { path: "/billing/webhooks/korapay" },
   // Public enterprise quotation intake (no session required).
-  "/billing/enterprise-quotes",
+  { path: "/billing/enterprise-quotes" },
   // Ops pilot invitation admin (OPS_STATUS_TOKEN gated; no browser session).
-  "/ops/pilot-invitations",
+  { path: "/ops/pilot-invitations", nested: true },
 ];
 
-function isCsrfExempt(path: string): boolean {
-  const normalized = path.split("?")[0] ?? path;
-  return CSRF_EXEMPT_SUFFIXES.some(
-    (suffix) =>
-      normalized === suffix ||
-      normalized.endsWith(suffix) ||
-      normalized.startsWith(`${suffix}/`) ||
-      // Nested routes under a global prefix (e.g. /api/v1/ops/pilot-invitations/:id/revoke).
-      normalized.includes(`${suffix}/`),
-  );
+/** Normalize to an `/api/v1`-relative path beginning with `/`. */
+function toApiRelativePath(rawPath: string): string {
+  const withoutQuery = (rawPath.split("?")[0] ?? rawPath).replace(/\/+$/, "") || "/";
+  if (withoutQuery === "/api/v1" || withoutQuery.startsWith("/api/v1/")) {
+    const rest = withoutQuery.slice("/api/v1".length);
+    return rest.startsWith("/") ? rest : `/${rest}`;
+  }
+  return withoutQuery.startsWith("/") ? withoutQuery : `/${withoutQuery}`;
+}
+
+/**
+ * Exact allowlist match (optionally nested children). Does not use substring
+ * `includes` / bare `endsWith`, which previously could exempt unrelated paths.
+ */
+export function isCsrfExemptPath(rawPath: string): boolean {
+  const relative = toApiRelativePath(rawPath);
+  return CSRF_EXEMPT_ROUTES.some(({ path, nested }) => {
+    if (relative === path) return true;
+    return Boolean(nested && relative.startsWith(`${path}/`));
+  });
 }
 
 @Injectable()
@@ -50,7 +64,7 @@ export class CsrfMiddleware implements NestMiddleware {
       return;
     }
 
-    if (isCsrfExempt(req.path) || isCsrfExempt(req.originalUrl)) {
+    if (isCsrfExemptPath(req.path) || isCsrfExemptPath(req.originalUrl)) {
       next();
       return;
     }

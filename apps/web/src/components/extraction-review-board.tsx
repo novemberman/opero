@@ -168,7 +168,7 @@ export function ExtractionReviewBoard({
       {lines.length > 0 && reviewComplete ? (
         <div className="mt-4">
           <Alert tone="success" title="Review complete for extracted lines">
-            All current line items are confirmed, corrected or rejected.
+            All current line items are confirmed or rejected.
           </Alert>
         </div>
       ) : null}
