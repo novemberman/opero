@@ -9,6 +9,7 @@ import { InjectQueue } from "@nestjs/bullmq";
 import {
   assessSnapshotPayloadIntegrity,
   CALC_ENGINE_VERSION,
+  materialMonetaryNeedsConfirmation,
   RULE_SET_VERSION,
   SCORE_METHODOLOGY_VERSION,
 } from "@opero/diagnostics";
@@ -56,6 +57,35 @@ export class DiagnosticsService {
     if (notReady.length) {
       throw new BadRequestException(
         "Diagnostics require READY documents; complete material figure review first",
+      );
+    }
+
+    // Belt: refuse sticky READY badges that still have unconfirmed material lines (D-P0-003).
+    const lines = await this.prisma.financialLineItem.findMany({
+      where: {
+        organizationId: input.organizationId,
+        statement: { documentId: { in: uniqueIds } },
+      },
+      select: {
+        concept: true,
+        quantityClass: true,
+        reviewStatus: true,
+        unitScale: true,
+        unitScaleRequiresReview: true,
+      },
+    });
+    const materialPending = lines.filter((line) =>
+      materialMonetaryNeedsConfirmation({
+        concept: line.concept,
+        quantityClass: line.quantityClass,
+        reviewStatus: line.reviewStatus,
+        unitScale: line.unitScale,
+        unitScaleRequiresReview: line.unitScaleRequiresReview,
+      }),
+    );
+    if (materialPending.length) {
+      throw new BadRequestException(
+        "Diagnostics require confirmed material monetary figures; complete extraction review first",
       );
     }
 

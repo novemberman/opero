@@ -1,6 +1,7 @@
 import { Processor, WorkerHost } from "@nestjs/bullmq";
 import { Inject, Logger } from "@nestjs/common";
 import type { PrismaClient } from "@opero/database";
+import { materialMonetaryNeedsConfirmation } from "@opero/diagnostics";
 import { extractFinancialDocument } from "@opero/document-processing";
 import type { MalwareScannerPort, ObjectStoragePort } from "@opero/object-storage";
 import type { Job } from "bullmq";
@@ -260,11 +261,25 @@ export class DocumentProcessProcessor extends WorkerHost {
           }
         }
 
+        // New lines default to PENDING review. READY is only valid after human
+        // confirmation of material monetary figures (same predicate as API reconcile).
+        const materialPending = extraction.statements.some((statement) =>
+          statement.lines.some((line) =>
+            materialMonetaryNeedsConfirmation({
+              concept: line.concept,
+              quantityClass: line.quantityClass,
+              reviewStatus: "PENDING",
+              unitScale: line.unitScale,
+              unitScaleRequiresReview: line.unitScaleRequiresReview,
+            }),
+          ),
+        );
         const scaleNeedsReview = extraction.statements.some((s) => s.unitScaleRequiresReview);
         const nextStatus =
           extraction.manualRequired ||
           extraction.quality === "LOW" ||
           scaleNeedsReview ||
+          materialPending ||
           extraction.consistency.some((c) => c.status === "INCONSISTENT")
             ? "REVIEW_REQUIRED"
             : "READY";

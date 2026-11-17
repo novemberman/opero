@@ -30,7 +30,7 @@ Pilot doc `cc04b221-…`: **READY** / **SUCCEEDED** after OWNER status read; 19 
 | M7 | Customer experience | COMPLETE (billing/members) | JSON dumps removed; residual list polish |
 | M8 | Security / reliability | COMPLETE local audit | Shared-bucket plan only; no remap |
 | M9 | Comprehensive QA | COMPLETE composable + Docker PW | Live providers not claimed |
-| M10 | Release / commercial readiness | COMPLETE docs | Rehearsal GO; commercial launch NO-GO |
+| M10 | Release / commercial readiness | COMPLETE + stabilization | Internal P0 local FIXED; rehearsal GO; commercial NO-GO |
 
 ---
 
@@ -157,6 +157,26 @@ Incorporated findings from frontend + backend architecture audits.
 **Local RC:** `3e64963fe2e0688c5e1227d6bb8c9beddfb3649c` (not pushed).
 
 **Boundary:** **STOP FOR OWNER REVIEW.**
+
+### 2026-11-17 — Final integrated release stabilization (local)
+
+**Scope:** Resolve remaining internal blockers (D-P0-003 READY, D-P0-004 B2.2 advisory, D-P1-011 retention dry-run); audit + isolate-test migration `20261117120000_m6_report_generate_entitlement`; full local regression; package rehearsal RC.
+
+**Code:**
+- Worker READY only when material monetary lines are not PENDING
+- Diagnostics `createRun` evidence belt against sticky READY
+- B2.2 CF/equity identities advisory in quality details (do not gate `score.v1`)
+- `RetentionPurgeService.dryRun` (DELETED + expired `retentionUntil`; no execute)
+
+**Migration:** Isolated fresh-15 + baseline-14→M6 **PASS**; idempotent; additive; no prod apply.
+
+**Tests:** diagnostics 75 · ai 151 · reports 61 · shared 13 · API IT 60 (+ readiness 3) · worker 57 · web 99 · typechecks/builds PASS · Docker Chromium 5/5 · documents D-P0-003 IT PASS
+
+**Doc:** `FINAL-INTEGRATED-RELEASE-STABILIZATION.md`
+
+**Verdict:** **PARTIAL PASS** — internal blockers locally cleared; Korapay Gate C + live AI external; commercial **NO-GO**; rehearsal **GO** after owner deploy auth.
+
+**Boundary:** **STOP FOR OWNER REVIEW.** No push/deploy/prod migrate.
 
 ---
 

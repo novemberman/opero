@@ -1,8 +1,10 @@
 # M10 RELEASE READINESS
 
 **Date:** 2026-11-17  
-**Integrated local RC tip:** `c50fa0e7d4a672d89d5a36169000f46b6d3e35db`  
+**Stabilization pack:** `FINAL-INTEGRATED-RELEASE-STABILIZATION.md`  
+**Integrated local RC tip:** stamp after stabilization commit (prior tip `f4fe3d69c6f096fa04cd2090dd292cff0c0f4767`)  
 **Feature code tip (M6–M10):** `3e64963fe2e0688c5e1227d6bb8c9beddfb3649c`  
+**Stabilization deltas:** D-P0-003 READY, D-P0-004 advisory B2.2, D-P1-011 retention dry-run  
 
 
 ## Feature-completion inventory
@@ -18,21 +20,33 @@
 | M7 CX | COMPLETE for billing/members commercial surfaces |
 | M8 Security | COMPLETE audit + IT |
 | M9 E2E | COMPLETE composable + Docker Chromium |
-| M10 Release pack | THIS DOCUMENT |
+| M10 Release pack | THIS DOCUMENT + final stabilization |
+
+## Internal blocker close-out
+
+| ID | Local status |
+|----|--------------|
+| D-P0-003 READY semantics | FIXED_LOCAL |
+| D-P0-004 B2.2 unused concepts | FIXED_LOCAL advisory / DEFERRED KPIs |
+| D-P0-005 report_generate | FIXED_LOCAL (prior) |
+| D-P1-011 retention | PARTIAL_LOCAL dry-run |
+| D-P1-004 SHA skew | OPEN until coordinated deploy |
 
 ## Migrations
 
 | Migration | Required on deploy? |
 |-----------|---------------------|
-| `20261117120000_m6_report_generate_entitlement` | **Yes** (API/worker before enforcing generate on OS plans) |
+| `20261117120000_m6_report_generate_entitlement` | **Yes** (before enforcing generate on OS plans) |
 | Prior 14 | Already on production baseline |
+
+**Isolated verify:** baseline-14 → M6 apply **PASS**; idempotent; additive rollback-safe.
 
 ## Deployment dependency graph
 
-1. Apply DB migration  
+1. Apply DB migration `20261117120000_m6_report_generate_entitlement`  
 2. Deploy packages build (`shared` → `ai`/`reports`/`payments`/`diagnostics`)  
-3. API (entitlement gate + billing grants)  
-4. Worker (integrity-only reports; shared package compat)  
+3. API (READY belt + entitlement gate + retention dry-run)  
+4. Worker (READY material-pending terminal + report integrity)  
 5. Web (billing/members CX + unlock copy)  
 
 **Do not** enable uploads/checkout emergencies off, registration, or live pilot without owner authorize.
@@ -87,8 +101,15 @@ Continue dormant/emergency posture until Confirm UX + M6 generate gate are deplo
 | Criterion | Assessment |
 |-----------|------------|
 | Local financial intelligence | GO |
+| Internal P0 release blockers | GO (local FIXED; deploy pending) |
 | Mock billing integrity | GO |
+| Migration readiness | GO (isolated PASS) |
+| Controlled rehearsal | **GO** (owner authorize) |
 | Live payment settlement | **NO-GO** until Korapay verified |
 | Live AI provider ops | **NO-GO** / optional mock |
 | Shared bucket remap | Not required for pilot; ACCEPTED_RISK |
 | Overall commercial launch | **NO-GO** — rehearsal-ready, not production-payment-ready |
+
+## STOP FOR OWNER REVIEW
+
+No push / deploy / production migrate from this gate.

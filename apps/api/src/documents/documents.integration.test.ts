@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { INestApplication } from "@nestjs/common";
 import { createPrismaClient } from "@opero/database";
+import { materialMonetaryNeedsConfirmation } from "@opero/diagnostics";
 import { extractFinancialDocument } from "@opero/document-processing";
 import { MemoryObjectStorage, MockMalwareScanner } from "@opero/object-storage";
 import request from "supertest";
@@ -181,9 +182,23 @@ async function runPipeline(input: {
         });
       }
     }
+    const materialPending = extraction.statements.some((statement) =>
+      statement.lines.some((line) =>
+        materialMonetaryNeedsConfirmation({
+          concept: line.concept,
+          quantityClass: line.quantityClass,
+          reviewStatus: "PENDING",
+          unitScale: line.unitScale,
+          unitScaleRequiresReview: line.unitScaleRequiresReview,
+        }),
+      ),
+    );
     const scaleNeedsReview = extraction.statements.some((s) => s.unitScaleRequiresReview);
     nextStatus =
-      extraction.manualRequired || extraction.quality === "LOW" || scaleNeedsReview
+      extraction.manualRequired ||
+      extraction.quality === "LOW" ||
+      scaleNeedsReview ||
+      materialPending
         ? "REVIEW_REQUIRED"
         : "READY";
     await tx.document.update({
@@ -528,6 +543,73 @@ describe("document ingestion integration", () => {
       .send({ lineItemId: revenue!.id, action: "CONFIRM" })
       .expect(404);
 
+    await prisma.$disconnect();
+  });
+
+  it("keeps extraction terminal status REVIEW_REQUIRED while material monetary lines are PENDING (D-P0-003)", async () => {
+    const suffix = `${Date.now()}-pending-ready`;
+    const auth = await registerVerifyLogin(app, mail, {
+      email: `docs.pending.${suffix}@example.com`,
+      name: "Pending Owner",
+      password: "docs-password-123",
+    });
+    const org = await request(app.getHttpServer())
+      .post("/api/v1/organizations")
+      .set("Cookie", auth.cookies)
+      .set("x-csrf-token", auth.csrfToken)
+      .send({ name: "Pending Org", slug: `pending-org-${suffix}` })
+      .expect(201);
+    const organizationId = org.body.organization.id as string;
+
+    const upload = await request(app.getHttpServer())
+      .post(`/api/v1/organizations/${organizationId}/documents/uploads`)
+      .set("Cookie", auth.cookies)
+      .set("x-csrf-token", auth.csrfToken)
+      .send({
+        filename: "pending.csv",
+        declaredFormat: "CSV",
+        declaredMimeType: "text/csv",
+      })
+      .expect(201);
+    const csv = Buffer.from(
+      ["Label,Amount", "Total Revenue,\"1,250,000\"", "Cost of sales,\"750,000\""].join("\n"),
+      "utf8",
+    );
+    const completed = await request(app.getHttpServer())
+      .post(
+        `/api/v1/organizations/${organizationId}/documents/uploads/${upload.body.upload.uploadId}/complete`,
+      )
+      .set("Cookie", auth.cookies)
+      .set("x-csrf-token", auth.csrfToken)
+      .attach("file", csv, "pending.csv")
+      .expect(201);
+    const documentId = completed.body.documentId as string;
+    const processingJobId = completed.body.processingJobId as string;
+    const terminal = await runPipeline({ organizationId, documentId, processingJobId, storage });
+    expect(terminal).toBe("REVIEW_REQUIRED");
+
+    const status = await request(app.getHttpServer())
+      .get(`/api/v1/organizations/${organizationId}/documents/${documentId}/status`)
+      .set("Cookie", auth.session)
+      .expect(200);
+    expect(status.body.processingStatus).toBe("REVIEW_REQUIRED");
+
+    const prisma = createPrismaClient(process.env.DATABASE_URL!);
+    const lines = await prisma.financialLineItem.findMany({
+      where: { organizationId, statement: { documentId } },
+    });
+    expect(lines.some((line) => line.reviewStatus === "PENDING")).toBe(true);
+    expect(
+      lines.some((line) =>
+        materialMonetaryNeedsConfirmation({
+          concept: line.concept,
+          quantityClass: line.quantityClass,
+          reviewStatus: line.reviewStatus,
+          unitScale: line.unitScale,
+          unitScaleRequiresReview: line.unitScaleRequiresReview,
+        }),
+      ),
+    ).toBe(true);
     await prisma.$disconnect();
   });
 

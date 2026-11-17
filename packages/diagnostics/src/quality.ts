@@ -132,6 +132,42 @@ export function assessQuality(
       consistencyFlags += 1;
     }
   }
+
+  // B2.2 optional identities — advisory only (do not gate BHS / score.v1 consistency).
+  // Absence is optional; presence enables integrity warnings without changing historical scores.
+  const ocf = resolveConcept(snapshot, "OPERATING_CASH_FLOW");
+  const investing = resolveConcept(snapshot, "INVESTING_CASH_FLOW");
+  const financing = resolveConcept(snapshot, "FINANCING_CASH_FLOW");
+  const netCashChange = resolveConcept(snapshot, "NET_CHANGE_IN_CASH");
+  const openingCash = resolveConcept(snapshot, "OPENING_CASH_AND_EQUIVALENTS");
+  const closingCash = resolveConcept(snapshot, "CASH_AND_EQUIVALENTS");
+  const shareCapital = resolveConcept(snapshot, "SHARE_CAPITAL");
+  const retainedEarnings = resolveConcept(snapshot, "RETAINED_EARNINGS");
+  const optionalIdentityFailures: string[] = [];
+  const optionalIdentityChecks: string[] = [];
+
+  if (ocf.amount && investing.amount && financing.amount && netCashChange.amount) {
+    optionalIdentityChecks.push("cash_flow_sections");
+    const derived = ocf.amount.value.plus(investing.amount.value).plus(financing.amount.value);
+    if (!identityOk(derived, netCashChange.amount.value, netCashChange.amount.value)) {
+      optionalIdentityFailures.push("cash_flow_sections");
+    }
+  }
+  if (openingCash.amount && netCashChange.amount && closingCash.amount) {
+    optionalIdentityChecks.push("cash_roll_forward");
+    const derived = openingCash.amount.value.plus(netCashChange.amount.value);
+    if (!identityOk(derived, closingCash.amount.value, closingCash.amount.value)) {
+      optionalIdentityFailures.push("cash_roll_forward");
+    }
+  }
+  if (shareCapital.amount && retainedEarnings.amount && equity.amount) {
+    optionalIdentityChecks.push("equity_bridge");
+    const derived = shareCapital.amount.value.plus(retainedEarnings.amount.value);
+    if (!identityOk(derived, equity.amount.value, equity.amount.value)) {
+      optionalIdentityFailures.push("equity_bridge");
+    }
+  }
+
   const conflictedCore = CORE_CONCEPTS.filter((c) => resolveConcept(snapshot, c).conflict);
   if (conflictedCore.length || revenue.conflict || cogs.conflict || gross.conflict) {
     consistencyChecks += 1;
@@ -182,6 +218,8 @@ export function assessQuality(
       scaleCount: scales.size,
       snapshotWarnings: snapshot.warnings,
       lineCount: snapshot.lines.length,
+      optionalIdentityChecks,
+      optionalIdentityFailures,
     },
   };
 }
