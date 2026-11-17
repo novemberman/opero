@@ -4,7 +4,7 @@
 **Mode:** Local engineering + isolated synthetic tests only  
 **Verdict:** **PARTIAL PASS** — internal release blockers resolved locally; commercial launch remains **NO-GO**; controlled rehearsal **GO** after owner-authorized deploy.
 
-**Release candidate tip (post-commit stamp):** see commit created with this document.  
+**Release candidate tip:**   
 **Prior tip before stabilization commit:** `f4fe3d69c6f096fa04cd2090dd292cff0c0f4767`  
 **Origin/main baseline:** `77ecbf6b4954387888bfda24dc747ac038fa6175`  
 **Feature lineage ahead of origin (12 commits before this RC):**
