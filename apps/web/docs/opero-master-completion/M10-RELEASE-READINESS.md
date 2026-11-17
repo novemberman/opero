@@ -1,7 +1,7 @@
 # M10 RELEASE READINESS
 
 **Date:** 2026-11-17  
-**Integrated local RC tip:** `d2963a081dd2e51965013966ba71db367d081df1`  
+**Integrated local RC tip:** `c50fa0e7d4a672d89d5a36169000f46b6d3e35db`  
 **Feature code tip (M6–M10):** `3e64963fe2e0688c5e1227d6bb8c9beddfb3649c`  
 
 

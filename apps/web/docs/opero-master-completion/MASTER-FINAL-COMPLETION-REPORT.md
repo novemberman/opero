@@ -17,7 +17,7 @@
 | M3 feature | `fe7eed6c02b42c7cef5b8582149eaf4869b14b76` |
 | M4/M5 feature | `4f7b19361f1cab0fa073b61f8bbdb5e24b00f634` |
 | M6–M10 feature RC | `3e64963fe2e0688c5e1227d6bb8c9beddfb3649c` |
-| Local tip | `3e64963fe2e0688c5e1227d6bb8c9beddfb3649c` (+ docs stamp if advanced) |
+| Local tip | `c50fa0e7d4a672d89d5a36169000f46b6d3e35db` |
 
 ---
 
