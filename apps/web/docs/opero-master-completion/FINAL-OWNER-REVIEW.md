@@ -51,7 +51,7 @@
 ## 6. Git commit SHAs
 
 - Program start / production API baseline: `bc1567a70c54a16c776390f887d8ca9cb8636859`  
-- Local completion commit: *(recorded after commit in ledger)*  
+- Local completion commit: `da1322e60fe5dd358caefcad7abac018ceac3a31`  
 
 ## 7. External dependencies
 

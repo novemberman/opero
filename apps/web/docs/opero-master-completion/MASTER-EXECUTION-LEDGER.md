@@ -61,6 +61,8 @@ Pilot doc `cc04b221-…`: extraction OK; **0/18** CONFIRMED in production (pre-f
 
 **Next (owner):** authorize deploy → one-figure diagnostic → full confirms. No further local blockers for Confirm UX.
 
+**Local commit:** `da1322e60fe5dd358caefcad7abac018ceac3a31` (not pushed).
+
 ---
 
 ## Release discipline map (this program)
