@@ -3,7 +3,7 @@
 **Date:** 2026-11-17  
 **Verdict: PASS**  
 **Exact release SHA:** `86dc4b2d0eb55dfe66ba4573c7b3fd324913a77a`  
-**Local tip after docs stamp:** recorded by follow-up stamp commit (docs-only; same web behavior)  
+**Local tip (docs stamp):** `e79fdddbbbffcfcf3b9e7c20ffeb417159e94a28` (docs-only; same web behavior as release SHA — prefer deploying this tip)  
 **Production web still:** `f59e65e6f220f96f58d08868a75aaa4d91bc384a`  
 **Production API (compatible, unchanged):** `bc1567a70c54a16c776390f887d8ca9cb8636859`
 
