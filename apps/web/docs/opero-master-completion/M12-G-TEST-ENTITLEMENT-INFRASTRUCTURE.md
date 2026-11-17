@@ -7,7 +7,7 @@
 
 | Item | Value |
 |------|--------|
-| Local feature SHA | See final acceptance after commit |
+| Local feature SHA | `514c37b2a193d5ac8c204e1f09e3cf4ad2fcc467` |
 | Migration | **None** |
 | Production | **Not deployed** |
 

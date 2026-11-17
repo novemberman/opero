@@ -6,8 +6,8 @@
 
 | Item | Value |
 |------|--------|
-| Feature commit SHA | *(filled after local commit)* |
-| Tip SHA after commit | *(filled after local commit)* |
+| Feature commit SHA | `514c37b2a193d5ac8c204e1f09e3cf4ad2fcc467` |
+| Tip SHA | `ebe6b7aec40dda2d0b58eff5514544f357c00c02` |
 | Migration | **None** |
 | Production | **Not deployed** · no grants · no payments |
 
