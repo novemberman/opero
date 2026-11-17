@@ -4,7 +4,7 @@
 **Mode:** Local engineering + isolated synthetic tests only  
 **Verdict:** **PARTIAL PASS** — internal release blockers resolved locally; commercial launch remains **NO-GO**; controlled rehearsal **GO** after owner-authorized deploy.
 
-**Release candidate tip:** __TIP__
+**Release candidate tip:** `5163fe75533a83a9c556d724bd5b0ae8b9a12ab7`
 **Stabilization feature SHA:** `a27806648dd5f708072dbd58a305f9a1a43f4143`
 **Prior tip before stabilization commit:** `f4fe3d69c6f096fa04cd2090dd292cff0c0f4767`  
 **Origin/main baseline:** `77ecbf6b4954387888bfda24dc747ac038fa6175`  
