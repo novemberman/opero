@@ -2,7 +2,7 @@
 
 **Date:** 2026-11-17  
 **Stabilization pack:** `FINAL-INTEGRATED-RELEASE-STABILIZATION.md`  
-**Integrated local RC tip:** stamp after stabilization commit (prior tip `f4fe3d69c6f096fa04cd2090dd292cff0c0f4767`)  
+**Integrated local RC tip:** __TIP__
 **Feature code tip (M6–M10):** `3e64963fe2e0688c5e1227d6bb8c9beddfb3649c`  
 **Stabilization feature SHA:** `a27806648dd5f708072dbd58a305f9a1a43f4143`  
 **Stabilization deltas:** D-P0-003 READY, D-P0-004 advisory B2.2, D-P1-011 retention dry-run  
