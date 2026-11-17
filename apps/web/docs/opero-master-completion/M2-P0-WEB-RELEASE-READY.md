@@ -2,7 +2,8 @@
 
 **Date:** 2026-11-17  
 **Verdict: PASS**  
-**Exact release SHA (local tip):** `PENDING_STAMP`  
+**Exact release SHA:** `86dc4b2d0eb55dfe66ba4573c7b3fd324913a77a`  
+**Local tip after docs stamp:** recorded by follow-up stamp commit (docs-only; same web behavior)  
 **Production web still:** `f59e65e6f220f96f58d08868a75aaa4d91bc384a`  
 **Production API (compatible, unchanged):** `bc1567a70c54a16c776390f887d8ca9cb8636859`
 
@@ -62,7 +63,7 @@ Unit regression: `classifyReviewHttpFailure(401, { message: "Unauthorized" })` r
 | `9993c39965ed60f69efea9784b8c31e8ff039a1f` | fix(security): tighten CSRF exemptions and align upload limits | Optional API hardening (not required for web RC) |
 | `430fa49ecb223aa3755a18d79168da796dbb7e25` | fix(review): harden Confirm figure submission and add contract E2E | Submit helper + E2E |
 | `163e078a2fbe54ef1a81bebe255a2e5cc642fafd` | docs(m2): stamp review-repair release candidate SHA | Prior RC stamp |
-| `PENDING_STAMP` | fix(review): prefer curated 401 session-expiry copy | **This release tip** (401 fix + docs) |
+| `86dc4b2d0eb55dfe66ba4573c7b3fd324913a77a` | fix(review): prefer curated 401 session-expiry copy | **This release tip** (401 fix + docs) |
 
 ### Changed files in the 401 fix commit
 
