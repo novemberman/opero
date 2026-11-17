@@ -2,9 +2,12 @@
 
 import { FormEvent, useState } from "react";
 import { formatFinancialConceptLabel } from "../lib/extraction-review-presentation";
+import type { ExtractionReviewSubmitInput } from "../lib/extraction-review-submit";
 import { resolveMonetaryPresentation } from "../lib/monetary-presentation";
 import { cn } from "../lib/cn";
 import { Alert, Badge, Button, Input, Select } from "./ui";
+
+export type { ExtractionReviewSubmitInput };
 
 export type ExtractionLine = {
   id: string;
@@ -29,13 +32,6 @@ export type ExtractionLine = {
     columnIndex?: number | null;
     snippet?: string | null;
   } | null;
-};
-
-export type ExtractionReviewSubmitInput = {
-  lineItemId: string;
-  action: "CONFIRM" | "CORRECT" | "REJECT";
-  newValue?: string;
-  reason?: string;
 };
 
 function toneForReview(status: string): "warning" | "success" | "error" | "neutral" {

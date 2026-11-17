@@ -5,8 +5,9 @@
 
 | ID | Sev | Title | Status | Evidence / notes |
 |----|-----|-------|--------|------------------|
-| D-P0-001 | P0 | Pilot Confirm clicks did not persist (0/18) | FIXED_LOCAL | R4J-A: no `POST /review`. One-click **Confirm figure**. Needs deploy + owner re-confirm. |
-| D-P0-002 | P0 | False success on review without server ack | FIXED_LOCAL | Requires `lineItem` in response; try/catch. |
+| D-P0-001 | P0 | Pilot Confirm clicks did not persist (0/18) | FIXED_LOCAL | Root cause: prod UX never POSTed. One-click **Confirm figure** + `submitExtractionReview`. Needs **web deploy** + owner re-confirm. One-figure diagnostic still FAIL on prod. |
+| D-P0-002 | P0 | False success on review without server ack | FIXED_LOCAL | Requires `lineItem` in response; shared submit helper. |
+| D-P1-012 | P1 | Playwright E2E cannot run on current Hetzner host | BLOCKED_EXTERNAL | Missing Chromium shared libs (`libnspr4`…); no sudo. Specs in `apps/web/e2e/`; happy-dom + contract E2E PASS. |
 | D-P0-003 | P0 | Worker may set document `READY` while lines still PENDING | OPEN | Mitigated by eligibility/readiness; status semantics still misleading. `document-process.processor.ts`. |
 | D-P0-004 | P0 | B2.2 concepts extractable but unused in KPI formulas | OPEN | Schema Increment A/B1; not wired in `@opero/diagnostics` KPIs. |
 | D-P0-005 | P0 | `xray.report_generate` entitlement never enforced | OPEN | Create/publish free; only view/PDF gated. Product decision before enforcing. |

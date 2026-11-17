@@ -10,14 +10,16 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ExtractionReviewBoard } from "../../../../../components/extraction-review-board";
-import type {
-  ExtractionLine,
-  ExtractionReviewSubmitInput,
-} from "../../../../../components/extraction-line-card";
+import type { ExtractionLine } from "../../../../../components/extraction-line-card";
 import { ProcessingTimeline } from "../../../../../components/processing-timeline";
 import { StatementMetadataPanel } from "../../../../../components/statement-metadata";
 import { Alert, Badge, buttonClassName } from "../../../../../components/ui";
-import { apiErrorMessage, apiFetch } from "../../../../../lib/api";
+import { apiFetch } from "../../../../../lib/api";
+import {
+  submitExtractionReview,
+  successMessageForReviewAction,
+  type ExtractionReviewSubmitInput,
+} from "../../../../../lib/extraction-review-submit";
 
 type Extraction = {
   id: string;
@@ -106,57 +108,31 @@ export default function DocumentDetailPage() {
     };
   }, [load]);
 
+  useEffect(() => {
+    if (!submittingLineId) return;
+    const onBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [submittingLineId]);
+
   async function onSubmitReview(input: ExtractionReviewSubmitInput) {
     if (!canWrite || submittingLineId) return;
-    const action = input.action;
-    const newValue = input.newValue?.trim() ?? "";
-    const reason = input.reason?.trim() ?? "";
-    // Draft corrected amounts must not be confirmed via Confirm — require Correct & confirm.
-    if (action === "CONFIRM" && newValue) {
-      setError(
-        "A corrected value is entered. Choose “Correct & confirm” to submit the new amount, or clear the field to Confirm the existing value.",
-      );
-      return;
-    }
-    if (action === "CORRECT" && !newValue) {
-      setError("Correct & confirm requires a corrected statement-units value.");
-      return;
-    }
     setSubmittingLineId(input.lineItemId);
     setError(null);
     setMessage(null);
+    const result = await submitExtractionReview({ orgId, documentId }, input);
+    if (!result.ok) {
+      setError(result.message);
+      setSubmittingLineId(null);
+      return;
+    }
+    // Never paint CONFIRMED from client state — reload server extractions.
+    setMessage(successMessageForReviewAction(input.action));
     try {
-      const { status: httpStatus, body } = await apiFetch<{
-        message?: string;
-        lineItem?: { id: string; reviewStatus?: string };
-      }>(`/organizations/${orgId}/documents/${documentId}/review`, {
-        method: "POST",
-        json: {
-          lineItemId: input.lineItemId,
-          action,
-          newValue: action === "CORRECT" ? newValue : undefined,
-          reason: reason || undefined,
-        },
-      });
-      if (httpStatus >= 400) {
-        setError(apiErrorMessage(body, "Review failed"));
-        return;
-      }
-      // Never claim success until the server returns the persisted line.
-      if (!body.lineItem?.id) {
-        setError("Review response was incomplete; refresh and verify before continuing.");
-        return;
-      }
-      setMessage(
-        action === "CONFIRM"
-          ? "Figure confirmed — original raw evidence preserved"
-          : action === "CORRECT"
-            ? "Correction confirmed — original raw evidence preserved"
-            : "Figure rejected — original raw evidence preserved",
-      );
       await load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Review request failed");
     } finally {
       setSubmittingLineId(null);
     }
@@ -239,6 +215,11 @@ export default function DocumentDetailPage() {
       {error ? (
         <Alert tone="error" title="Something went wrong">
           {error}
+        </Alert>
+      ) : null}
+      {submittingLineId ? (
+        <Alert tone="info" title="Saving">
+          Persisting review to the server — do not close this page until finished.
         </Alert>
       ) : null}
       {message ? (

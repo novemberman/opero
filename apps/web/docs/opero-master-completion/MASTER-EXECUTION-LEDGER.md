@@ -75,6 +75,17 @@ Incorporated findings from frontend + backend architecture audits.
 
 **Documented OPEN (no silent product change):** D-P0-003 READY-vs-PENDING semantics, D-P0-004 B2.2 KPI wiring, D-P0-005 `xray.report_generate` gate, billing UI scaffold, retention purge.
 
+### 2026-11-17 — M2 P0 review submission repair RC
+
+**Root cause confirmed:** production web `f59e65e` Confirm+Submit path issued **no** POSTs; backend OK.
+
+**Added:** `submitExtractionReview` contract, saving/beforeunload/401 messaging, design-system specimen, happy-dom + contract E2E tests, Playwright specs (host-blocked).
+
+**Evidence:** web 97 tests PASS; typecheck/build PASS; API CONFIRM integration PASS; Playwright BLOCKED (missing system libs).
+
+**Doc:** `M2-P0-REVIEW-SUBMISSION-REPAIR.md`  
+**Boundary:** stop for owner deploy authorization.
+
 ---
 
 ## Release discipline map (this program)
