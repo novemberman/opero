@@ -12,7 +12,7 @@
 | Field | Value |
 |-------|--------|
 | Feature RC | `4f7b19361f1cab0fa073b61f8bbdb5e24b00f634` |
-| Docs stamp tip |  |
+| Local tip (docs) | see `git rev-parse HEAD` after this stamp; feature SHA above is authoritative for code |
 | Prior M3 feature | `fe7eed6c02b42c7cef5b8582149eaf4869b14b76` |
 | Prior M3 docs tip | `a8175592719f503a6cf331b9b8367ee35baf5eb6` |
 | Migrations | **None** |
