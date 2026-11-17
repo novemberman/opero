@@ -36,6 +36,32 @@ Pilot doc `cc04b221-…`: **READY** / **SUCCEEDED** after OWNER status read; 19 
 
 ## Change log
 
+### 2026-11-17 — M13-B2 Korapay post-payment redirect repair (PASS local)
+
+**Root cause:** Checkout `redirect_url` → `/billing/return` had no Next.js page → HTTP 404 after successful sandbox pay (settlement itself was already PASS).
+
+**Fix:** `/billing/return` page + `GET /billing/payments/return-context` + default/same-origin redirect resolution + billing verify UX (bounded poll + retry status).
+
+**Tests:** billing IT 17 PASS; redirect unit 3 PASS; web billing-return 2 PASS; API/web typecheck; web build includes `ƒ /billing/return`.
+
+**Docs:** `M13-B2-KORAPAY-REDIRECT-REPAIR-ACCEPTANCE.md`; D-P1-015 FIXED_LOCAL.
+
+**Next:** rehearsal API+web deploy of feature SHA; **STOP** before production.
+
+### 2026-11-17 — M13-B Gate C sandbox verify + fulfill (PASS)
+
+**Scope:** Owner-authorized sandbox verify/fulfill for `opero_29ef27116f97489c9cba9a4a183f8a2f` on `korapay-rehearsal` only (`sk_test_`).
+
+**Result:** Korapay `success` ₦15,000 → authentic signed `charge.success` → payment/intent `SUCCEEDED` + fulfilled → 3 PURCHASE grants → PDF 200 / sibling 403 → invalid signature rejected → webhook replay `duplicate` → verify `ALREADY_FULFILLED`. Merchant payout **N/A**. Production emergencies unchanged ON; probe sessions revoked.
+
+**Docs:** `M13-B-KORAPAY-GATE-C-SANDBOX-TRANSACTION-ACCEPTANCE.md` → **PASS**; D-P1-003 → PARTIAL_LOCAL (sandbox closed; live open); M13 commercial updated.
+
+**Boundary:** **STOP FOR OWNER REVIEW.** No live probe / prod checkout enable without new auth.
+
+### 2026-11-17 — M13-B Gate C one sandbox checkout (init; superseded by verify PASS)
+
+Historical unpaid `opero_af4def5d…` + init of `opero_29ef2711…` / intent `5307c05b-…` / payment `adc1c3df-…` before interactive sandbox completion.
+
 ### 2026-11-17 — M2 Confirm UX + acceptance (local)
 
 **Scope:** Fix the production-observed “Confirm did not persist” failure mode by making confirmation a single explicit server-backed action and hardening client error handling; add API acceptance coverage.

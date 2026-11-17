@@ -51,6 +51,113 @@ export class CheckoutService {
     );
   }
 
+  /** Canonical browser return after hosted checkout (Korapay appends ?reference=). */
+  defaultRedirectUrl(): string {
+    const origin = this.config.get("APP_ORIGIN", { infer: true }).replace(/\/$/, "");
+    return `${origin}/billing/return`;
+  }
+
+  /**
+   * Prefer caller redirect when same-origin as APP_ORIGIN; otherwise default.
+   * Rejects open redirects to foreign origins.
+   */
+  resolveRedirectUrl(redirectUrl?: string | null): string {
+    const fallback = this.defaultRedirectUrl();
+    if (!redirectUrl?.trim()) return fallback;
+    let parsed: URL;
+    try {
+      parsed = new URL(redirectUrl.trim());
+    } catch {
+      throw new BadRequestException({
+        message: "redirectUrl is not a valid URL",
+        code: "INVALID_REDIRECT_URL",
+      });
+    }
+    const origin = new URL(this.config.get("APP_ORIGIN", { infer: true }));
+    if (parsed.origin !== origin.origin) {
+      throw new BadRequestException({
+        message: "redirectUrl must match APP_ORIGIN",
+        code: "INVALID_REDIRECT_ORIGIN",
+      });
+    }
+    if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+      throw new BadRequestException({
+        message: "redirectUrl protocol not allowed",
+        code: "INVALID_REDIRECT_URL",
+      });
+    }
+    return parsed.toString();
+  }
+
+  /**
+   * Authenticated lookup so `/billing/return?reference=` can route to the org
+   * billing page. Does not verify with the provider or grant entitlements.
+   */
+  async returnContext(input: { reference: string; actor: AuthenticatedUser }) {
+    const reference = input.reference.trim();
+    if (reference.length < 8 || reference.length > 120) {
+      throw new NotFoundException("Payment not found");
+    }
+
+    const payment = await this.prisma.payment.findFirst({
+      where: { reference },
+      select: {
+        id: true,
+        reference: true,
+        status: true,
+        organizationId: true,
+        fulfilledAt: true,
+        checkoutIntent: {
+          select: {
+            reportId: true,
+            purpose: true,
+            productCode: true,
+            status: true,
+            expiresAt: true,
+          },
+        },
+      },
+    });
+    if (!payment) {
+      throw new NotFoundException("Payment not found");
+    }
+
+    const membership = await this.prisma.membership.findUnique({
+      where: {
+        organizationId_userId: {
+          organizationId: payment.organizationId,
+          userId: input.actor.id,
+        },
+      },
+      select: { role: true },
+    });
+    if (!membership) {
+      // Do not leak whether the reference exists in another org.
+      throw new NotFoundException("Payment not found");
+    }
+
+    const intent = payment.checkoutIntent;
+    const expired =
+      intent != null &&
+      intent.expiresAt.getTime() < Date.now() &&
+      payment.status === "PENDING" &&
+      intent.status !== "SUCCEEDED";
+
+    return {
+      reference: payment.reference,
+      organizationId: payment.organizationId,
+      reportId: intent?.reportId ?? null,
+      paymentStatus: payment.status,
+      checkoutStatus: intent?.status ?? null,
+      purpose: intent?.purpose ?? null,
+      productCode: intent?.productCode ?? null,
+      fulfilled: payment.fulfilledAt != null,
+      expired,
+      // Explicit: browser return is not payment confirmation.
+      paymentConfirmed: payment.status === "SUCCEEDED" && payment.fulfilledAt != null,
+    };
+  }
+
   private assertCheckoutEnabled(): void {
     if (this.config.get("EMERGENCY_DISABLE_CHECKOUT", { infer: true })) {
       throw new BadRequestException({
@@ -108,6 +215,7 @@ export class CheckoutService {
 
     const reference = `opero_${randomUUID().replace(/-/g, "")}`;
     const expiresAt = new Date(Date.now() + CHECKOUT_TTL_MS);
+    const redirectUrl = this.resolveRedirectUrl(input.redirectUrl);
 
     const initialized = await this.payments.initializeCheckout({
       reference,
@@ -115,7 +223,7 @@ export class CheckoutService {
       currency: price.currency,
       customerEmail: input.actor.email,
       customerName: input.actor.name,
-      redirectUrl: input.redirectUrl,
+      redirectUrl,
       notificationUrl: this.notificationUrl(),
       narration: `Opero X-Ray Pro report ${input.reportId}`,
       metadata: {
@@ -143,7 +251,7 @@ export class CheckoutService {
           checkoutUrl: initialized.checkoutUrl,
           customerEmail: input.actor.email,
           customerName: input.actor.name,
-          redirectUrl: input.redirectUrl ?? null,
+          redirectUrl,
           expiresAt,
         },
       });
@@ -266,6 +374,7 @@ export class CheckoutService {
 
     const reference = `opero_${randomUUID().replace(/-/g, "")}`;
     const expiresAt = new Date(Date.now() + CHECKOUT_TTL_MS);
+    const redirectUrl = this.resolveRedirectUrl(input.redirectUrl);
     const maxSuccesses = this.config.get("LIVE_PILOT_MAX_SUCCESSES", { infer: true });
 
     // Commit reservation before any external provider call.
@@ -336,7 +445,7 @@ export class CheckoutService {
             checkoutUrl: null,
             customerEmail: input.actor.email,
             customerName: input.actor.name,
-            redirectUrl: input.redirectUrl ?? null,
+            redirectUrl,
             expiresAt,
           },
         });
@@ -379,7 +488,7 @@ export class CheckoutService {
         currency: price.currency,
         customerEmail: input.actor.email,
         customerName: input.actor.name,
-        redirectUrl: input.redirectUrl,
+        redirectUrl,
         notificationUrl: this.notificationUrl(),
         narration: `Opero live-pilot probe report ${input.reportId}`,
         metadata: {
@@ -560,13 +669,14 @@ export class CheckoutService {
     }
 
     const reference = `opero_${randomUUID().replace(/-/g, "")}`;
+    const redirectUrl = this.resolveRedirectUrl(input.redirectUrl);
     const initialized = await this.payments.initializeCheckout({
       reference,
       amountMinor: price.amountMinor,
       currency: price.currency,
       customerEmail: input.actor.email,
       customerName: input.actor.name,
-      redirectUrl: input.redirectUrl,
+      redirectUrl,
       notificationUrl: this.notificationUrl(),
       narration: `Opero ${plan.code} ${input.purpose === "SUBSCRIPTION_RENEW" ? "renewal" : "subscription"}`,
       metadata: {
@@ -595,7 +705,7 @@ export class CheckoutService {
           checkoutUrl: initialized.checkoutUrl,
           customerEmail: input.actor.email,
           customerName: input.actor.name,
-          redirectUrl: input.redirectUrl ?? null,
+          redirectUrl,
           expiresAt: new Date(Date.now() + CHECKOUT_TTL_MS),
         },
       });

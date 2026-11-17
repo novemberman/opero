@@ -18,7 +18,8 @@ export default function UnlockReportPage() {
       typeof crypto !== "undefined" && "randomUUID" in crypto
         ? crypto.randomUUID()
         : `web-${Date.now()}`;
-    const redirectUrl = `${window.location.origin}/organizations/${params.orgId}/billing?reportId=${params.reportId}`;
+    // Canonical return path — Korapay appends ?reference=; page routes to org billing.
+    const redirectUrl = `${window.location.origin}/billing/return`;
     const { status, body } = await apiFetch<{
       checkout?: {
         checkoutUrl?: string;

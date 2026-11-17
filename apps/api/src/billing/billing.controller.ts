@@ -6,6 +6,7 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  Query,
   Req,
   UseGuards,
 } from "@nestjs/common";
@@ -87,6 +88,21 @@ export class BillingController {
   @Get("billing/catalog")
   async publicCatalog() {
     return this.billing.publicCatalog();
+  }
+
+  /**
+   * Post-hosted-checkout browser return helper.
+   * Resolves `?reference=` to an org billing destination for the signed-in member.
+   * Does not call the provider or grant entitlements — verification stays on the org page.
+   */
+  @Get("billing/payments/return-context")
+  @UseGuards(SessionAuthGuard)
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  async paymentReturnContext(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Query("reference") reference: string | undefined,
+  ) {
+    return this.checkout.returnContext({ reference: reference ?? "", actor });
   }
 
   @Post("billing/enterprise-quotes")

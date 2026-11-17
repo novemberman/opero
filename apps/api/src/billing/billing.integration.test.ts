@@ -193,6 +193,63 @@ describe("Phase 7A billing (mock Korapay)", () => {
     await get(app, ctx.outsider, `${ctx.path}/pdf`).expect(404);
   });
 
+  it("resolves post-payment return context and rejects foreign redirects", async () => {
+    const ctx = await draftReport("return");
+    const checkout = await post(
+      app,
+      ctx.owner,
+      `/organizations/${ctx.organizationId}/billing/checkout/xray-pro`,
+    )
+      .send({ reportId: ctx.reportId, idempotencyKey: `return-default-${randomUUID()}` })
+      .expect(201);
+    const reference = checkout.body.checkout.reference as string;
+
+    // Default redirect when omitted must be same-origin /billing/return.
+    const intent = await prisma.checkoutIntent.findFirst({
+      where: { paymentReference: reference },
+      select: { redirectUrl: true },
+    });
+    expect(intent?.redirectUrl).toMatch(/\/billing\/return$/);
+
+    const ctxRes = await get(
+      app,
+      ctx.owner,
+      `/billing/payments/return-context?reference=${encodeURIComponent(reference)}`,
+    ).expect(200);
+    expect(ctxRes.body.organizationId).toBe(ctx.organizationId);
+    expect(ctxRes.body.reportId).toBe(ctx.reportId);
+    expect(ctxRes.body.reference).toBe(reference);
+    expect(ctxRes.body.paymentConfirmed).toBe(false);
+
+    // Cross-org member cannot resolve another org's reference.
+    await get(
+      app,
+      ctx.outsider,
+      `/billing/payments/return-context?reference=${encodeURIComponent(reference)}`,
+    ).expect(404);
+
+    // Unauthenticated cannot probe references.
+    await request(app.getHttpServer())
+      .get(`/api/v1/billing/payments/return-context?reference=${encodeURIComponent(reference)}`)
+      .expect(401);
+
+    // Foreign-origin redirect_url rejected (open-redirect guard).
+    await post(
+      app,
+      ctx.owner,
+      `/organizations/${ctx.organizationId}/billing/checkout/xray-pro`,
+    )
+      .send({
+        reportId: ctx.reportId,
+        idempotencyKey: `return-evil-${randomUUID()}`,
+        redirectUrl: "https://evil.example/phish",
+      })
+      .expect(400);
+
+    // URL query alone never grants — still locked until settle+verify.
+    await get(app, ctx.viewer, `${ctx.path}/pdf`).expect(403);
+  });
+
   it("rejects invalid webhook signatures and dedupes replays", async () => {
     const ctx = await draftReport("hook");
     const checkout = await post(

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { Alert, Badge, EmptyState, Skeleton } from "../../../../components/ui";
 import { apiFetch } from "../../../../lib/api";
 
@@ -34,6 +34,16 @@ type SubscriptionRow = {
   graceUntil?: string | null;
 };
 
+type VerifyBody = {
+  providerStatus?: string;
+  fulfillment?: { status?: string };
+  payment?: { status?: string };
+  message?: string;
+};
+
+const MAX_PENDING_POLLS = 8;
+const POLL_INTERVAL_MS = 2500;
+
 function formatMoney(amountMinor?: number, currency?: string) {
   if (amountMinor == null || !currency) return "—";
   const major = amountMinor / 100;
@@ -56,9 +66,14 @@ function BillingInner() {
   const [loading, setLoading] = useState(true);
   const [verifyNote, setVerifyNote] = useState<string | null>(null);
   const [verifyTone, setVerifyTone] = useState<"success" | "error" | "info">("info");
+  const [verifyBusy, setVerifyBusy] = useState(false);
+  const [canRetry, setCanRetry] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const pollCount = useRef(0);
+  const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const verifyAgainRef = useRef<(manual: boolean) => Promise<void>>(async () => {});
 
-  async function reloadBilling() {
+  const reloadBilling = useCallback(async () => {
     setLoading(true);
     const [p, s, e] = await Promise.all([
       apiFetch<{ purchases?: PurchaseRow[]; message?: string }>(
@@ -81,52 +96,106 @@ function BillingInner() {
     setSubscriptions(s.body.subscriptions ?? []);
     setEntitlements(e.body.entitlements ?? []);
     setLoading(false);
-  }
-
-  useEffect(() => {
-    void reloadBilling();
   }, [orgId]);
 
-  useEffect(() => {
-    if (!reference) return;
-    void (async () => {
+  const runVerify = useCallback(
+    async (manual: boolean) => {
+      if (!reference) return;
+      if (pollTimer.current) {
+        clearTimeout(pollTimer.current);
+        pollTimer.current = null;
+      }
+      if (manual) {
+        pollCount.current = 0;
+      }
+      setVerifyBusy(true);
       setVerifyNote("Payment pending verification…");
       setVerifyTone("info");
-      const { status, body } = await apiFetch<{
-        providerStatus?: string;
-        fulfillment?: { status?: string };
-        message?: string;
-      }>(`/organizations/${orgId}/billing/payments/verify`, {
-        method: "POST",
-        json: { reference },
-      });
+      setCanRetry(false);
+      const { status, body } = await apiFetch<VerifyBody>(
+        `/organizations/${orgId}/billing/payments/verify`,
+        {
+          method: "POST",
+          json: { reference },
+        },
+      );
+      setVerifyBusy(false);
       if (status >= 400) {
         setVerifyTone("error");
         setVerifyNote(body.message ?? "Verification failed");
+        setCanRetry(true);
         return;
       }
-      if (body.providerStatus === "success" && body.fulfillment?.status === "FULFILLED") {
+
+      const fulfillment = body.fulfillment?.status;
+      const provider = body.providerStatus;
+
+      if (provider === "success" && fulfillment === "FULFILLED") {
         setVerifyTone("success");
         setVerifyNote("Payment successful. Entitlements are active — report unlocked.");
+        setCanRetry(false);
         await reloadBilling();
-      } else if (body.fulfillment?.status === "ALREADY_FULFILLED") {
+        return;
+      }
+      if (fulfillment === "ALREADY_FULFILLED") {
         setVerifyTone("success");
         setVerifyNote("Payment was already fulfilled. Download remains available.");
+        setCanRetry(false);
         await reloadBilling();
-      } else if (body.providerStatus === "failed" || body.fulfillment?.status === "FAILED") {
+        return;
+      }
+      if (provider === "failed" || fulfillment === "FAILED") {
         setVerifyTone("error");
         setVerifyNote(
-          `Payment failed or was not successful (provider: ${body.providerStatus ?? "unknown"}). The report stays locked.`,
+          `Payment failed or was not successful (provider: ${provider ?? "unknown"}). The report stays locked.`,
         );
-      } else {
-        setVerifyTone("info");
+        setCanRetry(true);
+        return;
+      }
+      if (provider === "expired" || body.payment?.status === "EXPIRED") {
+        setVerifyTone("error");
         setVerifyNote(
-          `Payment pending (provider: ${body.providerStatus ?? "unknown"}). This page never treats a redirect alone as success.`,
+          "This checkout session expired before payment completed. Start a new unlock if you still need access.",
+        );
+        setCanRetry(false);
+        return;
+      }
+
+      setVerifyTone("info");
+      setVerifyNote(
+        `Payment pending (provider: ${provider ?? "unknown"}). This page never treats a redirect alone as success.`,
+      );
+      setCanRetry(true);
+
+      const shouldPoll = !manual;
+      if (shouldPoll && pollCount.current < MAX_PENDING_POLLS) {
+        pollCount.current += 1;
+        pollTimer.current = setTimeout(() => {
+          void verifyAgainRef.current(false);
+        }, POLL_INTERVAL_MS);
+      } else if (shouldPoll) {
+        setVerifyNote(
+          `Payment still pending after automatic checks (provider: ${provider ?? "unknown"}). Use “Check status again” — this does not create a new checkout.`,
         );
       }
-    })();
-  }, [orgId, reference]);
+    },
+    [orgId, reference, reloadBilling],
+  );
 
+  verifyAgainRef.current = runVerify;
+
+  useEffect(() => {
+    void reloadBilling();
+  }, [reloadBilling]);
+
+  useEffect(() => {
+    if (!reference) return;
+    pollCount.current = 0;
+    void runVerify(false);
+    return () => {
+      if (pollTimer.current) clearTimeout(pollTimer.current);
+    };
+  }, [reference, runVerify]);
   const activeEntitlements = entitlements.filter((row) => !row.revokedAt);
 
   return (
@@ -138,7 +207,7 @@ function BillingInner() {
       </p>
 
       {verifyNote ? (
-        <div className="mt-4">
+        <div className="mt-4" data-testid="billing-verify-banner">
           <Alert
             tone={verifyTone === "success" ? "success" : verifyTone === "error" ? "error" : "info"}
             title={
@@ -157,6 +226,17 @@ function BillingInner() {
               >
                 Open unlocked report
               </Link>
+            ) : null}
+            {canRetry && reference ? (
+              <button
+                type="button"
+                className="mt-3 inline-flex min-h-10 items-center rounded-full border border-line bg-white px-4 text-sm text-ink disabled:opacity-60"
+                disabled={verifyBusy}
+                data-testid="billing-retry-status"
+                onClick={() => void runVerify(true)}
+              >
+                {verifyBusy ? "Checking…" : "Check status again"}
+              </button>
             ) : null}
           </Alert>
         </div>

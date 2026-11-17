@@ -1,11 +1,13 @@
 # Defect Register
 
-**Updated:** 2026-11-17 (M12-G synthetic entitlement infrastructure)  
+**Updated:** 2026-11-17 (M13-B2 post-payment redirect repair)  
 **Status key:** OPEN / FIXED_LOCAL / PARTIAL_LOCAL / BLOCKED_EXTERNAL / ACCEPTED_RISK / DEFERRED
 
 | ID | Sev | Title | Status | Evidence / notes |
 |----|-----|-------|--------|------------------|
-| D-P1-014 | P1 | No production-safe synthetic entitlement grant/revoke API (M12-F BLOCKED) | FIXED_LOCAL | M12-G ops dual-token `/ops/synthetic-entitlements` (+ revoke); separate MANUAL grants for `xray.report_generate` and `xray.pdf_download`; flag off by default; revoke-during-shutdown; IT PASS. Needs API deploy + timed enable for M12-F retry. |
+| D-P1-015 | P1 | Korapay post-payment redirect 404 (`/billing/return`) | FIXED_LOCAL | Gate C redirect_url pointed at missing Next route. Added `/billing/return` + `GET /billing/payments/return-context` + same-origin default redirect. See `M13-B2-KORAPAY-REDIRECT-REPAIR-ACCEPTANCE.md`. Needs API+web deploy. |
+| D-P1-003 | P1 | Korapay hosted checkout / settlement unverified | PARTIAL_LOCAL | **Sandbox Gate C PASS** on `opero_29ef2711…`. **Live** settlement still unverified. Redirect UX fixed under D-P1-015. See M13-B / M13-B2. |
+| D-P1-014 | P1 | No production-safe synthetic entitlement grant/revoke API (M12-F BLOCKED) | FIXED_LOCAL | M12-G ops dual-token `/ops/synthetic-entitlements` (+ revoke); separate MANUAL grants for `xray.report_generate` and `xray.pdf_download`; flag off by default; revoke-during-shutdown; IT PASS. Prod API deployed M12-H1; issuance OFF after M12-H2. |
 | D-P1-013 | P1 | M12-A expected BHS 46 ignored production `quality=LOW` reliability gate | ACCEPTED_RISK / DOCUMENTED | Prod run `ad64efd5-…` correctly **INSUFFICIENT_DATA** (reliability 0.4 < 0.50). Confirmation ≠ rewrite of extraction quality. score.v1 unchanged; regression tests added. See M12-C. |
 | D-P0-001 | P0 | Pilot Confirm clicks did not persist (0/18) | FIXED_LOCAL | Root cause: prod UX never POSTed. One-click **Confirm figure** + `submitExtractionReview`. Needs **web deploy** + owner re-confirm. One-figure diagnostic still FAIL on prod. |
 | D-P0-002 | P0 | False success on review without server ack | FIXED_LOCAL | Requires `lineItem` in response; shared submit helper. |
@@ -16,7 +18,6 @@
 | D-P0-005 | P0 | `xray.report_generate` entitlement never enforced | FIXED_LOCAL | Publish requires `xray.report_generate` after integrity gates; granted via `XRAY_PRO_ENTITLEMENTS` + OS plan migration. Draft/review remain free. Needs API deploy + migration. |
 | D-P1-001 | P1 | Document stays `REVIEW_REQUIRED` after material confirms | FIXED | `reconcileDocumentReviewStatus` on review **and** `status()` (M2-P4/P5). Prod API `77ecbf6…` (`baa04a73-…`); pilot doc reconciled READY on OWNER status read. |
 | D-P1-002 | P1 | Confirm UX ambiguous (dropdown vs Submit) | FIXED_LOCAL | One-click Confirm; Correct/Reject secondary. |
-| D-P1-003 | P1 | Korapay hosted checkout / settlement unverified | BLOCKED_EXTERNAL | Gate C unresolved. |
 | D-P1-004 | P1 | Production deploy SHA skew (API/web/worker) | OPEN | Web `15299f1`; API `77ecbf6` (M2-P5); worker `31749a3`. Cleared only by coordinated RC deploy. |
 | D-P1-005 | P1 | Uploads/checkout emergency shutdown still on | ACCEPTED_RISK | Intentional. |
 | D-P1-006 | P1 | CSRF exempt matching used `includes`/`endsWith` | FIXED_LOCAL | Exact `/api/v1`-relative allowlist; nested only where intended. |
