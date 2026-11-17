@@ -4,7 +4,13 @@ const ORG = "6693e901-9051-49bc-82a6-20094835432c";
 const DOC = "cc04b221-06c6-41da-b016-213753ca2a08";
 const REVENUE = "f6da2815-5e54-461c-ae35-0fed50d020d1";
 
-async function mockReviewApis(page: Page, options?: { failStatus?: number }) {
+const SESSION_EXPIRED =
+  "Your session has expired. Please sign in again. Your confirmation was not saved.";
+
+async function mockReviewApis(
+  page: Page,
+  options?: { failStatus?: number; delayMs?: number },
+) {
   const posts: Array<{ url: string; body: unknown; headers: Record<string, string> }> = [];
 
   await page.route("**/api/v1/auth/csrf", async (route) => {
@@ -22,6 +28,9 @@ async function mockReviewApis(page: Page, options?: { failStatus?: number }) {
       body: request.postDataJSON(),
       headers: request.headers(),
     });
+    if (options?.delayMs) {
+      await new Promise((resolve) => setTimeout(resolve, options.delayMs));
+    }
     if (options?.failStatus) {
       await route.fulfill({
         status: options.failStatus,
@@ -76,14 +85,30 @@ test.describe("Review Confirm figure E2E", () => {
     await expect(page.getByTestId("sibling-pending-guard")).toContainText("PENDING");
   });
 
-  test("failed review shows error and does not mark CONFIRMED", async ({ page }) => {
+  test("failed review shows session-expiry copy and does not mark CONFIRMED", async ({
+    page,
+  }) => {
     await mockReviewApis(page, { failStatus: 401 });
     await page.goto("/design-system/review-confirm");
     await page.getByTestId("confirm-figure").click();
-    await expect(page.getByText(/session has expired/i)).toBeVisible();
+    await expect(page.getByText(SESSION_EXPIRED)).toBeVisible();
     await expect(page.getByTestId("extraction-line-card")).toHaveAttribute(
       "data-review-status",
       "PENDING",
+    );
+  });
+
+  test("duplicate clicks while submitting issue a single review POST", async ({ page }) => {
+    const posts = await mockReviewApis(page, { delayMs: 800 });
+    await page.goto("/design-system/review-confirm");
+    const confirm = page.getByTestId("confirm-figure");
+    await confirm.click();
+    await expect(confirm).toBeDisabled();
+    await confirm.click({ force: true }).catch(() => undefined);
+    await expect.poll(() => posts.length).toBe(1);
+    await expect(page.getByTestId("extraction-line-card")).toHaveAttribute(
+      "data-review-status",
+      "CONFIRMED",
     );
   });
 });

@@ -61,29 +61,33 @@ export function buildExtractionReviewRequest(
   };
 }
 
+const SESSION_EXPIRED_MESSAGE =
+  "Your session has expired. Please sign in again. Your confirmation was not saved.";
+
 export function classifyReviewHttpFailure(
   status: number,
   body: unknown,
 ): Extract<ExtractionReviewSubmitResult, { ok: false }> {
+  // Prefer curated operator copy for auth/tenancy failures — raw API bodies like
+  // "Unauthorized" must not replace the session-expiry guidance.
+  if (status === 401) {
+    return { ok: false, status, code: "UNAUTHORIZED", message: SESSION_EXPIRED_MESSAGE };
+  }
   const fallback =
-    status === 401
-      ? "Your session has expired. Sign in again, then confirm the figure."
-      : status === 403
-        ? "You do not have permission to confirm figures for this organization."
-        : status === 404
-          ? "Figure or document was not found for this organization."
-          : "Review failed";
+    status === 403
+      ? "You do not have permission to confirm figures for this organization."
+      : status === 404
+        ? "Figure or document was not found for this organization."
+        : "Review failed";
   const message = apiErrorMessage(body, fallback);
   const code =
-    status === 401
-      ? "UNAUTHORIZED"
-      : status === 403
-        ? "FORBIDDEN"
-        : status === 404
-          ? "NOT_FOUND"
-          : status >= 500
-            ? "SERVER"
-            : "VALIDATION";
+    status === 403
+      ? "FORBIDDEN"
+      : status === 404
+        ? "NOT_FOUND"
+        : status >= 500
+          ? "SERVER"
+          : "VALIDATION";
   return { ok: false, status, code, message };
 }
 

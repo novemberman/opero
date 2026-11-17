@@ -125,8 +125,14 @@ describe("extraction-review-submit", () => {
   });
 
   it("surfaces expired session and cross-tenant failures clearly", () => {
-    expect(classifyReviewHttpFailure(401, {}).message).toMatch(/session has expired/i);
-    expect(classifyReviewHttpFailure(401, {}).code).toBe("UNAUTHORIZED");
+    const sessionMessage =
+      "Your session has expired. Please sign in again. Your confirmation was not saved.";
+    expect(classifyReviewHttpFailure(401, {}).message).toBe(sessionMessage);
+    // Realistic API bodies must not replace curated session-expiry copy.
+    expect(classifyReviewHttpFailure(401, { message: "Unauthorized" }).message).toBe(
+      sessionMessage,
+    );
+    expect(classifyReviewHttpFailure(401, { message: "Unauthorized" }).code).toBe("UNAUTHORIZED");
     expect(classifyReviewHttpFailure(404, {}).code).toBe("NOT_FOUND");
     expect(classifyReviewHttpFailure(403, { message: "Forbidden" }).message).toBe("Forbidden");
   });
