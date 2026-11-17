@@ -2,7 +2,7 @@
 
 **Date:** 2026-11-17  
 **Verdict: PASS (local)**  
-**Release candidate SHA:** *(stamped after local commit)*  
+**Release candidate SHA:** `64b97b96e79c07a32e0b640c37339729d7baa8a2`  
 **Production:** unchanged (no deploy)
 
 No push, deploy, production mutations, uploads/checkout enablement, reports, or payments.
