@@ -2,7 +2,7 @@
 
 **Date:** 2026-11-17  
 **Verdict: PASS (local)**  
-**Release candidate SHA:** *(stamped after local commit)*  
+**Release candidate SHA:** `eccef004970394cab3d60189687912495c76dfde`  
 **Production access:** READ-ONLY (no mutations / push / deploy / diagnostics)
 
 ---
