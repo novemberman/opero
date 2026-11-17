@@ -376,6 +376,9 @@ export class DocumentsService {
   }
 
   async status(organizationId: string, documentId: string) {
+    // Derive sticky REVIEW_REQUIRED / READY from persisted line evidence so
+    // already-complete statements promote without requiring another review POST.
+    await this.reconcileDocumentReviewStatus({ organizationId, documentId });
     const document = await this.get(organizationId, documentId);
     const job = await this.prisma.documentProcessingJob.findFirst({
       where: { organizationId, documentId },
@@ -620,6 +623,9 @@ export class DocumentsService {
       jobMaxAttempts: job?.maxAttempts ?? 3,
     });
 
+    const priorStatus = document.processingStatus;
+    const priorExtractionStatus = document.extractionStatus;
+
     await this.prisma.$transaction(async (tx) => {
       await tx.document.update({
         where: { id: document.id },
@@ -638,6 +644,22 @@ export class DocumentsService {
         });
       }
     });
+
+    if (priorStatus !== nextStatus || priorExtractionStatus !== nextExtractionStatus) {
+      await this.audit.record({
+        action: "document.review_status_reconciled",
+        entityType: "document",
+        entityId: document.id,
+        organizationId: input.organizationId,
+        metadata: {
+          fromProcessingStatus: priorStatus,
+          toProcessingStatus: nextStatus,
+          fromExtractionStatus: priorExtractionStatus,
+          toExtractionStatus: nextExtractionStatus,
+          materialPending,
+        },
+      });
+    }
   }
 
   async softDelete(input: {

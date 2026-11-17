@@ -531,6 +531,153 @@ describe("document ingestion integration", () => {
     await prisma.$disconnect();
   });
 
+  it("reconciles REVIEW_REQUIRED→READY from persisted confirms; status GET is idempotent", async () => {
+    const suffix = `${Date.now()}-ready`;
+    const auth = await registerVerifyLogin(app, mail, {
+      email: `docs.ready.${suffix}@example.com`,
+      name: "Ready Owner",
+      password: "docs-password-123",
+    });
+    const org = await request(app.getHttpServer())
+      .post("/api/v1/organizations")
+      .set("Cookie", auth.cookies)
+      .set("x-csrf-token", auth.csrfToken)
+      .send({ name: "Ready Org", slug: `ready-org-${suffix}` })
+      .expect(201);
+    const organizationId = org.body.organization.id as string;
+
+    const upload = await request(app.getHttpServer())
+      .post(`/api/v1/organizations/${organizationId}/documents/uploads`)
+      .set("Cookie", auth.cookies)
+      .set("x-csrf-token", auth.csrfToken)
+      .send({
+        filename: "ready.csv",
+        declaredFormat: "CSV",
+        declaredMimeType: "text/csv",
+      })
+      .expect(201);
+    const csv = Buffer.from(
+      [
+        "Label,Amount",
+        "Total Revenue,\"2,500.00\"",
+        "Cost of sales,\"1,000.00\"",
+        "Property plant and equipment,\"400.00\"",
+      ].join("\n"),
+      "utf8",
+    );
+    const completed = await request(app.getHttpServer())
+      .post(
+        `/api/v1/organizations/${organizationId}/documents/uploads/${upload.body.upload.uploadId}/complete`,
+      )
+      .set("Cookie", auth.cookies)
+      .set("x-csrf-token", auth.csrfToken)
+      .attach("file", csv, "ready.csv")
+      .expect(201);
+    const documentId = completed.body.documentId as string;
+    const processingJobId = completed.body.processingJobId as string;
+    await runPipeline({ organizationId, documentId, processingJobId, storage });
+    await runPipeline({ organizationId, documentId, processingJobId, storage });
+
+    const extractions = await request(app.getHttpServer())
+      .get(`/api/v1/organizations/${organizationId}/documents/${documentId}/extractions`)
+      .set("Cookie", auth.session)
+      .expect(200);
+    const lines = extractions.body.extractions[0].statements[0].lineItems as Array<{
+      id: string;
+      concept: string;
+      reviewStatus: string;
+      quantityClass?: string;
+    }>;
+    const revenue = lines.find((line) => line.concept === "REVENUE")!;
+    const cogs = lines.find((line) => line.concept === "COST_OF_GOODS_SOLD")!;
+    const ppe = lines.find((line) => line.concept === "UNMAPPED");
+
+    // Partial confirm: material pending remains → still REVIEW_REQUIRED.
+    await request(app.getHttpServer())
+      .post(`/api/v1/organizations/${organizationId}/documents/${documentId}/review`)
+      .set("Cookie", auth.cookies)
+      .set("x-csrf-token", auth.csrfToken)
+      .send({ lineItemId: revenue.id, action: "CONFIRM" })
+      .expect(201);
+    const partial = await request(app.getHttpServer())
+      .get(`/api/v1/organizations/${organizationId}/documents/${documentId}/status`)
+      .set("Cookie", auth.session)
+      .expect(200);
+    expect(partial.body.processingStatus).toBe("REVIEW_REQUIRED");
+    expect(partial.body.extractionStatus).toBe("MANUAL_REQUIRED");
+
+    // Confirm remaining mapped monetary; optional UNMAPPED PPE may stay PENDING.
+    await request(app.getHttpServer())
+      .post(`/api/v1/organizations/${organizationId}/documents/${documentId}/review`)
+      .set("Cookie", auth.cookies)
+      .set("x-csrf-token", auth.csrfToken)
+      .send({ lineItemId: cogs.id, action: "CONFIRM" })
+      .expect(201);
+    if (ppe && ppe.reviewStatus === "PENDING") {
+      // Leave PPE pending — must not block READY (not material).
+    }
+
+    const readyAfterReview = await request(app.getHttpServer())
+      .get(`/api/v1/organizations/${organizationId}/documents/${documentId}/status`)
+      .set("Cookie", auth.session)
+      .expect(200);
+    expect(readyAfterReview.body.processingStatus).toBe("READY");
+    expect(readyAfterReview.body.extractionStatus).toBe("SUCCEEDED");
+
+    const { createPrismaClient } = await loadDatabaseModule();
+    const prisma = createPrismaClient(process.env.DATABASE_URL!);
+
+    // Sticky badge simulation: force REVIEW_REQUIRED after material confirms complete.
+    await prisma.document.update({
+      where: { id: documentId },
+      data: { processingStatus: "REVIEW_REQUIRED", extractionStatus: "MANUAL_REQUIRED" },
+    });
+    await prisma.documentProcessingJob.updateMany({
+      where: { documentId, organizationId },
+      data: { status: "REVIEW_REQUIRED" },
+    });
+
+    const promoted = await request(app.getHttpServer())
+      .get(`/api/v1/organizations/${organizationId}/documents/${documentId}/status`)
+      .set("Cookie", auth.session)
+      .expect(200);
+    expect(promoted.body.processingStatus).toBe("READY");
+    expect(promoted.body.extractionStatus).toBe("SUCCEEDED");
+
+    // Idempotent second status poll — no flip-flop; audit should not spam endlessly.
+    const again = await request(app.getHttpServer())
+      .get(`/api/v1/organizations/${organizationId}/documents/${documentId}/status`)
+      .set("Cookie", auth.session)
+      .expect(200);
+    expect(again.body.processingStatus).toBe("READY");
+
+    const reconcileAudits = await prisma.auditEvent.findMany({
+      where: {
+        organizationId,
+        action: "document.review_status_reconciled",
+        entityId: documentId,
+      },
+    });
+    expect(reconcileAudits.length).toBeGreaterThanOrEqual(1);
+
+    // Optional PPE confirm preserves evidence and does not invent values.
+    if (ppe) {
+      await request(app.getHttpServer())
+        .post(`/api/v1/organizations/${organizationId}/documents/${documentId}/review`)
+        .set("Cookie", auth.cookies)
+        .set("x-csrf-token", auth.csrfToken)
+        .send({ lineItemId: ppe.id, action: "CONFIRM" })
+        .expect(201);
+      const afterPpe = await request(app.getHttpServer())
+        .get(`/api/v1/organizations/${organizationId}/documents/${documentId}/status`)
+        .set("Cookie", auth.session)
+        .expect(200);
+      expect(afterPpe.body.processingStatus).toBe("READY");
+    }
+
+    await prisma.$disconnect();
+  });
+
   it("persists Revenue of 144,000 NGN thousands and exposes scaled actualMonetaryValue", async () => {
     const suffix = `${Date.now()}-fy24`;
     const auth = await registerVerifyLogin(app, mail, {

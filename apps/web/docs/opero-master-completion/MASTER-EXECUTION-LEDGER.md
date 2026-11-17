@@ -4,16 +4,16 @@
 **Workspace SHA at start:** `bc1567a70c54a16c776390f887d8ca9cb8636859`  
 **Mode:** Local implementation + local tests only (no push, no deploy, no production mutations)
 
-## Production baseline (revalidated 2026-11-17)
+## Production baseline (revalidated 2026-11-17 M2-P4)
 
 | Service | Deploy commit | Notes |
 |---------|---------------|-------|
-| API | `bc1567a70c54a16c776390f887d8ca9cb8636859` | `/ready.version` stamp still `31749a3…` |
-| Web | `f59e65e6f220f96f58d08868a75aaa4d91bc384a` | |
+| API | `bc1567a70c54a16c776390f887d8ca9cb8636859` | Lacks status-poll reconcile; `/ready.version` stamp still `31749a3…` |
+| Web | `15299f14affb4b0c710462329d84f4f0d6c3f395` | Confirm UX + confirmed-figure visibility |
 | Worker | `31749a375ae5d7a89a66fc6dba05636988429ce3` | |
 
 Gates: uploads emergency **on**, checkout emergency **on**, public registration **off**, pilot upload **off**.  
-Pilot doc `cc04b221-…`: extraction OK; **0/18** CONFIRMED in production (pre-fix). Migrations: **14**.
+Pilot doc `cc04b221-…`: **18/18** mapped CONFIRMED + optional PPE CONFIRMED; badge still `REVIEW_REQUIRED` until API RC deploy. Migrations: **14**.
 
 ---
 
@@ -22,7 +22,7 @@ Pilot doc `cc04b221-…`: extraction OK; **0/18** CONFIRMED in production (pre-f
 | ID | Milestone | Local status | Notes |
 |----|-----------|--------------|-------|
 | M1 | Architecture & defect audit | COMPLETE (local docs) | ARCHITECTURE-AUDIT / DEFECT-REGISTER |
-| M2 | Extraction / review / readiness | COMPLETE (local) | Confirm UX + status reconcile + acceptance tests |
+| M2 | Extraction / review / readiness | COMPLETE (local) + M2-P4 RC | Confirm UX + visibility + status-poll reconcile; prod API deploy pending |
 | M3 | Financial intelligence engine | VALIDATED (local) | diagnostics 65 PASS |
 | M4 | AI interpretation | VALIDATED (local) | ai 151 PASS |
 | M5 | Reporting | VALIDATED (local) | reports 61 PASS |
@@ -85,6 +85,17 @@ Incorporated findings from frontend + backend architecture audits.
 
 **Doc:** `M2-P0-REVIEW-SUBMISSION-REPAIR.md`  
 **Boundary:** stop for owner deploy authorization.
+
+### 2026-11-17 — M2-P4 readiness reconciliation (local)
+
+**Root cause:** Prod API `bc1567a` never ran reconcile; reconcile-on-review alone cannot heal already-complete sticky badges.
+
+**Fix:** `status()` invokes evidence-derived `reconcileDocumentReviewStatus` (idempotent) + audit `document.review_status_reconciled` on real transitions.
+
+**Evidence:** documents integration **8 PASS** (new READY reconcile case); diagnostics eligibility/readiness **17 PASS**; API typecheck **PASS**.
+
+**Doc:** `M2-P4-READINESS-RECONCILIATION.md`  
+**Boundary:** stop for owner **API-only** deploy authorization. No push/deploy from this gate.
 
 ---
 

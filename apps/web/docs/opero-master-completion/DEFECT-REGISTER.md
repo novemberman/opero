@@ -8,13 +8,13 @@
 | D-P0-001 | P0 | Pilot Confirm clicks did not persist (0/18) | FIXED_LOCAL | Root cause: prod UX never POSTed. One-click **Confirm figure** + `submitExtractionReview`. Needs **web deploy** + owner re-confirm. One-figure diagnostic still FAIL on prod. |
 | D-P0-002 | P0 | False success on review without server ack | FIXED_LOCAL | Requires `lineItem` in response; shared submit helper. |
 | D-P1-012 | P1 | Playwright E2E cannot run on current Hetzner host | BLOCKED_EXTERNAL | Missing Chromium shared libs (`libnspr4`…); no sudo. Specs in `apps/web/e2e/`; happy-dom + contract E2E PASS. |
-| D-P0-003 | P0 | Worker may set document `READY` while lines still PENDING | OPEN | Mitigated by eligibility/readiness; status semantics still misleading. `document-process.processor.ts`. |
+| D-P0-003 | P0 | Worker may set document `READY` while lines still PENDING | OPEN | Mitigated by eligibility/readiness + post-review reconcile; worker initial status still may open READY before confirms. `document-process.processor.ts`. |
 | D-P0-004 | P0 | B2.2 concepts extractable but unused in KPI formulas | OPEN | Schema Increment A/B1; not wired in `@opero/diagnostics` KPIs. |
 | D-P0-005 | P0 | `xray.report_generate` entitlement never enforced | OPEN | Create/publish free; only view/PDF gated. Product decision before enforcing. |
-| D-P1-001 | P1 | Document stays `REVIEW_REQUIRED` after material confirms | FIXED_LOCAL | `reconcileDocumentReviewStatus`. |
+| D-P1-001 | P1 | Document stays `REVIEW_REQUIRED` after material confirms | FIXED_LOCAL | `reconcileDocumentReviewStatus` on review **and** `status()` (M2-P4). Prod API still `bc1567a` until authorized API deploy. |
 | D-P1-002 | P1 | Confirm UX ambiguous (dropdown vs Submit) | FIXED_LOCAL | One-click Confirm; Correct/Reject secondary. |
 | D-P1-003 | P1 | Korapay hosted checkout / settlement unverified | BLOCKED_EXTERNAL | Gate C unresolved. |
-| D-P1-004 | P1 | Production deploy SHA skew (API/web/worker) | OPEN | Align on next authorized deploy. |
+| D-P1-004 | P1 | Production deploy SHA skew (API/web/worker) | OPEN | Web `15299f1`; API `bc1567a`; worker `31749a3`. Next authorize: API-only for M2-P4. |
 | D-P1-005 | P1 | Uploads/checkout emergency shutdown still on | ACCEPTED_RISK | Intentional. |
 | D-P1-006 | P1 | CSRF exempt matching used `includes`/`endsWith` | FIXED_LOCAL | Exact `/api/v1`-relative allowlist; nested only where intended. |
 | D-P1-007 | P1 | Multer 25 MiB vs `DOCUMENT_MAX_BYTES` 20 MiB | FIXED_LOCAL | Multer limit aligned to 20 MiB. |
