@@ -64,25 +64,47 @@ async function mockReviewApis(
 }
 
 test.describe("Review Confirm figure E2E", () => {
-  test("Confirm figure issues POST /review with CSRF and persists CONFIRMED", async ({
+  test("Confirm figure issues POST /review with CSRF and keeps Revenue visible as CONFIRMED", async ({
     page,
   }) => {
     const posts = await mockReviewApis(page);
     await page.goto("/design-system/review-confirm");
     await expect(page.getByTestId("review-confirm-specimen")).toBeVisible();
-    await expect(page.getByTestId("confirm-figure")).toBeVisible();
+    await expect(page.getByTestId("specimen-inventory-counts")).toContainText("2 extracted");
+    await expect(page.getByTestId("specimen-inventory-counts")).toContainText("0 confirmed");
+    await expect(page.getByTestId("confirm-figure").first()).toBeVisible();
 
-    await page.getByTestId("confirm-figure").click();
+    await page.getByTestId("confirm-figure").first().click();
 
     await expect.poll(() => posts.length).toBe(1);
     expect(posts[0]?.body).toEqual({ lineItemId: REVENUE, action: "CONFIRM" });
     expect(posts[0]?.headers["x-csrf-token"] || posts[0]?.headers["X-Csrf-Token"]).toBeTruthy();
     await expect(page.getByText("Figure confirmed", { exact: false })).toBeVisible();
-    await expect(page.getByTestId("extraction-line-card")).toHaveAttribute(
-      "data-review-status",
-      "CONFIRMED",
-    );
-    await expect(page.getByTestId("sibling-pending-guard")).toContainText("PENDING");
+    await expect(page.getByText(/kept in the inventory/i)).toBeVisible();
+
+    // Default / preferred All figures keeps Revenue visible after confirm.
+    await expect(page.getByTestId("extraction-filter-all")).toHaveAttribute("aria-selected", "true");
+    const revenueCard = page.locator(`[data-testid="extraction-line-card"][data-line-id="${REVENUE}"]`);
+    await expect(revenueCard).toBeVisible();
+    await expect(revenueCard).toHaveAttribute("data-review-status", "CONFIRMED");
+    await expect(page.getByTestId("specimen-inventory-counts")).toContainText("2 extracted");
+    await expect(page.getByTestId("specimen-inventory-counts")).toContainText("1 confirmed");
+    await expect(page.getByTestId("specimen-inventory-counts")).toContainText("1 pending");
+
+    // Pending queue no longer lists Revenue; Confirmed does; total inventory unchanged.
+    await page.getByTestId("extraction-filter-needs_financial_review").click();
+    await expect(page.locator(`[data-line-id="${REVENUE}"]`)).toHaveCount(0);
+    await expect(page.locator('[data-testid="extraction-line-card"]')).toHaveCount(1);
+
+    await page.getByTestId("extraction-filter-confirmed").click();
+    await expect(revenueCard).toBeVisible();
+    await expect(revenueCard).toHaveAttribute("data-review-status", "CONFIRMED");
+
+    await page.reload();
+    await mockReviewApis(page);
+    // After reload the specimen resets to PENDING fixtures (client-only). Re-confirm path is
+    // covered above; production reload uses server extractions. Assert All filter exists.
+    await expect(page.getByTestId("extraction-filter-all")).toBeVisible();
   });
 
   test("failed review shows session-expiry copy and does not mark CONFIRMED", async ({
@@ -90,25 +112,23 @@ test.describe("Review Confirm figure E2E", () => {
   }) => {
     await mockReviewApis(page, { failStatus: 401 });
     await page.goto("/design-system/review-confirm");
-    await page.getByTestId("confirm-figure").click();
+    await page.getByTestId("confirm-figure").first().click();
     await expect(page.getByText(SESSION_EXPIRED)).toBeVisible();
-    await expect(page.getByTestId("extraction-line-card")).toHaveAttribute(
-      "data-review-status",
-      "PENDING",
-    );
+    await expect(
+      page.locator(`[data-testid="extraction-line-card"][data-line-id="${REVENUE}"]`),
+    ).toHaveAttribute("data-review-status", "PENDING");
   });
 
   test("duplicate clicks while submitting issue a single review POST", async ({ page }) => {
     const posts = await mockReviewApis(page, { delayMs: 800 });
     await page.goto("/design-system/review-confirm");
-    const confirm = page.getByTestId("confirm-figure");
+    const confirm = page.getByTestId("confirm-figure").first();
     await confirm.click();
     await expect(confirm).toBeDisabled();
     await confirm.click({ force: true }).catch(() => undefined);
     await expect.poll(() => posts.length).toBe(1);
-    await expect(page.getByTestId("extraction-line-card")).toHaveAttribute(
-      "data-review-status",
-      "CONFIRMED",
-    );
+    await expect(
+      page.locator(`[data-testid="extraction-line-card"][data-line-id="${REVENUE}"]`),
+    ).toHaveAttribute("data-review-status", "CONFIRMED");
   });
 });

@@ -150,8 +150,15 @@ describe("extraction-review-presentation", () => {
     ).toBe(true);
   });
 
-  it("defaults the financial review filter to pending monetary and legacy CORRECTED", () => {
-    expect(DEFAULT_EXTRACTION_REVIEW_FILTER).toBe("needs_financial_review");
+  it("defaults the inventory filter to All figures so confirmed rows stay visible", () => {
+    expect(DEFAULT_EXTRACTION_REVIEW_FILTER).toBe("all");
+    expect(filterExtractionReviewLines(fixture, "all")).toHaveLength(11);
+    expect(filterExtractionReviewLines(fixture, "all").some((l) => l.reviewStatus === "CONFIRMED")).toBe(
+      true,
+    );
+  });
+
+  it("keeps Pending review as the actionable monetary queue (excludes CONFIRMED)", () => {
     const filtered = filterExtractionReviewLines(fixture, "needs_financial_review");
     expect(filtered.map((l) => l.id).sort()).toEqual([
       "legacy",
@@ -164,9 +171,10 @@ describe("extraction-review-presentation", () => {
       filtered.every((l) => l.reviewStatus === "PENDING" || l.reviewStatus === "CORRECTED"),
     ).toBe(true);
     expect(filtered.every((l) => isMonetaryQuantityClass(l.quantityClass))).toBe(true);
+    expect(filtered.some((l) => l.reviewStatus === "CONFIRMED")).toBe(false);
   });
 
-  it("excludes non-monetary quantities from the default financial queue", () => {
+  it("excludes non-monetary quantities from the Pending review queue", () => {
     const filtered = filterExtractionReviewLines(fixture, "needs_financial_review");
     expect(filtered.some((l) => l.quantityClass === "PERCENTAGE")).toBe(false);
     expect(filtered.some((l) => l.quantityClass === "DATE")).toBe(false);
@@ -174,7 +182,8 @@ describe("extraction-review-presentation", () => {
     expect(filtered.some((l) => l.quantityClass === "NOTE_NUMBER")).toBe(false);
   });
 
-  it("supports scale, unmapped monetary, contextual and all filters", () => {
+  it("supports confirmed, scale, unmapped monetary, contextual and all filters", () => {
+    expect(filterExtractionReviewLines(fixture, "confirmed").map((l) => l.id)).toEqual(["cogs"]);
     expect(filterExtractionReviewLines(fixture, "scale_issues").map((l) => l.id)).toEqual([
       "other",
     ]);
@@ -202,12 +211,27 @@ describe("extraction-review-presentation", () => {
     expect(ids.indexOf("cogs")).toBeGreaterThan(otherIdx);
   });
 
-  it("selectExtractionReviewLines applies default filter then sort", () => {
+  it("selectExtractionReviewLines applies default All filter then sort", () => {
     const selected = selectExtractionReviewLines(fixture);
-    expect(selected.every((l) => lineMatchesExtractionReviewFilter(l, "needs_financial_review"))).toBe(
-      true,
+    expect(selected).toHaveLength(11);
+    expect(selected.every((l) => lineMatchesExtractionReviewFilter(l, "all"))).toBe(true);
+    expect(selected.some((l) => l.reviewStatus === "CONFIRMED")).toBe(true);
+  });
+
+  it("confirming a figure reduces pending count without changing total inventory", () => {
+    const before = summarizeExtractionReview(fixture);
+    const afterConfirm = fixture.map((line) =>
+      line.id === "rev" ? { ...line, reviewStatus: "CONFIRMED", unitScaleRequiresReview: false } : line,
     );
-    expect(selected[0]?.concept).not.toBe("UNMAPPED");
+    const after = summarizeExtractionReview(afterConfirm);
+    expect(after.total).toBe(before.total);
+    expect(after.pendingMonetary).toBe(before.pendingMonetary - 1);
+    expect(after.confirmed).toBe(before.confirmed + 1);
+    expect(filterExtractionReviewLines(afterConfirm, "all").map((l) => l.id)).toContain("rev");
+    expect(filterExtractionReviewLines(afterConfirm, "confirmed").map((l) => l.id)).toContain("rev");
+    expect(filterExtractionReviewLines(afterConfirm, "needs_financial_review").map((l) => l.id)).not.toContain(
+      "rev",
+    );
   });
 
   it("preserves evidence and raw fields on filtered lines (no mutation)", () => {

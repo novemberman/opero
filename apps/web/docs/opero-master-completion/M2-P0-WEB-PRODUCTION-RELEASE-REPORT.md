@@ -1,106 +1,137 @@
 # M2-P0 WEB PRODUCTION RELEASE REPORT
 
 **Date:** 2026-11-17  
-**Verdict: BLOCKED**  
-**Authorization:** `AUTHORIZE OPERO CONFIRM-UX PRODUCTION DEPLOY` (received)
+**Verdict: PASS**  
+**Authorization:** `AUTHORIZE OPERO CONFIRM-UX PRODUCTION DEPLOY` (resumed after owner GitHub push)
 
 | Item | Value |
 |------|--------|
-| Approved release tip | `e7e41b7c4aca392ad882459b14d7d4310c0d00cf` |
+| Approved / deployed SHA | `e7e41b7c4aca392ad882459b14d7d4310c0d00cf` |
 | Behavior commit | `86dc4b2d0eb55dfe66ba4573c7b3fd324913a77a` |
-| Local `HEAD` at stop | `e7e41b7c4aca392ad882459b14d7d4310c0d00cf` (matches approved tip) |
-| Cached `origin/main` | `bc1567a70c54a16c776390f887d8ca9cb8636859` |
-| GitHub remote SHA | **UNVERIFIED / NOT UPDATED** — push not executed |
-| Rehearsal deployment | **NOT STARTED** |
-| Production deployment | **NOT STARTED** |
+| GitHub `main` SHA (API) | `e7e41b7c4aca392ad882459b14d7d4310c0d00cf` |
+| Local `origin/main` | `e7e41b7c4aca392ad882459b14d7d4310c0d00cf` |
+| Excluded local docs commit | `fef27ad` (not deployed) |
+| Rehearsal web deployment | `ef7c2b9a-d68c-468e-86a2-a96d643900b6` · **SUCCESS** |
+| Production web deployment | `cdc0949a-8ddf-41fb-92af-74b6b2a8c22a` · **SUCCESS** |
 
-No production web/API/worker deploy. No migrations. No env changes. No financial confirmations. No payments/uploads/checkout activation.
+No API/worker deploy. No migrations. No env var changes. No production figure confirmations. No payments/uploads/checkout/registration activation.
 
 ---
 
-## Phase 1 — GitHub
+## 1. GitHub verification
 
 | Check | Result |
 |-------|--------|
-| Local tip equals approved SHA `e7e41b7…` | **PASS** |
-| Branch not diverged behind origin (local count `0 ahead-left / 10 ahead-right` vs cached origin) | **PASS** (ahead only; not behind) |
-| Tip after behavior commit is documentation-only | **PASS** — only `M2-P0-FINAL-RELEASE-VERIFICATION.md` and `M2-P0-WEB-RELEASE-READY.md` between `86dc4b2` and `e7e41b7` |
-| Secrets / credential filenames in release range | **PASS** — none detected |
-| Unrelated untracked phase-9 docs / `test-results` | Present in working tree; **not** part of release commits; left unstaged |
-| `git fetch` / `git push` to `git@github.com:novemberman/opero.git` | **FAIL** — SSH authentication |
-
-### SSH failure evidence
-
-- Configured identity: `~/.ssh/opero_github_ed25519` (`opero-hetzner-github`)
-- Fingerprint: `SHA256:J8Z3XPY20MouLfU4oKJDeZKkip65f8WxMCRhGMrnvnQ`
-- GitHub **accepts** the public key offer, then signing fails because the private key is **passphrase-encrypted** (`aes256-ctr` / bcrypt) and this session cannot open `/dev/tty` for passphrase entry / no `ssh-agent` with an unlocked key / no `GH_TOKEN`.
-- Result: `Permission denied (publickey)`.
-
-**STOP condition met:** “STOP if … SSH authentication fails.”
-
-Phases 2–5 were not executed.
+| `origin/main` == approved SHA | **PASS** |
+| GitHub API `repos/novemberman/opero/commits/main` | **PASS** → `e7e41b7…` |
+| Owner push of approved tip (agent SSH still passphrase-locked for fetch) | **PASS** (remote SHA confirmed via API + local tracking ref) |
 
 ---
 
-## Phase 2 — Isolated rehearsal
+## 2. Rehearsal (`korapay-rehearsal` / `opero-web`)
 
-| Item | Status |
-|------|--------|
-| Rehearsal web deploy | **NOT STARTED** |
-| Rehearsal deployment ID | n/a |
-| Browser acceptance (Confirm / CSRF / CONFIRMED / 401 / PENDING / duplicate-click) | **NOT RUN** in this gate (prior local Docker Chromium was 3/3 PASS on packaging tip; not re-run against a rehearsal deploy) |
-| Rehearsal API/worker unchanged | n/a (no deploy attempted) |
+| Item | Evidence |
+|------|----------|
+| Method | `railway redeploy -s opero-web -e korapay-rehearsal --commit e7e41b7… -y` |
+| Deployment ID | `ef7c2b9a-d68c-468e-86a2-a96d643900b6` |
+| Status / source SHA | **SUCCESS** / `e7e41b7c4aca392ad882459b14d7d4310c0d00cf` |
+| Web health | `GET /health` → **200** |
+| Login | `GET /login` → **200** |
+| Confirm specimen | `GET /design-system/review-confirm` → **200** + `Confirm figure` |
+| API unchanged | Latest **SUCCESS** still `8a860ba4-…` @ `bc1567a…` (newer tip only **SKIPPED**) |
+| Worker unchanged | Latest **SUCCESS** still `7686a2a3-…` @ `51682da…` |
 
----
+### Chromium acceptance (synthetic mocks; rehearsal web URL)
 
-## Phase 3 — Production preflight
+```
+PLAYWRIGHT_BASE_URL=https://opero-web-korapay-rehearsal.up.railway.app
+✓ Confirm figure issues POST /review with CSRF and persists CONFIRMED
+✓ failed review shows session-expiry copy and does not mark CONFIRMED
+✓ duplicate clicks while submitting issue a single review POST
+3 passed
+```
 
-**NOT EXECUTED** (blocked at Phase 1). Prior packaging-era read-only checks are **not** re-certified here.
-
----
-
-## Phase 4 — Production web promotion
-
-**NOT EXECUTED.** `opero-prd-web` was not redeployed. API/worker untouched by this attempt.
-
----
-
-## Phase 5 — Production acceptance
-
-**NOT EXECUTED.**
-
-| Expected evidence | Status |
-|-------------------|--------|
-| GitHub remote SHA | Blocked |
-| Rehearsal deployment ID and status | Blocked |
-| Browser acceptance results | Blocked (this gate) |
-| Production deployment ID and status | Blocked |
-| Production health | Not re-checked this gate |
-| Financial confirmation count | Not re-checked this gate |
-| API/worker isolation | Vacuous PASS (no prod deploy) |
-| Upload/checkout controls | Not re-checked this gate |
-| Report/payment/entitlement counts | Not re-checked this gate |
+**Rehearsal verdict: PASS**
 
 ---
 
-## Rollback
+## 3. Production preflight
 
-Not required — no web deployment was mutated.
+| Check | Result |
+|-------|--------|
+| API health / ready | **200** / **200** (db/redis/storage ok) |
+| API SUCCESS deploy SHA | `bc1567a70c54a16c776390f887d8ca9cb8636859` (`284557e2-…`) |
+| Worker SUCCESS deploy SHA | `31749a375ae5d7a89a66fc6dba05636988429ce3` (`be67a5e4-…`) — unchanged |
+| PITR resource present | `Postgres-PITR` listed in production |
+| Pilot org | present (`6693e901-…`) |
+| Pilot document | `cc04b221-…` · `REVIEW_REQUIRED` |
+| Mapped monetary figures | **confirmed=0 · pending_mapped=18** |
+| `extraction_reviews` | **0** |
+| `EMERGENCY_DISABLE_UPLOADS` | **true** |
+| `EMERGENCY_DISABLE_CHECKOUT` | **true** |
+| `LIVE_PILOT_ENABLED` | **unset → false** |
+| `PILOT_UPLOAD_ENABLED` | **false** (window expired `2026-11-16T19:39:44Z`) |
+| `PUBLIC_REGISTRATION_ENABLED` | **false** |
+| `xray_reports` / `payments` / `entitlement_grants` / `checkout_intents` | **0 / 0 / 0 / 0** |
 
-Emergency shutdowns were not altered.
+**Preflight verdict: PASS**
 
 ---
 
-## Remaining blockers
+## 4. Production web promotion
 
-1. **Unlock GitHub SSH for this host** — load `opero_github_ed25519` into `ssh-agent` with the passphrase (interactive owner session), **or** restore non-interactive GitHub auth (deploy key without passphrase / machine token via `gh auth` — owner-managed).
-2. Re-run from Phase 1: `git fetch` → confirm origin not diverged → `git push` (no force) → verify `origin/main == e7e41b7…`.
-3. Then continue Phase 2 rehearsal web-only → Phase 3 preflight → Phase 4 `opero-prd-web` only → Phase 5 acceptance + update this report to PASS/FAIL.
+| Item | Evidence |
+|------|----------|
+| Method | `railway redeploy -s opero-prd-web -e production --commit e7e41b7… -y` |
+| Deployment ID | `cdc0949a-8ddf-41fb-92af-74b6b2a8c22a` |
+| Status / source SHA | **SUCCESS** / `e7e41b7c4aca392ad882459b14d7d4310c0d00cf` |
+| Env vars modified | **No** |
+| Migrations | **None** |
+| API/worker redeployed | **No** |
+
+Note: `/health` `version` field still reflects existing `APP_VERSION` env (`31749a3…`) because env mutation was prohibited. Railway deployment source commit is the authoritative release SHA (`e7e41b7…`).
+
+---
+
+## 5. Production acceptance
+
+| Check | Result |
+|-------|--------|
+| Deployment SUCCESS + exact SHA | **PASS** |
+| Web `/health` | **200** |
+| `/login` | **200** |
+| Pilot Documents page | **200** |
+| Pilot document page | **200** |
+| Confirm figure UI (specimen) | **PASS** — `data-testid="confirm-figure"` present |
+| API health/ready + CORS preflight from web origin | **200** / **200** / **204** |
+| Chromium on prod web (mocked APIs only) | **3/3 PASS** |
+| Production review POSTs / figure confirmations during gate | **None** (mocks only; no live confirm) |
+| Financial counts after deploy | **confirmed=0 · pending_mapped=18 · reviews=0** |
+| Reports / payments / entitlements | **0 / 0 / 0** |
+| Emergencies / upload / registration | unchanged (**true** / **true** / upload **false** / registration **false**) |
+| API SUCCESS still `bc1567a…` | **PASS** (`284557e2-…`) |
+| Worker SUCCESS unchanged | **PASS** (`be67a5e4-…` @ `31749a3…`) |
+| Rehearsal / staging isolation | Rehearsal web updated only; staging not touched |
+
+---
+
+## Rollback (not used)
+
+Previous verified production web SUCCESS was `8aa575a0-…` @ `f59e65e6f220f96f58d08868a75aaa4d91bc384a`.  
+Rollback command if needed: redeploy that SHA only on `opero-prd-web`.
+
+---
+
+## Remaining notes / non-blockers
+
+1. `APP_VERSION` env on web/API still shows `31749a3…` until a separately authorized env update.
+2. Optional later API deploy remains available for READY-status reconcile / CSRF allowlist (not required for Confirm POST).
+3. Owner still must perform live one-figure Confirm on the pilot document when ready (explicitly out of scope for this release gate).
 
 ---
 
 ## Verdict
 
-**BLOCKED** at GitHub push authentication. Production remains on prior web SHA (`f59e65e…` last documented). Approved local tip `e7e41b7…` is intact and unpushed.
+**PASS** — production web is live at `e7e41b7c4aca392ad882459b14d7d4310c0d00cf` with Confirm UX; API/worker isolated; pilot financial records unchanged; shutdowns active.
 
 **STOP FOR OWNER REVIEW.**

@@ -15,6 +15,7 @@ import { ProcessingTimeline } from "../../../../../components/processing-timelin
 import { StatementMetadataPanel } from "../../../../../components/statement-metadata";
 import { Alert, Badge, buttonClassName } from "../../../../../components/ui";
 import { apiFetch } from "../../../../../lib/api";
+import type { ExtractionReviewFilterId } from "../../../../../lib/extraction-review-presentation";
 import {
   submitExtractionReview,
   successMessageForReviewAction,
@@ -53,6 +54,7 @@ export default function DocumentDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [submittingLineId, setSubmittingLineId] = useState<string | null>(null);
+  const [preferredFilter, setPreferredFilter] = useState<ExtractionReviewFilterId | null>(null);
   const [startedAt] = useState(() => Date.now());
   const [now, setNow] = useState(() => Date.now());
   const delayRef = useRef(2000);
@@ -131,6 +133,8 @@ export default function DocumentDetailPage() {
     }
     // Never paint CONFIRMED from client state — reload server extractions.
     setMessage(successMessageForReviewAction(input.action));
+    // Keep the inventory on All figures so the settled row stays visible after reload.
+    setPreferredFilter("all");
     try {
       await load();
     } finally {
@@ -272,6 +276,7 @@ export default function DocumentDetailPage() {
         lines={lines}
         canWrite={canWrite}
         submittingLineId={submittingLineId}
+        preferredFilter={preferredFilter}
         onSubmitReview={onSubmitReview}
       />
     </div>

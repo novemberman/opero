@@ -143,7 +143,11 @@ export async function submitExtractionReview(
 }
 
 export function successMessageForReviewAction(action: ExtractionReviewAction): string {
-  if (action === "CONFIRM") return "Figure confirmed — original raw evidence preserved";
-  if (action === "CORRECT") return "Correction confirmed — original raw evidence preserved";
-  return "Figure rejected — original raw evidence preserved";
+  if (action === "CONFIRM") {
+    return "Figure confirmed and kept in the inventory — status is CONFIRMED; original raw evidence preserved. Open Confirmed or All figures to review it anytime.";
+  }
+  if (action === "CORRECT") {
+    return "Correction confirmed and kept in the inventory — original raw evidence preserved.";
+  }
+  return "Figure rejected and kept in the inventory — original raw evidence preserved.";
 }

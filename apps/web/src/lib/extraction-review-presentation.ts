@@ -33,27 +33,30 @@ export function hasSoftScaleConfidence(
 }
 
 export const EXTRACTION_REVIEW_FILTERS = [
+  "all",
   "needs_financial_review",
+  "confirmed",
   "scale_issues",
   "unmapped_monetary",
   "contextual",
-  "all",
 ] as const;
 
 export type ExtractionReviewFilterId = (typeof EXTRACTION_REVIEW_FILTERS)[number];
 
 export const EXTRACTION_REVIEW_FILTER_LABELS: Record<ExtractionReviewFilterId, string> = {
-  needs_financial_review: "Needs financial review",
+  all: "All figures",
+  needs_financial_review: "Pending review",
+  confirmed: "Confirmed",
   scale_issues: "Scale issues",
   unmapped_monetary: "Unmapped monetary",
   contextual: "Contextual / non-diagnostic",
-  all: "All extracted items",
 };
 
-/** Default review queue: actionable pending monetary figures. */
-export const DEFAULT_EXTRACTION_REVIEW_FILTER: ExtractionReviewFilterId =
-  "needs_financial_review";
-
+/**
+ * Default inventory view: every extracted figure remains visible after confirm.
+ * Use "Pending review" for the actionable monetary queue without losing confirmed rows.
+ */
+export const DEFAULT_EXTRACTION_REVIEW_FILTER: ExtractionReviewFilterId = "all";
 const NON_MONETARY = new Set([
   "PERCENTAGE",
   "RATIO",
@@ -219,19 +222,21 @@ export function lineMatchesExtractionReviewFilter(
   const monetary = isMonetaryQuantityClass(line.quantityClass);
 
   switch (filter) {
+    case "all":
+      return true;
     case "needs_financial_review":
       return (
         monetary &&
         (isPendingReview(line.reviewStatus) || isLegacyCorrectedReview(line.reviewStatus))
       );
+    case "confirmed":
+      return isConfirmedReview(line.reviewStatus);
     case "scale_issues":
       return monetary && Boolean(line.unitScaleRequiresReview);
     case "unmapped_monetary":
       return monetary && !isMappedConcept(line.concept);
     case "contextual":
       return !monetary;
-    case "all":
-      return true;
     default: {
       const _exhaustive: never = filter;
       return _exhaustive;

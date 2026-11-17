@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   DEFAULT_EXTRACTION_REVIEW_FILTER,
   EXTRACTION_REVIEW_FILTER_LABELS,
@@ -60,6 +60,7 @@ export function ExtractionReviewBoard({
   onSubmitReview,
   heading = "Extracted figures",
   description,
+  preferredFilter,
 }: {
   lines: ExtractionLine[];
   canWrite: boolean;
@@ -67,8 +68,15 @@ export function ExtractionReviewBoard({
   onSubmitReview: (input: ExtractionReviewSubmitInput) => void | Promise<void>;
   heading?: string;
   description?: string;
+  /** After a successful confirm, parent may steer the inventory to All/Confirmed. */
+  preferredFilter?: ExtractionReviewFilterId | null;
 }) {
   const [filter, setFilter] = useState<ExtractionReviewFilterId>(DEFAULT_EXTRACTION_REVIEW_FILTER);
+
+  useEffect(() => {
+    if (!preferredFilter) return;
+    setFilter(preferredFilter);
+  }, [preferredFilter]);
 
   const summary = useMemo(() => summarizeExtractionReview(lines), [lines]);
   const visibleLines = useMemo(
@@ -89,13 +97,13 @@ export function ExtractionReviewBoard({
           </h2>
           <p className="mt-1 max-w-2xl text-sm text-text-secondary">
             {description ??
-              "Financial review defaults to pending monetary figures. Contextual dates, percentages and ratios stay available under Contextual / non-diagnostic — filtering never resolves or deletes records."}
+              "All extracted figures stay in the inventory after confirmation. Use Pending review for the monetary queue and Confirmed to inspect settled figures — filtering never deletes records."}
           </p>
         </div>
         {lines.length > 0 ? (
           <p className="text-sm text-text-secondary" data-testid="extraction-review-totals">
-            {summary.confirmed} confirmed · {summary.rejected} rejected · {summary.pendingAll}{" "}
-            pending
+            {summary.total} extracted · {summary.confirmed} confirmed · {summary.rejected} rejected ·{" "}
+            {summary.pendingAll} pending
             {reviewComplete ? " · all line statuses settled" : ""}
           </p>
         ) : null}
@@ -149,8 +157,8 @@ export function ExtractionReviewBoard({
           <Alert tone="warning" title="Monetary figures need human confirmation">
             {summary.pendingMonetary} monetary figure
             {summary.pendingMonetary === 1 ? "" : "s"} still pending. Confirm, correct or reject
-            each item. Diagnostics should use only eligible confirmed monetary inputs. Contextual
-            records in other filters are not resolved by leaving them hidden.
+            each item. Confirmed figures remain listed under All figures and Confirmed. Diagnostics
+            should use only eligible confirmed monetary inputs.
           </Alert>
         </div>
       ) : null}
@@ -158,8 +166,8 @@ export function ExtractionReviewBoard({
       {lines.length > 0 && !monetaryPendingRemain && summary.pendingAll > 0 ? (
         <div className="mt-4">
           <Alert tone="info" title="No pending monetary figures in this queue">
-            Remaining pending items are contextual or already outside the default financial filter.
-            Open Contextual / non-diagnostic or All extracted items to inspect them — statuses are
+            Remaining pending items are contextual or already outside the Pending review filter.
+            Open Contextual / non-diagnostic or All figures to inspect them — statuses are
             unchanged.
           </Alert>
         </div>
@@ -168,7 +176,7 @@ export function ExtractionReviewBoard({
       {lines.length > 0 && reviewComplete ? (
         <div className="mt-4">
           <Alert tone="success" title="Review complete for extracted lines">
-            All current line items are confirmed or rejected.
+            All current line items are confirmed or rejected and remain in the inventory.
           </Alert>
         </div>
       ) : null}
@@ -238,15 +246,24 @@ export function ExtractionReviewBoard({
         <div className="mt-4">
           <EmptyState
             title="No items in this filter"
-            description="Try another filter. Hidden records keep their review status — filtering does not confirm, reject or delete extractions."
+            description="Try All figures or Confirmed. Hidden records keep their review status — filtering does not confirm, reject or delete extractions."
             action={
-              <button
-                type="button"
-                className={buttonClassName({ variant: "secondary", size: "sm" })}
-                onClick={() => setFilter("all")}
-              >
-                Show all extracted items
-              </button>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  className={buttonClassName({ variant: "secondary", size: "sm" })}
+                  onClick={() => setFilter("all")}
+                >
+                  Show all figures
+                </button>
+                <button
+                  type="button"
+                  className={buttonClassName({ variant: "secondary", size: "sm" })}
+                  onClick={() => setFilter("confirmed")}
+                >
+                  Show confirmed
+                </button>
+              </div>
             }
           />
         </div>
