@@ -116,6 +116,7 @@ Incorporated findings from frontend + backend architecture audits.
 
 **Evidence:** diagnostics **72 PASS**; API diagnostics/readiness IT **6 PASS**; web presentation **11 PASS**; typecheck/build PASS; Playwright **BLOCKED** (host perms/libs).
 
+**Local RC SHA:** `fe7eed6c02b42c7cef5b8582149eaf4869b14b76` (not pushed; docs stamp follows on `main`)  
 **Doc:** `M3-FINANCIAL-DIAGNOSTICS-ACCEPTANCE.md`  
 **Boundary:** **STOP FOR OWNER REVIEW** at release (push/deploy/prod diagnostic run require separate authorization).
 

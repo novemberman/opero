@@ -8,7 +8,7 @@
 |------|--------|
 | Production API baseline (read-only) | `77ecbf6b4954387888bfda24dc747ac038fa6175` |
 | Production web / worker | `15299f1…` / `31749a3…` |
-| Local release candidate tip | *(commit after this doc — see ledger)* |
+| Local release candidate | `fe7eed6c02b42c7cef5b8582149eaf4869b14b76` (+ docs stamp commit on `main`; not pushed) |
 | Migrations | **None** |
 | Engine versions | `calc.v1` · `score.v1` · `rules.v1` |
 
