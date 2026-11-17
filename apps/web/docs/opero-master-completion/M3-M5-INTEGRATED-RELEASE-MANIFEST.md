@@ -12,7 +12,7 @@
 | Field | Value |
 |-------|--------|
 | Feature RC | `4f7b19361f1cab0fa073b61f8bbdb5e24b00f634` |
-| Docs stamp tip |  |
+| Docs stamp tip | `5a8aaf09fdbb59c7d2a9395a14a2ea81c6ae1453` (+ follow-up if tip advances) |
 | Prior M3 feature | `fe7eed6c02b42c7cef5b8582149eaf4869b14b76` |
 | Prior M3 docs tip | `a8175592719f503a6cf331b9b8367ee35baf5eb6` |
 | Migrations | **None** |
