@@ -36,12 +36,14 @@ export type ReportPayloadMetric = {
 
 export type ReportPayloadFinding = {
   id?: string | null;
+  ruleId?: string | null;
   category: string;
   severity: string;
   title: string;
   explanation?: string | null;
   implication?: string | null;
   suggestedAction?: string | null;
+  supportingMetrics?: readonly string[] | null;
 };
 
 /**
@@ -67,7 +69,22 @@ export type ReportSnapshotPayload = {
     status: string;
     overallScore?: number | null;
     limitations?: readonly string[] | null;
+    methodologyVersion?: string | null;
+    components?: readonly {
+      dimension: string;
+      weight?: number | null;
+      included: boolean;
+      score?: number | null;
+      exclusionReason?: string | null;
+      metricCodes?: readonly string[] | null;
+    }[] | null;
   };
+  engineVersions?: {
+    calculationEngine?: string | null;
+    ruleSet?: string | null;
+    scoreMethodology?: string | null;
+  } | null;
+  sourceDocumentIds?: readonly string[] | null;
   readinessStatus?: string | null;
 };
 
@@ -79,6 +96,14 @@ export type ReportAiNarrativeInput = {
     keyObservations?: readonly string[] | null;
     risks?: readonly string[] | null;
     limitations?: readonly string[] | null;
+    recommendations?: readonly string[] | null;
+    profitabilityInterpretation?: string | null;
+    liquidityInterpretation?: string | null;
+    solvencyInterpretation?: string | null;
+    efficiencyInterpretation?: string | null;
+    cashFlowInterpretation?: string | null;
+    dataQualityExplanation?: string | null;
+    trendCommentary?: string | null;
   };
   provider?: string | null;
   model?: string | null;
@@ -142,6 +167,14 @@ function assembleAiNarrative(input: ReportAiNarrativeInput): ReportAiNarrative |
     keyObservations: cleanList(input.narrative.keyObservations),
     risks: cleanList(input.narrative.risks),
     limitations: cleanList(input.narrative.limitations),
+    recommendations: cleanList(input.narrative.recommendations),
+    profitabilityInterpretation: clean(input.narrative.profitabilityInterpretation) ?? "",
+    liquidityInterpretation: clean(input.narrative.liquidityInterpretation) ?? "",
+    solvencyInterpretation: clean(input.narrative.solvencyInterpretation) ?? "",
+    efficiencyInterpretation: clean(input.narrative.efficiencyInterpretation) ?? "",
+    cashFlowInterpretation: clean(input.narrative.cashFlowInterpretation) ?? "",
+    dataQualityExplanation: clean(input.narrative.dataQualityExplanation) ?? "",
+    trendCommentary: clean(input.narrative.trendCommentary) ?? "",
     provider: clean(input.provider),
     model: clean(input.model),
   };
@@ -210,6 +243,16 @@ export function assembleReportModel(
 
   const readinessStatus = clean(payload.readinessStatus);
 
+  const components =
+    payload.score.components?.map((component) => ({
+      dimension: clean(component.dimension) ?? "unknown",
+      weight: typeof component.weight === "number" && Number.isFinite(component.weight) ? component.weight : null,
+      included: component.included === true,
+      score: typeof component.score === "number" && Number.isFinite(component.score) ? component.score : null,
+      exclusionReason: clean(component.exclusionReason),
+      metricCodes: cleanList(component.metricCodes ?? []),
+    })) ?? [];
+
   return {
     title: clean(options.title) ?? DEFAULT_REPORT_TITLE,
     orgName: clean(payload.organizationName) ?? "Organization not specified",
@@ -219,7 +262,9 @@ export function assembleReportModel(
     score: {
       status: scoreStatus,
       overall: scored ? overall : null,
+      methodologyVersion: clean(payload.score.methodologyVersion),
       limitations: cleanList(payload.score.limitations),
+      components,
     },
     metrics,
     findings,
@@ -231,6 +276,13 @@ export function assembleReportModel(
     },
     ...(readinessStatus ? { readinessStatus } : {}),
     ...(aiNarrative ? { aiNarrative } : {}),
+    methodology: {
+      calculationEngine: clean(payload.engineVersions?.calculationEngine),
+      ruleSet: clean(payload.engineVersions?.ruleSet),
+      scoreMethodology:
+        clean(payload.engineVersions?.scoreMethodology) ?? clean(payload.score.methodologyVersion),
+    },
+    sourceDocumentIds: cleanList(payload.sourceDocumentIds ?? []),
     disclosures,
     verifiedPublication,
   };

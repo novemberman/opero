@@ -50,6 +50,14 @@ type ReportModel = {
     keyObservations: string[];
     risks: string[];
     limitations: string[];
+    recommendations?: string[];
+    profitabilityInterpretation?: string;
+    liquidityInterpretation?: string;
+    solvencyInterpretation?: string;
+    efficiencyInterpretation?: string;
+    cashFlowInterpretation?: string;
+    dataQualityExplanation?: string;
+    trendCommentary?: string;
     provider: string | null;
     model: string | null;
   };
@@ -88,9 +96,18 @@ type Report = {
   approvals: Approval[];
 };
 
+type FreePreview = {
+  access: "FREE_PREVIEW";
+  summary: string;
+  limitedKpis: Array<{ code?: string; label?: string; available?: boolean; status?: string }>;
+  findingsSummary: string[];
+  upgradeRequired: true;
+  productCode: "XRAY_PRO";
+};
+
 type Detail = {
   report: Report;
-  preview: ReportModel | null;
+  preview: ReportModel | FreePreview | null;
   access?: "FULL" | "FREE_PREVIEW";
 };
 
@@ -231,8 +248,27 @@ function ReportPreview({ model, draft }: { model: ReportModel; draft: boolean })
           <p className="mt-2 whitespace-pre-line text-ink">{model.aiNarrative.summary}</p>
           {(
             [
+              ["Profitability", model.aiNarrative.profitabilityInterpretation],
+              ["Liquidity", model.aiNarrative.liquidityInterpretation],
+              ["Solvency", model.aiNarrative.solvencyInterpretation],
+              ["Efficiency", model.aiNarrative.efficiencyInterpretation],
+              ["Cash flow", model.aiNarrative.cashFlowInterpretation],
+              ["Data quality", model.aiNarrative.dataQualityExplanation],
+              ["Trends", model.aiNarrative.trendCommentary],
+            ] as const
+          ).map(([heading, text]) =>
+            text?.trim() ? (
+              <div key={heading}>
+                <h4 className="mt-3 text-base text-ink">{heading}</h4>
+                <p className="mt-1 whitespace-pre-line text-sm text-muted">{text}</p>
+              </div>
+            ) : null,
+          )}
+          {(
+            [
               ["Key observations", model.aiNarrative.keyObservations],
               ["Risks", model.aiNarrative.risks],
+              ["Recommendations", model.aiNarrative.recommendations ?? []],
               ["Limitations", model.aiNarrative.limitations],
             ] as const
           ).map(([heading, items]) =>
@@ -411,8 +447,18 @@ export default function ReportDetailPage() {
 
   const report = detail?.report ?? null;
   const current = report?.versions.find((version) => version.id === report.currentVersionId);
-  const shown = older?.model ?? detail?.preview ?? null;
-  const unscored = detail?.preview ? detail.preview.score.overall === null : false;
+  const freePreview =
+    detail?.access === "FREE_PREVIEW" &&
+    detail.preview &&
+    "upgradeRequired" in detail.preview
+      ? (detail.preview as FreePreview)
+      : null;
+  const shown =
+    older?.model ??
+    (detail?.preview && !("upgradeRequired" in detail.preview)
+      ? (detail.preview as ReportModel)
+      : null);
+  const unscored = shown ? shown.score.overall === null : false;
   const canRevise =
     canWrite && report ? ["DRAFT", "REJECTED", "PUBLISHED"].includes(report.status) : false;
   const versionNumbers = new Map(
@@ -440,14 +486,32 @@ export default function ReportDetailPage() {
         {loadError ? <p className="mb-4 text-sm text-copper">{loadError}</p> : null}
         {!detail && !loadError ? <p className="text-muted">Loading report…</p> : null}
 
-        {detail?.access === "FREE_PREVIEW" && report?.status === "PUBLISHED" ? (
-          <section className="mb-6 border border-line p-4">
+        {freePreview && report?.status === "PUBLISHED" ? (
+          <section className="mb-6 border border-line p-4" data-testid="free-preview">
             <h2 className="text-lg text-ink">Payment required</h2>
             <p className="mt-1 text-sm text-muted">
               Full report content and PDF download stay locked until X-Ray Pro is purchased for this
               report (or an active Opero OS plan covers it). Nothing is shown as unlocked before the
               API confirms entitlement.
             </p>
+            <p className="mt-3 text-sm text-ink">{freePreview.summary}</p>
+            {freePreview.limitedKpis.length ? (
+              <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-muted">
+                {freePreview.limitedKpis.map((kpi) => (
+                  <li key={kpi.code ?? kpi.label}>
+                    {kpi.label ?? kpi.code}
+                    {kpi.available ? " — figure present" : " — figure unavailable"}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            {freePreview.findingsSummary.length ? (
+              <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-muted">
+                {freePreview.findingsSummary.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            ) : null}
             <Link
               className="mt-3 inline-block text-pine underline"
               href={`/organizations/${orgId}/reports/${reportId}/unlock`}

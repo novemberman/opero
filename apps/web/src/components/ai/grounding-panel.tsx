@@ -38,7 +38,7 @@ export function GroundingPanel({
         title="Evidence grounding"
         description={
           coversEditedNarrative
-            ? "The check covers the generated draft, not reviewer edits."
+            ? "The check covers this version’s narrative, including reviewer edits."
             : "Claims are checked against metrics and findings in the linked diagnostic."
         }
         action={

@@ -414,6 +414,14 @@ export function checkNarrativeGrounding(
     ["keyObservations", narrative.keyObservations],
     ["risks", narrative.risks],
     ["limitations", narrative.limitations],
+    ["recommendations", narrative.recommendations ?? []],
+    ["profitabilityInterpretation", narrative.profitabilityInterpretation ? [narrative.profitabilityInterpretation] : []],
+    ["liquidityInterpretation", narrative.liquidityInterpretation ? [narrative.liquidityInterpretation] : []],
+    ["solvencyInterpretation", narrative.solvencyInterpretation ? [narrative.solvencyInterpretation] : []],
+    ["efficiencyInterpretation", narrative.efficiencyInterpretation ? [narrative.efficiencyInterpretation] : []],
+    ["cashFlowInterpretation", narrative.cashFlowInterpretation ? [narrative.cashFlowInterpretation] : []],
+    ["dataQualityExplanation", narrative.dataQualityExplanation ? [narrative.dataQualityExplanation] : []],
+    ["trendCommentary", narrative.trendCommentary ? [narrative.trendCommentary] : []],
   ];
   for (const [section, statements] of prose) {
     for (const statement of statements) {

@@ -12,9 +12,12 @@ export function redactPaidReportPreview(preview: unknown): {
 } {
   const model = (preview ?? {}) as {
     summary?: string;
-    metrics?: Array<{ code?: string; label?: string; value?: unknown }>;
+    title?: string;
+    score?: { overall?: number | null; status?: string };
+    metrics?: Array<{ code?: string; label?: string; value?: unknown; status?: string }>;
     findings?: Array<{ title?: string; severity?: string }>;
     narrative?: { summary?: string };
+    aiNarrative?: { summary?: string };
   };
 
   const limitedKpis = (model.metrics ?? [])
@@ -22,6 +25,7 @@ export function redactPaidReportPreview(preview: unknown): {
     .map((row) => ({
       code: row.code,
       label: row.label,
+      status: row.status,
       // Values stay high-level; free tier shows presence, not full precision tables.
       available: row.value != null,
     }));
@@ -33,6 +37,7 @@ export function redactPaidReportPreview(preview: unknown): {
   return {
     access: "FREE_PREVIEW",
     summary:
+      model.aiNarrative?.summary?.slice(0, 280) ||
       model.narrative?.summary?.slice(0, 280) ||
       model.summary?.slice(0, 280) ||
       "Limited diagnostic preview. Unlock X-Ray Pro for the full report and PDF.",

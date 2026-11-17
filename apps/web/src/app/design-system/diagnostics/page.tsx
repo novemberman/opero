@@ -338,15 +338,29 @@ export default function DiagnosticsDesignSpecimen() {
           <NarrativePanel
             isSimulated
             isEdited={false}
-            promptVersion="interpret.v1"
+            promptVersion="ai.interpret.v2"
             narrative={{
               summary:
                 "Fixture narrative only. Gross margin and liquidity measures are present; efficiency inputs remain incomplete.",
+              profitabilityInterpretation:
+                "Gross margin [GROSS_MARGIN] = 0.412 ratio for FY2024. Net margin evidence remains limited.",
+              liquidityInterpretation:
+                "Current ratio is computed; quick ratio is unavailable because inventory inputs are missing.",
+              solvencyInterpretation: "",
+              efficiencyInterpretation:
+                "Efficiency interpretation withheld — required turnover inputs are incomplete.",
+              cashFlowInterpretation: "",
+              dataQualityExplanation:
+                "Efficiency dimension excluded from the Business Health Score due to insufficient inputs.",
+              trendCommentary: "",
               keyObservations: [
                 "Gross margin computed at 0.412 for FY2024.",
                 "Current ratio computed; quick ratio unavailable.",
               ],
               risks: ["Working-capital coverage warrants evidence review."],
+              recommendations: [
+                "Confirm current assets and liabilities line items on source statements.",
+              ],
               limitations: [
                 "Simulated provider — not live model output.",
                 "Efficiency dimension excluded from the score.",
@@ -369,6 +383,46 @@ export default function DiagnosticsDesignSpecimen() {
               },
             ]}
           />
+        </section>
+
+        <section className="space-y-3" data-testid="fixture-report-lifecycle">
+          <h2 className="text-xl text-navy">Report generation and access</h2>
+          <Alert tone="info" title="Generation in progress">
+            <p data-testid="report-generation-progress">
+              Report version queued. Worker renders the PDF from the frozen diagnostic snapshot;
+              status polls until READY or FAILED.
+            </p>
+          </Alert>
+          <div
+            className="rounded-2xl border border-border bg-surface px-4 py-3"
+            data-testid="report-status-panel"
+          >
+            <p className="font-medium text-navy">Financial analysis — FY2024</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <Badge tone="success">PUBLISHED</Badge>
+              <Badge tone="warning">FREE_PREVIEW</Badge>
+              <Badge tone="neutral">NGN</Badge>
+              <span className="font-data text-sm text-emerald">Score 72</span>
+            </div>
+            <p className="mt-2 text-sm text-text-secondary">
+              Full PDF download stays locked until X-Ray Pro entitlement is verified. Preview shows
+              limited KPIs only — unsupported metrics are omitted, never shown as zero.
+            </p>
+            <button
+              type="button"
+              className={buttonClassName({ variant: "secondary", size: "sm" })}
+              data-testid="report-download-locked"
+              disabled
+            >
+              Download PDF (locked)
+            </button>
+          </div>
+          <Alert tone="warning" title="Cross-tenant access denied">
+            <p data-testid="report-cross-tenant-denial">
+              Requests for another organization&apos;s report return 404/403 — object keys are
+              tenant-scoped and download authorization is checked before storage read.
+            </p>
+          </Alert>
         </section>
 
         <section className="space-y-3" data-testid="fixture-loading">

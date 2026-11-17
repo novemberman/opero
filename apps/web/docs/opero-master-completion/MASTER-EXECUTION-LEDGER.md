@@ -24,8 +24,8 @@ Pilot doc `cc04b221-…`: **READY** / **SUCCEEDED** after OWNER status read; 19 
 | M1 | Architecture & defect audit | COMPLETE (local docs) | ARCHITECTURE-AUDIT / DEFECT-REGISTER |
 | M2 | Extraction / review / readiness | COMPLETE (prod API M2-P5) | Confirm UX + visibility + status-poll reconcile live on prod API `77ecbf6…` |
 | M3 | Financial intelligence engine | COMPLETE (local RC) | diagnostics 72 PASS; READY gate; missing KPIs added; deploy pending |
-| M4 | AI interpretation | VALIDATED (local) | ai 151 PASS |
-| M5 | Reporting | VALIDATED (local) | reports 61 PASS |
+| M4 | AI interpretation | COMPLETE (local RC) | `ai.interpret.v2` + grounding; mock PASS; live OpenAI unverified |
+| M5 | Reporting | COMPLETE (local RC) | PDF/model + lifecycle IT + FREE_PREVIEW UI; no prod reports |
 | M6 | Billing / entitlements | VALIDATED mock / BLOCKED live | billing integration PASS; Korapay external |
 | M7 | Customer experience | PARTIAL | Confirm UX shipped locally; broader CX polish deferred |
 | M8 | Security / reliability | DOCUMENTED + security IT PASS | No prod changes |
@@ -119,6 +119,26 @@ Incorporated findings from frontend + backend architecture audits.
 **Local RC SHA:** `fe7eed6c02b42c7cef5b8582149eaf4869b14b76` (not pushed; docs stamp follows on `main`)  
 **Doc:** `M3-FINANCIAL-DIAGNOSTICS-ACCEPTANCE.md`  
 **Boundary:** **STOP FOR OWNER REVIEW** at release (push/deploy/prod diagnostic run require separate authorization).
+
+### 2026-11-17 — M4+M5 AI interpretation + financial reporting (local RC)
+
+**Scope:** Complete evidence-grounded AI interpretation (`ai.interpret.v2`) and professional report generation/lifecycle as one local journey on top of M3 diagnostics. Deterministic mock provider; no production reporting or billing.
+
+**Delivered:**
+- Structured v2 narrative sections (dimension interpretations, recommendations, data-quality, trends)
+- Mock provider + schema/prompt/grounding/severity updates; `emptyNarrativeSections` test helper
+- Report model/PDF: BHS components, methodology, source docs, NGN-safe section rendering
+- API narrative persist, grounding-gate components, report payload/access FREE_PREVIEW
+- Web narrative/report UI + design-system report lifecycle fixtures + Playwright journey
+- Worker AI stubs + report-render bucket seam compatibility
+
+**Tests:** diagnostics 72 · ai 151 · reports 61 · API AI/reports/phase6 31 · worker AI 17 · web vitest 99 · tsc (api/web/worker) · web build · Docker Playwright 5/5
+
+**Docs:** `M4-AI-INTERPRETATION-ACCEPTANCE.md`, `M5-FINANCIAL-REPORTING-ACCEPTANCE.md`, `M3-M5-INTEGRATED-RELEASE-MANIFEST.md`
+
+**External:** Live OpenAI unverified. No push/deploy. D-P0-005 generate entitlement still open.
+
+**Boundary:** **STOP FOR OWNER REVIEW.**
 
 ---
 

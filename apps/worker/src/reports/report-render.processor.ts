@@ -38,10 +38,13 @@ export class ReportRenderProcessor extends WorkerHost {
       throw new Error("Job payload missing report identifiers");
     }
 
+    const reportsBucket =
+      this.config.get("S3_REPORTS_BUCKET", { infer: true }) ??
+      this.config.get("S3_DOCUMENTS_BUCKET", { infer: true });
     const outcome = await renderReportVersion(
       this.prisma,
       this.storage,
-      this.config.get("S3_DOCUMENTS_BUCKET", { infer: true }),
+      reportsBucket,
       job.data,
     );
     this.logger.log(`Report version ${reportVersionId} render: ${outcome}`);

@@ -150,7 +150,9 @@ describe("X-Ray reports integration", () => {
     const snapshot = draftVersion.body.version.snapshotPayload;
     expect(snapshot.aiNarrative).toBeNull();
     expect(snapshot.score.status).toBe("SCORED");
-    const serialized = JSON.stringify(snapshot);
+    // Source document ids are intentional references; document bytes/filename/lines stay out.
+    expect(snapshot.sourceDocumentIds).toEqual([seeded.documentId]);
+    const serialized = JSON.stringify({ ...snapshot, sourceDocumentIds: [] });
     expect(serialized).not.toContain(seeded.documentId);
     expect(serialized).not.toContain(seeded.filename);
     expect(Object.keys(snapshot)).not.toContain("lines");

@@ -1034,7 +1034,7 @@ export class ReportsService {
         organization: { select: { name: true } },
         snapshot: { select: { contentHash: true, documentIds: true } },
         quality: true,
-        score: true,
+        score: { include: { components: true } },
       },
     });
     if (!run) throw new NotFoundException("Diagnostic run not found");
@@ -1084,12 +1084,14 @@ export class ReportsService {
         orderBy: [{ severity: "desc" }, { createdAt: "asc" }],
         select: {
           id: true,
+          ruleId: true,
           category: true,
           severity: true,
           title: true,
           explanation: true,
           implication: true,
           suggestedAction: true,
+          supportingMetrics: true,
         },
       }),
     ]);
@@ -1122,7 +1124,16 @@ export class ReportsService {
         overallScore: run.score.overallScore,
         methodologyVersion: run.score.methodologyVersion,
         limitations: stringList(run.score.limitations),
+        components: run.score.components.map((component) => ({
+          dimension: component.dimension,
+          weight: component.weight,
+          included: component.included,
+          score: component.score,
+          exclusionReason: component.exclusionReason,
+          metricCodes: component.metricCodes,
+        })),
       },
+      sourceDocumentIds: run.snapshot?.documentIds ?? [],
       readinessStatus: result.status,
       readiness: {
         assessmentId: assessment.id,

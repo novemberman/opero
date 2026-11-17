@@ -299,6 +299,14 @@ export class AiService {
           keyObservations: editedNarrative.keyObservations,
           risks: editedNarrative.risks,
           limitations: editedNarrative.limitations,
+          recommendations: editedNarrative.recommendations,
+          profitabilityInterpretation: editedNarrative.profitabilityInterpretation,
+          liquidityInterpretation: editedNarrative.liquidityInterpretation,
+          solvencyInterpretation: editedNarrative.solvencyInterpretation,
+          efficiencyInterpretation: editedNarrative.efficiencyInterpretation,
+          cashFlowInterpretation: editedNarrative.cashFlowInterpretation,
+          dataQualityExplanation: editedNarrative.dataQualityExplanation,
+          trendCommentary: editedNarrative.trendCommentary,
           claims: claims as Array<{
             text: string;
             groundedMetricCodes: string[];

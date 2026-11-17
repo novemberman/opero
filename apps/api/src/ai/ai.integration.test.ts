@@ -1,6 +1,7 @@
 import type { INestApplication } from "@nestjs/common";
 import {
   AiProviderError,
+  emptyNarrativeSections,
   PROMPT_VERSION,
   SIMULATED_NOTICE,
   type AiInterpretationContext,
@@ -204,6 +205,7 @@ describe("AI interpretation integration", () => {
           fakeProvider((context) => {
             seen = context;
             return {
+              ...emptyNarrativeSections(),
               summary: "Margins are healthy.",
               keyObservations: [],
               risks: [],
@@ -312,6 +314,7 @@ describe("AI interpretation integration", () => {
             context.score.overallScore = 100;
             for (const metric of context.metrics) metric.value = "999";
             return {
+              ...emptyNarrativeSections(),
               summary: "The overall score is 100 out of 100. Revenue grew 500%.",
               keyObservations: [`Net margin is ${netMargin!.value}.`],
               risks: ["The company is insolvent and would not earn an investment-grade credit rating."],
@@ -376,6 +379,7 @@ describe("AI interpretation integration", () => {
           await gate;
           return {
             narrative: {
+              ...emptyNarrativeSections(),
               summary: "Margins are healthy.",
               keyObservations: [],
               risks: [],
@@ -540,7 +544,8 @@ describe("AI interpretation integration", () => {
       isSimulated: true,
     });
     // The corrected text keeps the structured claims so it can be re-validated.
-    expect(corrected.editedNarrative).toEqual({
+    expect(corrected.editedNarrative).toMatchObject({
+      ...version.narrative,
       summary: "Reviewed: liquidity is adequate.",
       keyObservations: version.narrative.keyObservations,
       risks: ["Customer concentration"],

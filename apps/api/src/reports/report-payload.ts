@@ -52,7 +52,17 @@ export type StoredReportPayload = {
     overallScore: number | null;
     methodologyVersion: string;
     limitations: string[];
+    components: Array<{
+      dimension: string;
+      weight: number;
+      included: boolean;
+      score: number | null;
+      exclusionReason: string | null;
+      metricCodes: string[];
+    }>;
   };
+  /** Source document ids from the diagnostic snapshot (no document bytes). */
+  sourceDocumentIds: string[];
   readinessStatus: string;
   readiness: { assessmentId: string; issues: StoredReadinessIssue[] };
   aiNarrative: StoredReportAiNarrative | null;

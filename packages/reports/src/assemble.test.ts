@@ -15,14 +15,22 @@ describe("assembleReportModel", () => {
     expect(model.currency).toBe("USD");
     expect(model.generatedAt).toBe("2026-11-13T00:00:00.000Z");
     expect(model.readinessStatus).toBe("PARTIALLY_READY");
-    expect(model.score).toEqual({
+    expect(model.score).toMatchObject({
       status: "SCORED",
       overall: 54,
+      methodologyVersion: "score.v1",
       limitations: [
         "score.v1 thresholds are provisional heuristics, not industry benchmarks",
         "Missing dimensions are not renormalized to hide coverage gaps",
       ],
     });
+    expect(model.score.components).toHaveLength(2);
+    expect(model.methodology).toEqual({
+      calculationEngine: "calc.v1",
+      ruleSet: "rules.v1",
+      scoreMethodology: "score.v1",
+    });
+    expect(model.sourceDocumentIds).toEqual(["00000000-0000-4000-8000-0000000000d1"]);
     expect(model.metrics).toEqual([
       {
         code: "CURRENT_RATIO",
@@ -126,12 +134,14 @@ describe("assembleReportModel", () => {
   it("carries a simulated AI narrative with its flag and disclosure", () => {
     const model = assembleReportModel(payloadFixture(), { aiNarrative: aiNarrativeFixture() });
 
-    expect(model.aiNarrative).toEqual({
+    expect(model.aiNarrative).toMatchObject({
       isSimulated: true,
       summary: "Liquidity is under pressure for the period.",
       keyObservations: ["Current ratio [CURRENT_RATIO] was computed as 0.8235."],
       risks: ["Current liabilities exceed current assets (HIGH)."],
       limitations: ["Debt to equity could not be computed."],
+      recommendations: ["Review the timing of payables and receivables."],
+      liquidityInterpretation: "Current ratio [CURRENT_RATIO] = 0.8235 ratio.",
       provider: "mock",
       model: "mock-deterministic-v1",
     });
@@ -178,10 +188,11 @@ describe("assembleReportModel", () => {
       }),
     );
 
-    expect(model.score).toEqual({
+    expect(model.score).toMatchObject({
       status: "INSUFFICIENT_DATA",
       overall: null,
       limitations: ["diagnosticCoverage < 0.5"],
+      components: [],
     });
     expect(model.disclosures).toContain(DISCLOSURES.notScored);
     expect(model.disclosures).not.toContain(DISCLOSURES.provisionalScore);

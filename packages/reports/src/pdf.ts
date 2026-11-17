@@ -97,6 +97,7 @@ export function formatMetricValue(metric: Pick<ReportMetric, "value" | "unit">):
 }
 
 function formatUnit(metric: ReportMetric, currency: string | null): string {
+  // Prefer ISO currency codes (e.g. NGN) — Windows-1252 cannot encode ₦.
   if (metric.unit === "currency") return currency ?? "currency";
   return metric.unit ?? "";
 }
@@ -284,13 +285,32 @@ class ReportWriter {
   }
 
   score(model: ReportModel): void {
-    this.heading("Overall score");
+    this.heading("Business Health Score");
     if (model.score.overall === null) {
       this.text("Not scored", { font: FONT.bold, size: 16 });
     } else {
       this.text(`${model.score.overall} / 100`, { font: FONT.bold, size: 22 });
     }
     this.labelled("Score status", model.score.status);
+    if (model.score.methodologyVersion) {
+      this.labelled("Methodology", model.score.methodologyVersion);
+    }
+    if (model.score.components.length) {
+      this.subheading("Dimension contributions");
+      for (const component of model.score.components) {
+        const label = component.dimension.replaceAll("_", " ");
+        if (component.included && component.score != null) {
+          const weight = component.weight != null ? ` · weight ${component.weight}` : "";
+          this.text(`${label}: ${component.score}/100${weight}`, { gap: 2 });
+        } else {
+          this.text(
+            `${label}: excluded${component.exclusionReason ? ` — ${component.exclusionReason}` : ""}`,
+            { color: COLOR.muted, gap: 2 },
+          );
+        }
+      }
+      this.gap(4);
+    }
   }
 
   quality(model: ReportModel): void {
@@ -303,8 +323,27 @@ class ReportWriter {
   }
 
   metrics(model: ReportModel): void {
-    this.heading("Metrics");
+    this.heading("Financial analysis");
     if (model.metrics.length === 0) {
+      this.text("No metrics are available.", { color: COLOR.muted });
+      return;
+    }
+
+    const byDimension = new Map<string, typeof model.metrics>();
+    for (const metric of model.metrics) {
+      const key = metric.dimension ?? "other";
+      const list = byDimension.get(key) ?? [];
+      list.push(metric);
+      byDimension.set(key, list);
+    }
+    for (const [dimension, rows] of byDimension) {
+      this.subheading(dimension.replaceAll("_", " "));
+      this.metricTable(model, rows);
+    }
+  }
+
+  metricTable(model: ReportModel, metrics: ReportModel["metrics"]): void {
+    if (metrics.length === 0) {
       this.text("No metrics are available.", { color: COLOR.muted });
       return;
     }
@@ -329,7 +368,7 @@ class ReportWriter {
     };
 
     drawHeader();
-    for (const metric of model.metrics) {
+    for (const metric of metrics) {
       const detail = toPdfText(
         metric.periodLabel && metric.periodLabel !== model.period
           ? `${metric.code} · ${metric.periodLabel}`
@@ -410,7 +449,7 @@ class ReportWriter {
   }
 
   interpretation(narrative: ReportAiNarrative): void {
-    this.heading("Interpretation");
+    this.heading("Executive summary");
     if (narrative.isSimulated) {
       this.box(SIMULATED_AI_LABEL, null);
     } else {
@@ -424,16 +463,57 @@ class ReportWriter {
     }
     this.text(narrative.summary, { gap: 6 });
 
-    const sections = [
+    const proseSections: Array<[string, string]> = [
+      ["Profitability", narrative.profitabilityInterpretation],
+      ["Liquidity", narrative.liquidityInterpretation],
+      ["Solvency", narrative.solvencyInterpretation],
+      ["Efficiency", narrative.efficiencyInterpretation],
+      ["Cash flow", narrative.cashFlowInterpretation],
+      ["Data quality", narrative.dataQualityExplanation],
+      ["Trends", narrative.trendCommentary],
+    ];
+    for (const [title, text] of proseSections) {
+      if (!text.trim()) continue;
+      this.subheading(title);
+      this.text(text, { gap: 4 });
+    }
+
+    const listSections = [
       ["Key observations", narrative.keyObservations],
-      ["Risks", narrative.risks],
+      ["Financial risks", narrative.risks],
+      ["Recommendations", narrative.recommendations],
       ["Interpretation limitations", narrative.limitations],
     ] as const;
-    for (const [title, items] of sections) {
+    for (const [title, items] of listSections) {
       if (items.length === 0) continue;
       this.subheading(title);
       this.bullets(items);
     }
+  }
+
+  methodology(model: ReportModel): void {
+    this.heading("Methodology");
+    this.labelled("Calculation engine", model.methodology.calculationEngine ?? "Not recorded");
+    this.labelled("Rule set", model.methodology.ruleSet ?? "Not recorded");
+    this.labelled(
+      "Score methodology",
+      model.methodology.scoreMethodology ?? model.score.methodologyVersion ?? "Not recorded",
+    );
+    this.text(
+      "Scores use provisional heuristic thresholds, not validated industry benchmarks. Missing inputs are never treated as zero.",
+      { color: COLOR.muted, gap: 4 },
+    );
+  }
+
+  sources(model: ReportModel): void {
+    this.heading("Source references");
+    if (model.sourceDocumentIds.length === 0) {
+      this.text("No source document identifiers were recorded on this diagnostic snapshot.", {
+        color: COLOR.muted,
+      });
+      return;
+    }
+    this.bullets(model.sourceDocumentIds.map((id) => `Document ${id}`));
   }
 
   disclosures(model: ReportModel): void {
@@ -521,9 +601,11 @@ export function renderReportPdf(model: ReportModel): Promise<Buffer> {
       writer.score(model);
       writer.quality(model);
       if (model.verifiedPublication) writer.limitations(model);
+      if (model.aiNarrative) writer.interpretation(model.aiNarrative);
       writer.metrics(model);
       writer.findings(model);
-      if (model.aiNarrative) writer.interpretation(model.aiNarrative);
+      writer.methodology(model);
+      writer.sources(model);
       writer.disclosures(model);
       writer.footers(model);
 

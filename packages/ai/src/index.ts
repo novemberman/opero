@@ -35,6 +35,7 @@ export {
   type AiChatMessage,
 } from "./prompt.js";
 export { MOCK_AI_MODEL, MockAiProvider, SIMULATED_NOTICE } from "./providers/mock.js";
+export { emptyNarrativeSections, factsFixture, narrativeFixture } from "./test-fixtures.js";
 export {
   OPENAI_DEFAULT_BASE_URL,
   OPENAI_DEFAULT_TIMEOUT_MS,

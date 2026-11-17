@@ -13,6 +13,7 @@ export const AI_GROUNDING_REASON_TEXT: Record<string, string> = {
   UNKNOWN_METRIC_CODE: "cites a metric that is not in this diagnostic",
   UNKNOWN_FINDING_ID: "cites a finding that is not in this diagnostic",
   UNSUPPORTED_NUMBER: "quotes a figure that is not in the diagnostic facts it rests on",
+  CONTRADICTORY_NUMBER: "quotes a figure that contradicts a cited diagnostic metric",
   RESTRICTED_LANGUAGE: "uses audit, credit-rating or insolvency wording",
 };
 

@@ -37,11 +37,20 @@ export function validateReportAiGrounding(
   const ai = payload.aiNarrative;
   if (!ai) return null;
 
+  const n = ai.narrative as ValidatableNarrative & { recommendations?: string[] };
   const narrative: ValidatableNarrative = {
-    summary: ai.narrative.summary,
-    keyObservations: [...(ai.narrative.keyObservations ?? [])],
-    risks: [...(ai.narrative.risks ?? [])],
-    limitations: [...(ai.narrative.limitations ?? [])],
+    summary: n.summary,
+    keyObservations: [...(n.keyObservations ?? [])],
+    risks: [...(n.risks ?? [])],
+    limitations: [...(n.limitations ?? [])],
+    recommendations: [...(n.recommendations ?? [])],
+    profitabilityInterpretation: n.profitabilityInterpretation ?? "",
+    liquidityInterpretation: n.liquidityInterpretation ?? "",
+    solvencyInterpretation: n.solvencyInterpretation ?? "",
+    efficiencyInterpretation: n.efficiencyInterpretation ?? "",
+    cashFlowInterpretation: n.cashFlowInterpretation ?? "",
+    dataQualityExplanation: n.dataQualityExplanation ?? "",
+    trendCommentary: n.trendCommentary ?? "",
     claims: [...(ai.claims ?? [])],
   };
 
@@ -58,14 +67,14 @@ export function validateReportAiGrounding(
     })),
     findings: payload.findings.map((finding) => ({
       id: finding.id ?? finding.title,
-      ruleId: finding.id ?? finding.title,
+      ruleId: finding.ruleId ?? finding.id ?? finding.title,
       category: finding.category,
       severity: finding.severity,
       title: finding.title,
       explanation: finding.explanation ?? "",
       implication: finding.implication ?? "",
       suggestedAction: finding.suggestedAction ?? "",
-      supportingMetrics: [],
+      supportingMetrics: finding.supportingMetrics ?? [],
     })),
     quality: payload.quality,
     score: {
@@ -73,7 +82,12 @@ export function validateReportAiGrounding(
       overallScore: payload.score.overallScore,
       methodologyVersion: payload.score.methodologyVersion,
       limitations: payload.score.limitations,
-      components: [],
+      components: (payload.score.components ?? []).map((component) => ({
+        dimension: component.dimension,
+        included: component.included,
+        score: component.score,
+        exclusionReason: component.exclusionReason,
+      })),
     },
     limitations: payload.score.limitations,
     currency: payload.currency,

@@ -1,5 +1,6 @@
 import {
   AiProviderError,
+  emptyNarrativeSections,
   PROMPT_VERSION,
   SIMULATED_NOTICE,
   type AiInterpretationContext,
@@ -272,6 +273,7 @@ function failing(error: Error): AiExecutionSettings {
 }
 
 const plainNarrative: AiInterpretationResult["narrative"] = {
+  ...emptyNarrativeSections(),
   summary: "Liquidity is under pressure.",
   keyObservations: [],
   risks: [],
@@ -373,6 +375,7 @@ describe("executeAiInterpretation", () => {
     const outcome = await executeAiInterpretation(
       db.prisma,
       provider(async () => ({
+        ...emptyNarrativeSections(),
         summary: "The overall score is 100 out of 100. Revenue grew 500% and the company is insolvent.",
         keyObservations: ["The current ratio is 0.82.", "Debt to equity is 1.4."],
         risks: ["This profile corresponds to a BB credit rating."],

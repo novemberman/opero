@@ -363,9 +363,17 @@ export type CreateAiInterpretationBody = z.infer<typeof createAiInterpretationBo
 export const editAiInterpretationBodySchema = z
   .object({
     summary: z.string().trim().min(1).max(4000).optional(),
-    keyObservations: z.array(z.string().trim().min(1).max(1000)).max(20).optional(),
-    risks: z.array(z.string().trim().min(1).max(1000)).max(20).optional(),
-    limitations: z.array(z.string().trim().min(1).max(1000)).max(20).optional(),
+    keyObservations: z.array(z.string().trim().min(1).max(1500)).max(25).optional(),
+    risks: z.array(z.string().trim().min(1).max(1500)).max(25).optional(),
+    limitations: z.array(z.string().trim().min(1).max(1500)).max(25).optional(),
+    recommendations: z.array(z.string().trim().min(1).max(1500)).max(25).optional(),
+    profitabilityInterpretation: z.string().trim().max(1500).optional(),
+    liquidityInterpretation: z.string().trim().max(1500).optional(),
+    solvencyInterpretation: z.string().trim().max(1500).optional(),
+    efficiencyInterpretation: z.string().trim().max(1500).optional(),
+    cashFlowInterpretation: z.string().trim().max(1500).optional(),
+    dataQualityExplanation: z.string().trim().max(1500).optional(),
+    trendCommentary: z.string().trim().max(1500).optional(),
   })
   .strict();
 

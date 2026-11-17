@@ -28,12 +28,26 @@ export const aiClaimSchema = z.object({
   groundedFindingIds: referenceList.default([]),
 });
 
+/** Optional dimension prose — empty string means “no commentary for this dimension”. */
+const optionalSection = z.string().trim().max(AI_OUTPUT_LIMITS.itemChars).default("");
+
 /** Structured narrative every provider must return. Unknown keys are dropped. */
 export const aiNarrativeSchema = z.object({
   summary: z.string().trim().min(1).max(AI_OUTPUT_LIMITS.summaryChars),
   keyObservations: narrativeList,
   risks: narrativeList,
   limitations: narrativeList,
+  /** Management-facing actions grounded in findings; never invents actions without evidence. */
+  recommendations: narrativeList.default([]),
+  profitabilityInterpretation: optionalSection,
+  liquidityInterpretation: optionalSection,
+  /** Maps to diagnostic leverage/solvency facts. */
+  solvencyInterpretation: optionalSection,
+  efficiencyInterpretation: optionalSection,
+  cashFlowInterpretation: optionalSection,
+  dataQualityExplanation: optionalSection,
+  /** Period-over-period commentary only when growth/movement metrics are COMPUTED. */
+  trendCommentary: optionalSection,
   claims: z.array(aiClaimSchema).max(AI_OUTPUT_LIMITS.claims),
 });
 

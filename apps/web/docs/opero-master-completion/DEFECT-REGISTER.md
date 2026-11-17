@@ -1,13 +1,14 @@
 # Defect Register
 
-**Updated:** 2026-11-17 (post [Thoroughness: medium](8e217dbd-4e70-4645-b483-e05f9a4e0b5e) + [Thoroughness: very thorough](52209ec9-1577-437e-a95d-0bf25cfef322) audits)  
+**Updated:** 2026-11-17 (M4+M5 local RC)  
 **Status key:** OPEN / FIXED_LOCAL / BLOCKED_EXTERNAL / ACCEPTED_RISK
 
 | ID | Sev | Title | Status | Evidence / notes |
 |----|-----|-------|--------|------------------|
 | D-P0-001 | P0 | Pilot Confirm clicks did not persist (0/18) | FIXED_LOCAL | Root cause: prod UX never POSTed. One-click **Confirm figure** + `submitExtractionReview`. Needs **web deploy** + owner re-confirm. One-figure diagnostic still FAIL on prod. |
 | D-P0-002 | P0 | False success on review without server ack | FIXED_LOCAL | Requires `lineItem` in response; shared submit helper. |
-| D-P1-012 | P1 | Playwright E2E cannot run on current Hetzner host | BLOCKED_EXTERNAL | Missing Chromium shared libs (`libnspr4`…); no sudo. Specs in `apps/web/e2e/`; happy-dom + contract E2E PASS. |
+| D-P1-012 | P1 | Playwright E2E cannot run on bare Hetzner host | FIXED_LOCAL | Mitigated: Docker `mcr.microsoft.com/playwright:v1.56.1-jammy` + host network; no Hetzner package changes. M4/M5 + review specs **5/5 PASS**. |
+| D-P2-009 | P2 | Live OpenAI interpretation unverified in this program | BLOCKED_EXTERNAL | Provider-neutral architecture + mock/fake IT PASS; production keys/cost not exercised. |
 | D-P0-003 | P0 | Worker may set document `READY` while lines still PENDING | OPEN | Mitigated by eligibility/readiness + post-review reconcile; worker initial status still may open READY before confirms. `document-process.processor.ts`. |
 | D-P0-004 | P0 | B2.2 concepts extractable but unused in KPI formulas | OPEN | Partial M3: ROA/ROE/asset turnover/profit growth/margin movement/debt-to-assets/cash coverage + PBT/tax/BS identity checks. Remaining unused: investing/financing/net cash change, share capital, retained earnings, tax payable as standalone KPIs. |
 | D-P0-005 | P0 | `xray.report_generate` entitlement never enforced | OPEN | Create/publish free; only view/PDF gated. Product decision before enforcing. |
@@ -23,7 +24,7 @@
 | D-P1-010 | P1 | Diagnostics can start without readiness READY | FIXED_LOCAL | API requires `processingStatus=READY`; web lists READY-only. Soft INSUFFICIENT_DATA remains for incomplete confirmed sets. |
 | D-P1-011 | P1 | Upload retention purge not implemented | OPEN | Soft-delete + `retentionUntil` metadata only. |
 | D-P2-001 | P2 | Shared physical S3 bucket prefixes | ACCEPTED_RISK | Owner-approved migration only. |
-| D-P2-002 | P2 | Limited browser E2E automation | OPEN | |
+| D-P2-002 | P2 | Limited browser E2E automation | FIXED_LOCAL | Docker Chromium covers review-confirm + financial-intelligence design-system journey; full authenticated tenant browser path still deferred. |
 | D-P2-003 | P2 | APP_VERSION stamp drift | OPEN | |
 | D-P2-004 | P2 | OCR absent (image PDFs → MANUAL_REQUIRED) | OPEN | |
 | D-P2-005 | P2 | AI grounding lexical-only for figures | OPEN | |

@@ -104,5 +104,17 @@ export function groundingAllowsPublication(result: GroundingValidationResult): b
 /** Minimal narrative shape used when re-validating a frozen report payload. */
 export type ValidatableNarrative = Pick<
   AiNarrative,
-  "summary" | "keyObservations" | "risks" | "limitations" | "claims"
+  | "summary"
+  | "keyObservations"
+  | "risks"
+  | "limitations"
+  | "recommendations"
+  | "profitabilityInterpretation"
+  | "liquidityInterpretation"
+  | "solvencyInterpretation"
+  | "efficiencyInterpretation"
+  | "cashFlowInterpretation"
+  | "dataQualityExplanation"
+  | "trendCommentary"
+  | "claims"
 >;

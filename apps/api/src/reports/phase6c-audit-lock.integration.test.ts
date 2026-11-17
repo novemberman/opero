@@ -3,6 +3,7 @@
  * disclosures / approval-critical metadata cannot be mutated in place.
  */
 import type { INestApplication } from "@nestjs/common";
+import { emptyNarrativeSections, PROMPT_VERSION } from "@opero/ai";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { executeAiInterpretation } from "../ai/run-ai-interpretation-job";
 import { createTestApp } from "../testing/app-factory";
@@ -207,6 +208,7 @@ describe("Phase 6C publication audit and disclosure lock", () => {
           async interpret() {
             return {
               narrative: {
+                ...emptyNarrativeSections(),
                 summary: "Revenue will reach 9,999,999 next year without evidence.",
                 keyObservations: ["Invented growth of 500%."],
                 risks: [],
@@ -221,7 +223,7 @@ describe("Phase 6C publication audit and disclosure lock", () => {
               },
               provider: "openai",
               model: "fake",
-              promptVersion: "ai.interpret.v1",
+              promptVersion: PROMPT_VERSION,
               isSimulated: false,
             };
           },

@@ -216,7 +216,7 @@ describe("renderReportPdf", () => {
 
     expect(pages[0]).toContain(NON_VERIFIED_BANNER);
     expect(text).toContain("This report has not been verified for publication.");
-    expect(text.indexOf("Limitations")).toBeLessThan(text.indexOf("Overall score"));
+    expect(text.indexOf("Limitations")).toBeLessThan(text.indexOf("Business Health Score"));
     expect(text.indexOf(NON_VERIFIED_BANNER)).toBeLessThan(text.indexOf("Limitations"));
     expect(text).toContain("score.v1 thresholds are provisional heuristics, not industry benchmarks");
     for (const page of pages) {
@@ -231,7 +231,7 @@ describe("renderReportPdf", () => {
 
     expect(text).not.toContain(NON_VERIFIED_BANNER);
     expect(text).not.toContain("has not been verified");
-    expect(text.indexOf("Overall score")).toBeLessThan(text.indexOf("Limitations"));
+    expect(text.indexOf("Business Health Score")).toBeLessThan(text.indexOf("Limitations"));
     expect(text).toContain("score.v1 thresholds are provisional heuristics, not industry benchmarks");
   });
 
@@ -240,13 +240,14 @@ describe("renderReportPdf", () => {
 
     const { text } = await render(model);
 
-    expect(text).toContain("Interpretation");
+    expect(text).toContain("Executive summary");
     expect(text).toContain(SIMULATED_AI_LABEL);
     expect(text).not.toContain(LIVE_AI_LABEL);
     expect(text.indexOf(SIMULATED_AI_LABEL)).toBeLessThan(
       text.indexOf("Liquidity is under pressure for the period."),
     );
     expect(text).toContain("Key observations");
+    expect(text).toContain("Recommendations");
     expect(text).toContain("Current ratio [CURRENT_RATIO] was computed as 0.8235.");
     expect(text).toContain("Current liabilities exceed current assets (HIGH).");
     expect(text).toContain("Debt to equity could not be computed.");
@@ -271,10 +272,12 @@ describe("renderReportPdf", () => {
     const { pdf, text } = await render(model);
 
     expect(pdf.subarray(0, 5).toString("latin1")).toBe("%PDF-");
-    expect(text).not.toContain("Interpretation");
+    expect(text).not.toContain("Executive summary");
     expect(text).not.toContain(SIMULATED_AI_LABEL);
     expect(text).not.toContain(LIVE_AI_LABEL);
-    expect(text).toContain("Metrics");
+    expect(text).toContain("Financial analysis");
+    expect(text).toContain("Methodology");
+    expect(text).toContain("Source references");
     expect(text).toContain("Findings");
     for (const disclosure of model.disclosures) {
       expect(text).toContain(disclosure);

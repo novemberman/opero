@@ -102,6 +102,30 @@ export function factsFixture(overrides: Partial<AiContextInput> = {}): AiContext
   };
 }
 
+/** Empty v2 section fields for partial narrative fixtures and provider stubs. */
+export function emptyNarrativeSections(): Pick<
+  AiNarrative,
+  | "recommendations"
+  | "profitabilityInterpretation"
+  | "liquidityInterpretation"
+  | "solvencyInterpretation"
+  | "efficiencyInterpretation"
+  | "cashFlowInterpretation"
+  | "dataQualityExplanation"
+  | "trendCommentary"
+> {
+  return {
+    recommendations: [],
+    profitabilityInterpretation: "",
+    liquidityInterpretation: "",
+    solvencyInterpretation: "",
+    efficiencyInterpretation: "",
+    cashFlowInterpretation: "",
+    dataQualityExplanation: "",
+    trendCommentary: "",
+  };
+}
+
 /** A well-formed narrative whose every claim cites facts from `factsFixture`. */
 export function narrativeFixture(overrides: Partial<AiNarrative> = {}): AiNarrative {
   return {
@@ -109,6 +133,15 @@ export function narrativeFixture(overrides: Partial<AiNarrative> = {}): AiNarrat
     keyObservations: ["Current ratio is 0.82."],
     risks: ["Current liabilities exceed current assets."],
     limitations: ["Debt to equity could not be computed."],
+    ...emptyNarrativeSections(),
+    recommendations: ["Review the timing of payables and receivables."],
+    profitabilityInterpretation: "Net margin [NET_MARGIN] = 0.071 ratio.",
+    liquidityInterpretation: "Current ratio [CURRENT_RATIO] = 0.82 ratio; Working capital [WORKING_CAPITAL] = -18000 currency.",
+    solvencyInterpretation: "No computed solvency metrics were available in the diagnostic facts.",
+    efficiencyInterpretation: "No computed efficiency metrics were available in the diagnostic facts.",
+    cashFlowInterpretation: "No computed cash flow metrics were available in the diagnostic facts.",
+    dataQualityExplanation:
+      "Completeness 0.75; consistency 1; evidence reliability 0.9; diagnostic coverage 0.6. Debt to equity could not be computed.",
     claims: [
       {
         text: "The current ratio is 0.82.",

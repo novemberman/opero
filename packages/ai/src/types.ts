@@ -109,7 +109,19 @@ export type UnsupportedClaimReason =
   | "RESTRICTED_LANGUAGE";
 
 /** Narrative field a flagged statement was found in, other than `claims`. */
-export type NarrativeSection = "summary" | "keyObservations" | "risks" | "limitations";
+export type NarrativeSection =
+  | "summary"
+  | "keyObservations"
+  | "risks"
+  | "limitations"
+  | "recommendations"
+  | "profitabilityInterpretation"
+  | "liquidityInterpretation"
+  | "solvencyInterpretation"
+  | "efficiencyInterpretation"
+  | "cashFlowInterpretation"
+  | "dataQualityExplanation"
+  | "trendCommentary";
 
 export type UnsupportedClaim = AiClaim & {
   reasons: UnsupportedClaimReason[];

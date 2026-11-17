@@ -15,6 +15,8 @@ export const SIMULATED_NOTICE =
 
 const RISK_SEVERITIES = new Set(["MEDIUM", "HIGH", "CRITICAL"]);
 
+const TREND_CODES = new Set(["REVENUE_GROWTH", "PROFIT_GROWTH", "NET_MARGIN_MOVEMENT"]);
+
 function clip(value: string, maxChars: number): string {
   return value.length <= maxChars ? value : `${value.slice(0, maxChars - 1).trimEnd()}…`;
 }
@@ -35,6 +37,29 @@ function describeFinding(finding: AiFindingFact): string {
 
 function isRisk(finding: AiFindingFact): boolean {
   return finding.category === "RISK" || RISK_SEVERITIES.has(finding.severity);
+}
+
+function dimensionMap(dimension: string): string {
+  if (dimension === "leverage") return "solvency";
+  if (dimension === "cash_flow") return "cash flow";
+  return dimension;
+}
+
+function interpretDimension(
+  computed: Array<AiMetricFact & { value: string }>,
+  dimension: string,
+  itemChars: number,
+): string {
+  const rows = computed.filter((metric) => metric.dimension === dimension);
+  if (!rows.length) {
+    return `No computed ${dimensionMap(dimension)} metrics were available in the diagnostic facts.`;
+  }
+  return clip(
+    `${dimensionMap(dimension)} metrics from the diagnostic facts: ${rows
+      .map((metric) => `${metric.label} [${metric.code}] = ${metric.value}${metric.unit ? ` ${metric.unit}` : ""}`)
+      .join("; ")}.`,
+    itemChars,
+  );
 }
 
 /**
@@ -89,6 +114,32 @@ export class MockAiProvider implements AiProviderPort {
     }
     for (const limitation of context.limitations) limitations.push(clip(limitation, itemChars));
 
+    const recommendations = context.findings
+      .map((finding) => (finding.suggestedAction ?? "").trim())
+      .filter(Boolean)
+      .slice(0, listItems)
+      .map((action) => clip(action, itemChars));
+
+    const trendMetrics = computed.filter((metric) => TREND_CODES.has(metric.code));
+    const trendCommentary = trendMetrics.length
+      ? clip(
+          `Period-over-period metrics from the diagnostic facts: ${trendMetrics
+            .map((metric) => `${metric.label} [${metric.code}] = ${metric.value}`)
+            .join("; ")}.`,
+          itemChars,
+        )
+      : "";
+
+    const dataQualityExplanation = clip(
+      [
+        `Completeness ${context.quality.completeness}; consistency ${context.quality.consistency}; evidence reliability ${context.quality.evidenceReliability}; diagnostic coverage ${context.quality.diagnosticCoverage}.`,
+        unavailable.length
+          ? `${unavailable.length} metrics remain unavailable and are not treated as zero.`
+          : "All supplied metrics in this run were computed.",
+      ].join(" "),
+      itemChars,
+    );
+
     const narrative = parseAiNarrative({
       summary,
       keyObservations: computed
@@ -99,6 +150,14 @@ export class MockAiProvider implements AiProviderPort {
         .slice(0, listItems)
         .map((finding) => clip(describeFinding(finding), itemChars)),
       limitations: limitations.slice(0, listItems),
+      recommendations,
+      profitabilityInterpretation: interpretDimension(computed, "profitability", itemChars),
+      liquidityInterpretation: interpretDimension(computed, "liquidity", itemChars),
+      solvencyInterpretation: interpretDimension(computed, "leverage", itemChars),
+      efficiencyInterpretation: interpretDimension(computed, "efficiency", itemChars),
+      cashFlowInterpretation: interpretDimension(computed, "cash_flow", itemChars),
+      dataQualityExplanation,
+      trendCommentary,
       claims,
     });
 

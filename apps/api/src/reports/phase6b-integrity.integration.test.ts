@@ -11,6 +11,7 @@
 import { ConflictException, type INestApplication } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import {
+  emptyNarrativeSections,
   GROUNDING_VALIDATION_VERSION,
   PROMPT_VERSION,
   type AiInterpretationResult,
@@ -116,6 +117,7 @@ describe("Phase 6B publication integrity", () => {
   /** A narrative whose every statement is backed by the diagnostic facts. */
   function groundedNarrative(overrides: Partial<Narrative> = {}): Narrative {
     return {
+      ...emptyNarrativeSections(),
       summary: "Profitability was assessed from the reviewed statements.",
       keyObservations: [`Net margin is ${netMargin}.`],
       risks: [],

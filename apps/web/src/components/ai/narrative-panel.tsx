@@ -10,17 +10,43 @@ export type Narrative = {
   keyObservations?: string[];
   risks?: string[];
   limitations?: string[];
+  recommendations?: string[];
+  profitabilityInterpretation?: string;
+  liquidityInterpretation?: string;
+  solvencyInterpretation?: string;
+  efficiencyInterpretation?: string;
+  cashFlowInterpretation?: string;
+  dataQualityExplanation?: string;
+  trendCommentary?: string;
 };
 
 export function NarrativeView({ narrative }: { narrative: Narrative }) {
+  const prose: Array<[string, string]> = [
+    ["Profitability", narrative.profitabilityInterpretation ?? ""],
+    ["Liquidity", narrative.liquidityInterpretation ?? ""],
+    ["Solvency", narrative.solvencyInterpretation ?? ""],
+    ["Efficiency", narrative.efficiencyInterpretation ?? ""],
+    ["Cash flow", narrative.cashFlowInterpretation ?? ""],
+    ["Data quality", narrative.dataQualityExplanation ?? ""],
+    ["Trends", narrative.trendCommentary ?? ""],
+  ];
   const sections: Array<[string, string[]]> = [
     ["Key observations", narrative.keyObservations ?? []],
     ["Risks", narrative.risks ?? []],
+    ["Recommendations", narrative.recommendations ?? []],
     ["Limitations", narrative.limitations ?? []],
   ];
   return (
     <div data-testid="narrative-view">
       <p className="mt-3 whitespace-pre-line text-navy">{narrative.summary || "No summary."}</p>
+      {prose.map(([heading, text]) =>
+        text.trim() ? (
+          <div key={heading}>
+            <h3 className="mt-4 text-base font-semibold text-navy">{heading}</h3>
+            <p className="mt-1 whitespace-pre-line text-sm text-text-secondary">{text}</p>
+          </div>
+        ) : null,
+      )}
       {sections.map(([heading, items]) =>
         items.length > 0 ? (
           <div key={heading}>

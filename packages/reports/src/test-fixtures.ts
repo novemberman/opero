@@ -57,11 +57,36 @@ export function payloadFixture(overrides: Partial<ReportSnapshotPayload> = {}): 
     score: {
       status: "SCORED",
       overallScore: 54,
+      methodologyVersion: "score.v1",
       limitations: [
         "score.v1 thresholds are provisional heuristics, not industry benchmarks",
         "Missing dimensions are not renormalized to hide coverage gaps",
       ],
+      components: [
+        {
+          dimension: "liquidity",
+          weight: 20,
+          included: true,
+          score: 40,
+          exclusionReason: null,
+          metricCodes: ["CURRENT_RATIO", "WORKING_CAPITAL"],
+        },
+        {
+          dimension: "leverage",
+          weight: 20,
+          included: false,
+          score: null,
+          exclusionReason: "No eligible computed metrics for dimension",
+          metricCodes: [],
+        },
+      ],
     },
+    engineVersions: {
+      calculationEngine: "calc.v1",
+      ruleSet: "rules.v1",
+      scoreMethodology: "score.v1",
+    },
+    sourceDocumentIds: ["00000000-0000-4000-8000-0000000000d1"],
     readinessStatus: "PARTIALLY_READY",
     ...overrides,
   };
@@ -79,6 +104,14 @@ export function aiNarrativeFixture(
       keyObservations: ["Current ratio [CURRENT_RATIO] was computed as 0.8235."],
       risks: ["Current liabilities exceed current assets (HIGH)."],
       limitations: ["Debt to equity could not be computed."],
+      recommendations: ["Review the timing of payables and receivables."],
+      profitabilityInterpretation: "",
+      liquidityInterpretation: "Current ratio [CURRENT_RATIO] = 0.8235 ratio.",
+      solvencyInterpretation: "No computed solvency metrics were available in the diagnostic facts.",
+      efficiencyInterpretation: "",
+      cashFlowInterpretation: "",
+      dataQualityExplanation: "Completeness 0.75; consistency 1.",
+      trendCommentary: "",
     },
     ...overrides,
   };
