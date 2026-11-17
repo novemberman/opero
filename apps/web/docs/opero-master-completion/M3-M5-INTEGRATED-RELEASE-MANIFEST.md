@@ -11,14 +11,12 @@
 
 | Field | Value |
 |-------|--------|
-| Feature RC (code tip before docs stamp) | *(recorded as commit parent after docs stamp)* |
-| Docs stamp tip | *(full SHA after local commit)* |
+| Feature RC | `4f7b19361f1cab0fa073b61f8bbdb5e24b00f634` |
+| Docs stamp tip | *(this commit — see ledger)* |
 | Prior M3 feature | `fe7eed6c02b42c7cef5b8582149eaf4869b14b76` |
 | Prior M3 docs tip | `a8175592719f503a6cf331b9b8367ee35baf5eb6` |
 | Migrations | **None** |
 | Production mutations | **None** |
-
-> SHA filled in ledger / stamp commit message after `git commit`.
 
 ---
 

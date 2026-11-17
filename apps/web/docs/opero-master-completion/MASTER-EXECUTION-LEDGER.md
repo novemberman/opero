@@ -138,6 +138,8 @@ Incorporated findings from frontend + backend architecture audits.
 
 **External:** Live OpenAI unverified. No push/deploy. D-P0-005 generate entitlement still open.
 
+**Local RC:** `4f7b19361f1cab0fa073b61f8bbdb5e24b00f634` (not pushed).
+
 **Boundary:** **STOP FOR OWNER REVIEW.**
 
 ---

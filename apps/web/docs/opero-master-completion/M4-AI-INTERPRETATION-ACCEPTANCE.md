@@ -2,6 +2,7 @@
 
 **Date:** 2026-11-17  
 **Verdict: PASS** (local; live OpenAI provider **unverified**)  
+**Local RC:** `4f7b19361f1cab0fa073b61f8bbdb5e24b00f634`  
 **Authorization:** Autonomous local M4+M5 workstream. No push, deploy, production diagnostics/reports, or payments.
 
 | Item | Value |
