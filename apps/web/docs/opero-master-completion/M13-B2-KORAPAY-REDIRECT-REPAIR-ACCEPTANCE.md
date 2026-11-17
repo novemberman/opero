@@ -57,13 +57,16 @@ Webhook / fulfill / entitlement logic unchanged.
 | Check | Result |
 |-------|--------|
 | Target | `korapay-rehearsal` only (`opero-api` + `opero-web`) |
-| Feature SHA | _(filled after commit/deploy)_ |
-| `/billing/return` HTTP | no longer 404 (page loads) |
-| Existing ref return URL | `…/billing/return?reference=opero_29ef2711…` resolves (auth required for context) |
-| Return-context API | org + report for Gate C ref when session member |
-| Grants / payments | unchanged for existing tx (read-only reuse) |
+| Feature SHA | `e3c676bd07677b51639557635002420db212e052` |
+| Deploy IDs | API `2c83e63c-…` SUCCESS · Web `631b1ad0-…` SUCCESS |
+| `/billing/return` HTTP | **200** HTML — “Returning from checkout” / verification in progress (was 404) |
+| Existing ref return URL | `…/billing/return?reference=opero_29ef2711…` loads |
+| Return-context API | unauth **401**; member **200** with org `a8c59283-…` + report `1b0e8db6-…` + `paymentConfirmed=true` |
+| Verify reuse | `ALREADY_FULFILLED` / provider `success` |
+| Grants / payments | **3** active grants · **8** org payments (unchanged) |
 | New payment | **not** initiated |
-| Production | unchanged |
+| Production | emergencies ON; no prod deploy |
+| Chromium container | Skipped (image `playwright` module path); HTTP 200 HTML SSR evidence sufficient for route presence |
 
 ---
 
